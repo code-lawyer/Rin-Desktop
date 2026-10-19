@@ -6,7 +6,7 @@ Windows 雨夜交互壁纸与 Codex 本地工作台。保留 3840×2400 场景�
 
 本项目基于 **Codex CLI**，请先自行安装并登录。基础安装包不包含、不自动安装或更新 CLI。按 [OpenAI 官方指南](https://learn.chatgpt.com/docs/codex/cli) 准备 Windows 原生 CLI，并在终端确认 `codex --version` 和 `codex login` 可正常运行。支持 PATH 中的原生程序、标准 npm 全局安装以及官方 Windows 安装路径；自定义安装可设置用户环境变量 `VIBE_CODEX_BINARY` 为 `codex.exe` 的绝对路径。更改 PATH 后重启 Rin Desktop。仅安装在 WSL 中的 CLI 不适用于此 Windows 原型。
 
-然后从 [Releases](https://github.com/code-lawyer/Rin-Desktop/releases) 下载 **Rin-Desktop-0.3.1-Setup.exe**（约 259 MB），双击安装。基础包只有桌面应用、4K 壁纸和必要运行组件，**不含语音模型**；沿用你当前用户的 CLI 登录。CLI 已安装但尚未登录时，也可使用气泡里的官方浏览器登录入口。
+然后从 [最新应用版本](https://github.com/code-lawyer/Rin-Desktop/releases/latest) 下载 **Rin-Desktop-0.3.1-Setup.exe**（约 259 MB），双击安装。**普通用户只需下载这个安装包。**基础包只有桌面应用、4K 壁纸和必要运行组件，**不含语音模型**；沿用你当前用户的 CLI 登录。CLI 已安装但尚未登录时，也可使用气泡里的官方浏览器登录入口。
 
 需要 Windows 10/11 x64，建议 16 GB 内存。在管理面板「语音与按键 → 本地语音模型」点击 **下载并载入模型**，应用才会直接从模型上游的 **Hugging Face** 仓库下载。面板显示百分比、已下载体积和进度条，支持取消、续传与 SHA-256 校验；之后显示准备环境、载入和已载入状态。再次使用时点击「载入模型」即可；「释放模型」释放内存，保留本机文件。
 
@@ -45,6 +45,8 @@ CPU 听写与轻量播报无需独显。Qwen 需要兼容 CUDA 12.8 的 NVIDIA �
 - [许可与对应源码](docs/licenses.md)
 - [发布审查与验证](docs/release-audit.md)
 
-自有代码采用 [MIT](LICENSE)。第三方运行时、模型与素材保留各自许可，Live2D Core 和 NVIDIA 组件不属于 MIT。语音原生组件包含 GPL/LGPL 依赖，Release 同时提供对应源码材料。本项目与 OpenAI、Live2D、小米及 NVIDIA 无隶属关系。
+自有代码采用 [MIT](LICENSE)。第三方运行时、模型与素材保留各自许可，Live2D Core 和 NVIDIA 组件不属于 MIT。本项目与 OpenAI、Live2D、小米及 NVIDIA 无隶属关系。
+
+需要检查、修改或重新编译第三方 CPU 语音组件的开发者，可前往独立的 [0.3.1 第三方对应源码页](https://github.com/code-lawyer/Rin-Desktop/releases/tag/third-party-source-v0.3.1)，下载 `Third-Party-Corresponding-Source-0.3.1.zip`。包内 `README.md` 提供构建说明，`SOURCES.json` 记录版本、上游地址和校验值。该源码包与应用版本对应，普通安装和使用无需下载。详细许可见 [许可与对应源码](docs/licenses.md)。
 
 核心应用位于 `prototypes/live2d-codex`，目录名为兼容已有开发入口保留；公开仓库不包含研究过程、个人运行数据、下载缓存或开发者的模型环境。
