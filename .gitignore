@@ -30,7 +30,9 @@ prototypes/qwen-tts-evaluation/
 prototypes/dots-bridge/
 prototypes/live2d-codex/backend/dots.mjs
 prototypes/live2d-codex/tests/dots.test.mjs
-prototypes/live2d-codex/assets/
+prototypes/live2d-codex/assets/*
+!prototypes/live2d-codex/assets/rainy-window-male/
+!prototypes/live2d-codex/assets/character-previews/
 prototypes/live2d-codex/vendor/
 prototypes/live2d-codex/README.md
 prototypes/live2d-codex/THIRD_PARTY.md

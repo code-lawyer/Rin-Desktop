@@ -34,7 +34,7 @@ test('legacy Codex drafts keep their keys while Dots drafts persist in a separat
   await assert.rejects(store.saveDraft({ ...dots, provider: 'unknown' }, 'invalid'), /来源/);
 });
 test('corrupt workspace metadata is preserved and unsafe speech settings are rejected',async t => {
-  const {dir,store} = await fixture(t); await assert.rejects(store.updateSettings({voice:102}),/女声/); await assert.rejects(store.updateSettings({speed:5}),/语速/);
+  const {dir,store} = await fixture(t); await assert.rejects(store.updateSettings({voice:103}),/声线/); await assert.rejects(store.updateSettings({speed:5}),/语速/);
   await writeFile(store.file,'not json'); const second = new WorkspaceStore(dir); await assert.rejects(second.load(),/原文件已保留/); assert.equal(await readFile(store.file,'utf8'),'not json');
 });
 

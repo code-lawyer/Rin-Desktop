@@ -1,0 +1,19 @@
+{
+	"Version": 3,
+	"FileReferences": {
+		"Moc": "Generated_artwork.moc3",
+		"Textures": [
+			"Generated_artwork.4096/texture_00.png"
+		],
+		"DisplayInfo": "Generated_artwork.cdi3.json"
+	},
+	"Groups": [
+		{
+			"Target": "Parameter",
+			"Name": "LipSync",
+			"Ids": [
+				"ParamMouthOpenY"
+			]
+		}
+	]
+}

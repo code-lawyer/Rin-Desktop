@@ -1,38 +1,37 @@
 import './pixi-compat.js';
-import { Application } from 'pixi.js';
+import { Application, Assets } from 'pixi.js';
 import { Live2DModel } from '@jannchie/pixi-live2d-display/cubism4';
 import { wallpaperState } from '../backend/wallpaper-state.cjs';
 import { typingMotion } from './typing-motion.mjs';
+import characters from '../backend/character-profiles.cjs';
+import { WallpaperScenes } from './wallpaper-scenes.mjs';
 
 export async function startWallpaper() {
   const host = document.getElementById('wallpaper-view'), api = window.companion;
   let backend = {}, presentation = {}, desired, look = 0, hands = 1, elapsed = 0;
+  let model, profile, selectionAttempt, renderedRequest;
   const app = new Application();
   await app.init({ resizeTo: host, resolution: window.devicePixelRatio || 1, autoDensity: true, backgroundAlpha: 1,
     background: '#111821', preference: 'webgl', preserveDrawingBuffer: true, gcActive: false });
   app.ticker.maxFPS = 30; host.appendChild(app.canvas);
-  const model = await Live2DModel.from('app://local/assets/rainy-window-v2-4k/Generated_artwork.model3.json', { ticker: app.ticker, autoInteract: false });
-  const internal = model.internalModel, originalDraw = internal.draw.bind(internal);
-  internal.draw = gl => { internal.viewport[2] = gl.drawingBufferWidth; internal.viewport[3] = gl.drawingBufferHeight; originalDraw(gl); };
-  app.stage.addChild(model);
-  // The rig keeps its original coordinates; each scene texture is now 3840×2400.
+  // Both character rigs keep the same scene coordinates and bubble anchor.
   const natural = { width: 1586, height: 992 };
   let sceneScale = 1, origin = { x: 0, y: 0 };
   let reportedRenderSize = '';
   function reportReady() {
-    if (host.dataset.ready !== 'true') return;
-    const size = `${app.canvas.width}x${app.canvas.height}`;
+    if (host.dataset.ready !== 'true' || profile.id !== characters.characterProfile(presentation.character).id || renderedRequest !== (presentation.characterRequest ?? 0)) return;
+    const size = `${renderedRequest}:${profile.id}:${app.canvas.width}x${app.canvas.height}`;
     if (size === reportedRenderSize) return;
     reportedRenderSize = size;
-    api.renderReady({ ready: true, kind: 'wallpaper', model: 'rainy-window-v2-4k',
-      sourceWidth: 3840, sourceHeight: 2400, renderWidth: app.canvas.width, renderHeight: app.canvas.height });
+    api.renderReady({ ready: true, kind: 'wallpaper', character: profile.id, requestId: renderedRequest, model: profile.model,
+      sourceWidth: profile.sourceWidth, sourceHeight: profile.sourceHeight, renderWidth: app.canvas.width, renderHeight: app.canvas.height });
   }
   function fit() {
     const density = window.devicePixelRatio || 1;
     app.renderer.resize(host.clientWidth, host.clientHeight, density);
     sceneScale = Math.max(host.clientWidth / natural.width, host.clientHeight / natural.height);
     origin = { x: (host.clientWidth - natural.width * sceneScale) / 2, y: (host.clientHeight - natural.height * sceneScale) / 2 };
-    model.scale.set(sceneScale); model.position.set(origin.x, origin.y);
+    if (model) { model.scale.set(sceneScale); model.position.set(origin.x, origin.y); }
     const normalized = (value, dimension, offset) => Math.max(0, Math.min(1, (value * sceneScale + offset) / dimension));
     api.avatarAnchor({ x: normalized(1180, host.clientWidth, origin.x), y: normalized(250, host.clientHeight, origin.y), left: normalized(1065, host.clientWidth, origin.x), right: normalized(1310, host.clientWidth, origin.x) });
     rain.width = Math.round(host.clientWidth * density); rain.height = Math.round(host.clientHeight * density);
@@ -61,14 +60,52 @@ export async function startWallpaper() {
     host.dataset.pose = desired.pose; host.dataset.typing = String(desired.typing); host.dataset.paused = String(desired.paused);
     if (desired.paused) app.ticker.stop(); else app.ticker.start();
   }
-  internal.on('beforeModelUpdate', () => {
-    const core = internal.coreModel;
-    const typing = typingMotion(elapsed);
-    core.setParameterValueById('ParamAttention', look);
-    core.setParameterValueById('ParamSceneBreath', (Math.sin(elapsed * Math.PI * 2 / 5.8) + 1) / 2);
-    core.setParameterValueById('ParamTypingLeft', hands * typing.left);
-    core.setParameterValueById('ParamTypingRight', hands * typing.right);
+  const scenes = new WallpaperScenes({
+    async load(id) {
+      const selected = characters.characterProfile(id);
+      const next = await Live2DModel.from(`app://local/assets/${selected.model}/Generated_artwork.model3.json`, { ticker: app.ticker, autoInteract: false });
+      const internal = next.internalModel, originalDraw = internal.draw.bind(internal);
+      internal.draw = gl => { internal.viewport[2] = gl.drawingBufferWidth; internal.viewport[3] = gl.drawingBufferHeight; originalDraw(gl); };
+      internal.on('beforeModelUpdate', () => {
+        const core = internal.coreModel, typing = typingMotion(elapsed);
+        core.setParameterValueById('ParamAttention', look);
+        core.setParameterValueById('ParamSceneBreath', (Math.sin(elapsed * Math.PI * 2 / 5.8) + 1) / 2);
+        core.setParameterValueById('ParamTypingLeft', hands * typing.left);
+        core.setParameterValueById('ParamTypingRight', hands * typing.right);
+      });
+      return next;
+    },
+    show(next, id) {
+      if (model) app.stage.removeChild(model);
+      model = next; profile = characters.characterProfile(id); app.stage.addChild(model);
+      host.dataset.character = id; host.dataset.ready = 'true'; host.dataset.loading = 'false';
+      host.dataset.rig = 'fingertips-v2'; delete host.dataset.error;
+      renderedRequest = presentation.characterRequest ?? 0;
+      fit(); updateState();
+    },
+    async dispose(scene) {
+      const urls = [...scene.textureUrls]; scene.destroy();
+      await Assets.unload(urls);
+    },
   });
+  async function selectCharacter() {
+    const id = characters.characterProfile(presentation.character).id, requestId = presentation.characterRequest ?? 0;
+    const attempt = `${requestId}:${id}`;
+    if (selectionAttempt === attempt) return;
+    selectionAttempt = attempt; renderedRequest = undefined;
+    host.dataset.loading = 'true'; delete host.dataset.error;
+    try {
+      await scenes.select(id);
+      if (selectionAttempt !== attempt) return;
+      host.dataset.loading = 'false';
+      if (profile) { renderedRequest = requestId; reportedRenderSize = ''; reportReady(); }
+    } catch (error) {
+      if (selectionAttempt !== attempt) return;
+      host.dataset.loading = 'false'; host.dataset.error = '人物壁纸未能载入，请在工作台点击重试加载。';
+      api.renderReady({ ready: false, kind: 'wallpaper', character: id, requestId, error: host.dataset.error });
+      console.error('[wallpaper:character]', error);
+    }
+  }
   app.ticker.add(ticker => {
     const dt = Math.min(.1, ticker.deltaMS / 1000); elapsed += dt;
     const ease = 1 - Math.exp(-dt * 8);
@@ -76,12 +113,12 @@ export async function startWallpaper() {
     hands += ((desired?.typing ? 1 : 0) - hands) * ease;
     drawRain(dt);
   }, undefined, 50);
-  const unsubscribe = api.onPresentation(value => { presentation = value; updateState(); });
-  const initial = await api.presentation(); if (initial.ok) presentation = initial.value;
+  let presentationReceived = false;
+  const unsubscribe = api.onPresentation(value => { presentationReceived = true; presentation = value; updateState(); selectCharacter(); });
+  const initial = await api.presentation(); if (initial.ok && !presentationReceived) presentation = initial.value;
+  await selectCharacter();
   fit(); const observer = new ResizeObserver(fit); observer.observe(host); updateState();
   window.addEventListener('resize', fit);
-  host.dataset.ready = 'true'; host.dataset.rig = 'fingertips-v2';
-  reportReady();
-  window.addEventListener('beforeunload', () => { unsubscribe(); observer.disconnect(); window.removeEventListener('resize', fit); app.destroy(true); });
+  window.addEventListener('beforeunload', () => { unsubscribe(); observer.disconnect(); window.removeEventListener('resize', fit); scenes.close().finally(() => app.destroy(true)); });
   return { setBackendState(value) { backend = value; updateState(); } };
 }

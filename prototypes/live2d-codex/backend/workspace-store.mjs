@@ -2,9 +2,11 @@ import { readFile, writeFile, mkdir, rename, stat, realpath } from 'node:fs/prom
 import { join, resolve, basename } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import actions from './input-actions.cjs';
+import characters from './character-profiles.cjs';
 
 export const { DEFAULT_SHORTCUTS, DEFAULT_REMOTE_KEYS } = actions;
-const defaults = () => ({ format: 1, projects: [], drafts: {}, settings: { completionSound: true, ttsResident: false, ttsEngine: 'qwen', qwenVoice: 'Serena', qwenRoot: '', autoSpeak: false, prepareSpeech: false, voice: 3, speed: 1, microphone: '', shortcuts: { ...DEFAULT_SHORTCUTS }, remoteEnabled: false, remoteKeys: { ...DEFAULT_REMOTE_KEYS } } });
+const { DEFAULT_CHARACTER, characterProfile, isCharacter, isQwenVoice, isChineseVoice } = characters;
+const defaults = () => ({ format: 1, projects: [], drafts: {}, settings: { character: DEFAULT_CHARACTER, completionSound: true, ttsResident: false, ttsEngine: 'qwen', qwenVoice: 'Serena', qwenRoot: '', autoSpeak: false, prepareSpeech: false, voice: 3, speed: 1, microphone: '', shortcuts: { ...DEFAULT_SHORTCUTS }, remoteEnabled: false, remoteKeys: { ...DEFAULT_REMOTE_KEYS } } });
 export const pathKey = value => resolve(value).replace(/[\\/]+$/, '').toLocaleLowerCase('en-US');
 export const draftKey = target => {
   if (!target || typeof target.cwd !== 'string') throw new Error('草稿目标无效。');
@@ -22,6 +24,10 @@ export class WorkspaceStore {
       const saved = JSON.parse(await readFile(this.file, 'utf8'));
       if (saved.format !== 1 || !Array.isArray(saved.projects)) throw new Error('工作台数据格式不支持。');
       this.data = { ...defaults(), ...saved, settings: { ...defaults().settings, ...saved.settings, shortcuts: { ...DEFAULT_SHORTCUTS, ...saved.settings?.shortcuts }, remoteKeys: { ...DEFAULT_REMOTE_KEYS, ...saved.settings?.remoteKeys } } };
+      const profile = characterProfile(saved.settings?.character);
+      this.data.settings.character = profile.id;
+      if (!isQwenVoice(saved.settings?.qwenVoice)) this.data.settings.qwenVoice = profile.qwenVoice;
+      if (!isChineseVoice(saved.settings?.voice)) this.data.settings.voice = profile.voice;
     } catch (error) { if (error.code !== 'ENOENT') throw new Error(`工作台记录未能读取，原文件已保留：${error.message}`); }
     return this.snapshot();
   }
@@ -61,14 +67,21 @@ export class WorkspaceStore {
   }
   async updateSettings(patch) {
     const next = structuredClone(this.data.settings);
+    if ('character' in patch) {
+      if (!isCharacter(patch.character)) throw new Error('请选择已支持的壁纸人物。');
+      if (patch.character !== next.character) {
+        const profile = characterProfile(patch.character);
+        next.character = profile.id; next.qwenVoice = profile.qwenVoice; next.voice = profile.voice;
+      }
+    }
     if ('completionSound' in patch) { if (typeof patch.completionSound !== 'boolean') throw new Error('提示音开关无效。'); next.completionSound = patch.completionSound; }
     if ('ttsResident' in patch) { if (typeof patch.ttsResident !== 'boolean') throw new Error('常驻开关无效。'); next.ttsResident = patch.ttsResident; }
     if ('ttsEngine' in patch) { if (!['qwen','kokoro'].includes(patch.ttsEngine)) throw new Error('请选择已支持的语音引擎。'); next.ttsEngine = patch.ttsEngine; }
-    if ('qwenVoice' in patch) { if (!['Serena','Vivian'].includes(patch.qwenVoice)) throw new Error('请选择 Qwen 女声。'); next.qwenVoice = patch.qwenVoice; }
+    if ('qwenVoice' in patch) { if (!isQwenVoice(patch.qwenVoice)) throw new Error('请选择已支持的 Qwen 声线。'); next.qwenVoice = patch.qwenVoice; }
     if ('qwenRoot' in patch) { if (typeof patch.qwenRoot !== 'string' || patch.qwenRoot.length > 2000 || /[\r\n\0]/.test(patch.qwenRoot)) throw new Error('Qwen 资源目录无效。'); next.qwenRoot = patch.qwenRoot; }
     if ('autoSpeak' in patch) next.autoSpeak = patch.autoSpeak === true;
     if ('prepareSpeech' in patch) { if (typeof patch.prepareSpeech !== 'boolean') throw new Error('提前准备语音开关无效。'); next.prepareSpeech = patch.prepareSpeech; }
-    if ('voice' in patch) { if (!Number.isInteger(patch.voice) || patch.voice < 3 || patch.voice > 57) throw new Error('请选择中文女声音色。'); next.voice = patch.voice; }
+    if ('voice' in patch) { if (!isChineseVoice(patch.voice)) throw new Error('请选择已支持的中文声线。'); next.voice = patch.voice; }
     if ('speed' in patch) { if (!Number.isFinite(patch.speed) || patch.speed < .75 || patch.speed > 1.25) throw new Error('语速应在 0.75–1.25 之间。'); next.speed = patch.speed; }
     if ('microphone' in patch) { if (typeof patch.microphone !== 'string' || patch.microphone.length > 500) throw new Error('麦克风选项无效。'); next.microphone = patch.microphone; }
     if ('remoteEnabled' in patch) next.remoteEnabled = patch.remoteEnabled === true;

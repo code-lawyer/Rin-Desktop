@@ -3,6 +3,7 @@ import { createInterface } from 'node:readline';
 import { existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import characters from './character-profiles.cjs';
 
 export function qwenPython(root) {
   if (!root) return '';
@@ -64,7 +65,7 @@ export class QwenSpeech {
     // Keep a bounded watchdog; cancellation remains available at every token.
     const timeout = Math.min(600000, Math.max(240000, Array.from(text).length * 2500));
     const id = ++this.serial; const request = this.wait(id, timeout); this.active = { id, promise: request };
-    this.send({ id, kind: 'synthesize', text, speaker: settings.qwenVoice === 'Vivian' ? 'Vivian' : 'Serena' });
+    this.send({ id, kind: 'synthesize', text, ...characters.qwenSynthesisVoice(settings) });
     request.then(() => { if (this.active?.id === id) this.active = null; }, () => { if (this.active?.id === id) this.active = null; });
     return request;
   }

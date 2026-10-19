@@ -1,8 +1,10 @@
 import { renderReply } from './reply-document.mjs';
 import { isTaskBusy } from '../backend/task-state.mjs';
+import characters from '../backend/character-profiles.cjs';
 const api = window.companion, $ = id => document.getElementById(id);
 let workspace = { projects: [], settings: {} }, current, projectId, selected, threads = [], listCursor, historyCursor, listVersion = 0, historyVersion = 0, noticeTimer, searchTimer, settingsDirty = false, ready = false;
 const node = (tag, text, cls) => { const n = document.createElement(tag); if (text !== undefined) n.textContent = text; if (cls) n.className = cls; return n; };
+for (const [id, voice] of Object.entries(characters.QWEN_VOICES)) $('qwen-voice').append(Object.assign(node('option', voice.label), { value: id }));
 function notice(text) { clearTimeout(noticeTimer); $('notice').textContent = text; $('notice').hidden = !text; if (text) noticeTimer = setTimeout(() => $('notice').hidden = true, 10000); }
 async function run(promise) { try { const r = await promise; if (!r?.ok) throw new Error(r?.error || '操作未完成。'); return r.value; } catch (e) { notice(e.message); throw e; } }
 const act = action => event => { Promise.resolve().then(() => action(event)).catch(() => {}); };
@@ -101,18 +103,49 @@ function keyFields(id, values) {
     }); label.append(field); host.append(label);
   }
 }
+function fillVoices() {
+  const s = workspace.settings;
+  $('qwen-voice').value = s.qwenVoice || characters.characterProfile(s.character).qwenVoice;
+  $('voice').value = String(s.voice);
+  if (!$('voice').value) { const o = node('option',`${s.voice >= 58 ? '男声' : '女声'} · ${s.voice}`); o.value = s.voice; $('voice').append(o); $('voice').value = s.voice; }
+}
+function updateCharacterStatus() {
+  const profile = characters.characterProfile(workspace.settings.character), status = workspace.wallpaper;
+  const requested = characters.characterProfile(status?.character);
+  for (const radio of document.querySelectorAll('[name="wallpaper-character"]')) radio.checked = radio.value === (status?.phase === 'loading' ? requested.id : profile.id);
+  $('character-status').dataset.phase = status?.phase || '';
+  $('character-status').textContent = status?.phase === 'error' ? status.error : status?.phase === 'loading' ? `正在载入${requested.label}…` : `当前人物：${profile.label}`;
+  $('retry-character').hidden = status?.phase !== 'error';
+  $('retry-character').textContent = `重试加载${requested.label}`;
+}
+async function saveCharacter(character) {
+  const radios = [...document.querySelectorAll('[name="wallpaper-character"]')];
+  for (const radio of radios) radio.disabled = true;
+  $('retry-character').disabled = true;
+  $('save-settings').disabled = true;
+  try {
+    acceptWorkspace(await run(api.saveSettings({ character })));
+    fillVoices(); updateSpeechStatus();
+  } finally {
+    updateCharacterStatus();
+    for (const radio of radios) radio.disabled = false;
+    $('retry-character').disabled = false;
+    $('save-settings').disabled = false;
+  }
+}
 function fillSettings() {
   // Replacing a focused input does not reliably emit blur. Preserve the key
   // learner through backend updates until the user explicitly leaves it.
   if (document.activeElement?.matches('#shortcuts input,#remote-keys input')) { updateSpeechStatus(); return; }
-  const s = workspace.settings; $('auto-speak').checked = s.autoSpeak; $('voice').value = String(s.voice); $('speed').value = String(s.speed); $('remote-enabled').checked = s.remoteEnabled;
-  if (!$('voice').value) { const o = node('option',`女声 ${s.voice}`); o.value = s.voice; $('voice').append(o); $('voice').value = s.voice; }
+  const s = workspace.settings; $('auto-speak').checked = s.autoSpeak; $('speed').value = String(s.speed); $('remote-enabled').checked = s.remoteEnabled;
+  fillVoices();
   keyFields('shortcuts',s.shortcuts); keyFields('remote-keys',s.remoteKeys); fillModels();
-  $('tts-engine').value = s.ttsEngine || 'qwen'; $('qwen-voice').value = s.qwenVoice || 'Serena';
+  $('tts-engine').value = s.ttsEngine || 'qwen';
   updateSpeechStatus();
   refreshDevices().catch(() => {}); settingsDirty = false;
 }
 function updateSpeechStatus() {
+  updateCharacterStatus();
   updateResourceStatus();
   $('shortcut-errors').hidden = !workspace.shortcutErrors?.length; $('shortcut-errors').textContent = workspace.shortcutErrors?.join(' ') || '';
   const speech = workspace.speech ?? {}, phase = speech.phase ?? 'unloaded', qwen = $('tts-engine').value === 'qwen';
@@ -188,6 +221,8 @@ $('refresh').onclick = act(() => refreshThreads()); $('more-threads').onclick = 
 $('search').oninput = () => { clearTimeout(searchTimer); searchTimer = setTimeout(() => refreshThreads(),250); };
 function showSettings() { $('settings').hidden = false; $('conversations').hidden = true; $('settings-tab').setAttribute('aria-pressed','true'); renderProjects(); if (!settingsDirty) fillSettings(); }
 $('settings-tab').onclick = showSettings;
+for (const radio of document.querySelectorAll('[name="wallpaper-character"]')) radio.onchange = act(() => saveCharacter(radio.value));
+$('retry-character').onclick = act(() => saveCharacter(workspace.wallpaper.character));
 $('tts-resident').onchange = act(async () => { const enabled = $('tts-resident').checked; try { await saveSpeechChoice({ttsResident:enabled}); } finally { updateSpeechStatus(); } });
 $('cancel-resource').onclick = act(async () => { await run(api.cancelDownload()); });
 $('tts-engine').onchange = act(() => saveSpeechChoice({ttsEngine:$('tts-engine').value}));
@@ -200,7 +235,7 @@ $('retry-tts').onclick = act(() => saveSpeechChoice({ttsResident:true}));
 $('choose-qwen').onclick = act(async () => { acceptWorkspace(await run(api.chooseQwen())); updateSpeechStatus(); });
 $('use-existing-data').onclick = act(() => run(api.useData()));
 $('save-settings').onclick = act(saveSettings); $('preview-voice').onclick = act(async () => { await saveSettings(); await run(api.previewVoice()); }); $('refresh-microphones').onclick = act(refreshDevices);
-$('settings').addEventListener('change',event => { if (!['model','effort','tts-resident','tts-engine','qwen-voice','auto-speak','prepare-speech','completion-sound'].includes(event.target.id)) settingsDirty = true; });
+$('settings').addEventListener('change',event => { if (event.target.name !== 'wallpaper-character' && !['model','effort','tts-resident','tts-engine','qwen-voice','auto-speak','prepare-speech','completion-sound'].includes(event.target.id)) settingsDirty = true; });
 $('model').onchange = act(async () => { await run(api.chooseModel($('model').value)); }); $('effort').onchange = act(async () => { await run(api.chooseEffort($('effort').value)); });
 $('close').onclick = () => api.windowAction('hide-workbench'); $('back-chat').onclick = () => api.windowAction('show-chat');
 window.addEventListener('blur', () => { if (document.activeElement?.matches('#shortcuts input,#remote-keys input')) document.activeElement.blur(); });
@@ -210,7 +245,7 @@ document.addEventListener('keydown',e => {
   if (['ArrowDown','ArrowUp'].includes(e.key) && e.target.matches('.thread-row,.project-row')) { e.preventDefault(); const siblings = [...e.target.parentElement.querySelectorAll('button')]; const i = siblings.indexOf(e.target); siblings[(i+(e.key==='ArrowDown'?1:-1)+siblings.length)%siblings.length]?.focus(); }
 });
 api.onState(state => { const wasReady = available(), changedModel = current?.model !== state.model || current?.effort !== state.effort; current = state; updateActivity(); if (changedModel) fillModels(); if (ready && !wasReady && available()) refreshWorkspace().then(() => refreshThreads()).catch(() => {}); });
-api.onWorkspace(value => { const settingsChanged = JSON.stringify(value.settings) !== JSON.stringify(workspace.settings); if (!acceptWorkspace(value) || !ready) return; renderProjects(); if (!projectId) refreshWorkspace().catch(() => {}); if (settingsChanged && !settingsDirty) fillSettings(); else updateSpeechStatus(); });
+api.onWorkspace(value => { const settingsChanged = JSON.stringify(value.settings) !== JSON.stringify(workspace.settings), characterChanged = value.settings.character !== workspace.settings.character; if (!acceptWorkspace(value) || !ready) return; renderProjects(); if (!projectId) refreshWorkspace().catch(() => {}); if (characterChanged) fillVoices(); if (settingsChanged && !settingsDirty) fillSettings(); else updateSpeechStatus(); });
 api.onWorkbenchRefresh(page => { refreshWorkspace().then(() => { if (page === 'speech') { showSettings(); $('voice-downloads').scrollIntoView({block:'start'}); } else if ($('settings').hidden) return refreshThreads(); }).catch(() => {}); });
 try { current = await run(api.snapshot()); await refreshWorkspace(); ready = true; } catch { ready = true; }
 import inputActions from '../backend/input-actions.cjs';

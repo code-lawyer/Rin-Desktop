@@ -118,7 +118,7 @@ while True:
         with torch.inference_mode():
             wavs, rate = model.generate_custom_voice(
                 text=text, speaker=command.get("speaker", "Serena"), language="Chinese",
-                instruct="用标准普通话自然地交谈。年轻成年女性，声音清澈，语气平静克制、清冷自信，语速适中，随语意自然停顿，句尾放松。",
+                instruct=command.get("instruct", "用标准普通话自然地交谈，语气平静，语速适中，随语意自然停顿。"),
                 non_streaming_mode=True, max_new_tokens=1024, do_sample=True,
                 temperature=0.9, top_k=50, top_p=1.0, repetition_penalty=1.05,
                 subtalker_dosample=True, subtalker_temperature=0.9,

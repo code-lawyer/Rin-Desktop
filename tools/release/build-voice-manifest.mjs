@@ -7,7 +7,7 @@ const version = '1.0.0'; // Model/runtime revision, independent of desktop relea
 const definitions = [
   { id:'asr', label:'中文听写 · SenseVoice', repo:'csukuangfj/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17', revision:'2365baeacb507f821a0c8120fcee3d484dba7a07', modelDirectory:'sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17', select: name => ['model.int8.onnx','tokens.txt','LICENSE'].includes(name) },
   { id:'kokoro', label:'轻量播报 · Kokoro', repo:'csukuangfj/kokoro-int8-multi-lang-v1_1', revision:'155831f1b4ba23b1f5c058be6a61df90cefb2a37', modelDirectory:'kokoro-int8-multi-lang-v1_1', select: name => name !== '.gitattributes' },
-  { id:'qwen', label:'自然女声 · Qwen3-TTS', repo:'Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice', revision:'0c0e3051f131929182e2c023b9537f8b1c68adfe', modelDirectory:'models/Qwen3-TTS-12Hz-1.7B-CustomVoice', select: name => name !== '.gitattributes' },
+  { id:'qwen', label:'自然人声 · Qwen3-TTS', repo:'Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice', revision:'0c0e3051f131929182e2c023b9537f8b1c68adfe', modelDirectory:'models/Qwen3-TTS-12Hz-1.7B-CustomVoice', select: name => name !== '.gitattributes' },
 ];
 async function get(url) { const r=await fetch(url); if(!r.ok)throw Error(`Upstream HTTP ${r.status}: ${url}`);return r; }
 const manifest={format:2,version,packs:[]};

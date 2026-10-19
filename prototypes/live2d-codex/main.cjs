@@ -6,6 +6,7 @@ const { bubbleLayout } = require('./backend/bubble-layout.cjs');
 const { avatarScale: normalizeAvatarScale, avatarBounds } = require('./backend/avatar-window.cjs');
 const { WallpaperHost } = require('./backend/wallpaper-host.cjs');
 const { registerInputActions } = require('./backend/input-actions.cjs');
+const { characterProfile, isCharacter } = require('./backend/character-profiles.cjs');
 
 const root = __dirname;
 const packaged = require('node:fs').existsSync(join(root, 'portable.json'));
@@ -34,10 +35,11 @@ let desiredBubble = { width: 440, height: 220 }, previousState, readingMode = fa
 let characterScale = 1, characterBox, dragOrigin, appearanceTimer, appearanceQueue = Promise.resolve();
 let bubblePosition = null, chatDragOrigin, currentChatLayout;
 let wallpaperHost, manualPause = false, pendingMode = null, lastPresentation = '';
+let wallpaperStatus = { phase: 'loading', requestId: 0 }, appliedWallpaperRequest = -1;
 const isLocal = url => { try { const u = new URL(url); return u.protocol === 'app:' && u.hostname === 'local' && ['/renderer/index.html', '/renderer/workbench.html'].includes(u.pathname); } catch { return false; } };
 const trusted = event => [avatar, chat, workbench].some(win => win && !win.isDestroyed() && win.webContents === event.sender) && isLocal(event.senderFrame?.url ?? '');
 const appearance = () => ({ scale: characterScale, mode: wallpaperMode ? 'wallpaper' : 'avatar' });
-const presentation = () => ({ mode: wallpaperMode ? 'wallpaper' : 'avatar', chatVisible: !!chat?.isVisible(), paused: manualPause || !!wallpaperHost?.status.occluded, manualPause, desktopAttached: !!wallpaperHost?.status.ok, desktopLayer: wallpaperHost?.status.parentClass ?? null, desktopBounds: wallpaperHost?.status.bounds ?? null });
+const presentation = () => ({ mode: wallpaperMode ? 'wallpaper' : 'avatar', character: wallpaperStatus.character ?? characterProfile(store?.data.settings.character).id, characterRequest: wallpaperStatus.requestId, chatVisible: !!chat?.isVisible(), paused: manualPause || !!wallpaperHost?.status.occluded, manualPause, desktopAttached: !!wallpaperHost?.status.ok, desktopLayer: wallpaperHost?.status.parentClass ?? null, desktopBounds: wallpaperHost?.status.bounds ?? null });
 function notifyPresentation() {
   if (!avatar || avatar.isDestroyed()) return;
   const value = presentation(), encoded = JSON.stringify(value);
@@ -95,9 +97,33 @@ function hideChat() { if (readingMode) { readingMode = false; chat.setFullScreen
 function toggleChat() { chat?.isVisible() ? hideChat() : showChat(); }
 function recallChat() { chat?.isVisible() && chat.isFocused() ? hideChat() : showChat(); }
 function showWorkbench(page) { hideChat(); workbench?.show(); workbench?.focus(); workbench?.webContents.send('workbench:refresh', typeof page === 'string' ? page : null); }
-function workspaceSnapshot() { return { ...store.snapshot(), version: workspaceVersion, speech: speech.status(), resources: voiceResources?.snapshot(), shortcutErrors, legacyDotsAvailable }; }
+function workspaceSnapshot() { return { ...store.snapshot(), version: workspaceVersion, speech: speech.status(), wallpaper: wallpaperStatus, resources: voiceResources?.snapshot(), shortcutErrors, legacyDotsAvailable }; }
 function notifyWorkspace() { workspaceVersion++; for (const win of [chat, workbench]) if (win && !win.isDestroyed()) win.webContents.send('workbench:state', workspaceSnapshot()); }
 function stopSpeech() { chat?.webContents.send('speech:stop'); return speech?.stop().catch(error => console.error('[speech:stop]', error.message)); }
+async function confirmWallpaper(info) {
+  const requested = wallpaperStatus;
+  const matches = info?.character === requested.character && info.requestId === requested.requestId;
+  if (info?.error) {
+    if (!matches || requested.phase !== 'loading') return;
+    wallpaperStatus = { ...requested, phase: 'error', error: '人物壁纸未能载入，已保留原人物和声线设置。' };
+    notifyWorkspace(); return;
+  }
+  if (info?.ready !== true || !isCharacter(info.character) || !Number.isSafeInteger(info.requestId) || info.requestId <= appliedWallpaperRequest || info.requestId > requested.requestId) return;
+  // A displayed scene can be confirmed while the next choice is still loading.
+  // Apply each visible scene once, without clearing a newer request or its error.
+  appliedWallpaperRequest = info.requestId;
+  try {
+    // Keep the last working character and both voices until its replacement renders.
+    if (info.character !== store.data.settings.character) stopSpeech();
+    await store.updateSettings({ character: info.character });
+    if (matches && wallpaperStatus === requested) wallpaperStatus = { ...requested, phase: 'ready' };
+  } catch (error) {
+    if (matches && wallpaperStatus === requested) wallpaperStatus = { ...requested, phase: 'error', error: '人物已载入，但设置未能保存，请重试。' };
+    console.error('[wallpaper:settings]', error.message);
+  } finally {
+    notifyWorkspace();
+  }
+}
 function switchAllowed() { if (captureTarget) throw new Error('请先完成或取消听写，再切换对话。'); if (provider !== 'codex') throw new Error('项目工作台需要切换到 Codex。'); stopSpeech(); }
 function sendInputAction(action) {
   if (changingData) return;
@@ -226,6 +252,7 @@ else {
     const { WorkspaceStore } = await import(pathToFileURL(join(root, 'backend/workspace-store.mjs')).href);
     const { ResidentSpeech } = await import(pathToFileURL(join(root, 'backend/resident-speech.mjs')).href);
     store = new WorkspaceStore(storageDir); await store.load();
+    wallpaperStatus.character = store.data.settings.character;
     const { VoiceResources, MODEL_FOLDERS } = await import(pathToFileURL(join(root, 'backend/voice-resources.mjs')).href);
     const { upstreamProxyEnvironment } = await import(pathToFileURL(join(root, 'backend/voice-runtime.mjs')).href);
     voiceResources = new VoiceResources(join(storageDir, 'voice-resources'), JSON.parse(await readFile(join(root, 'voice-resources.json'), 'utf8')), {
@@ -368,16 +395,25 @@ else {
     handler('workbench:draft', (_event, target, text) => text === undefined ? store.draft(target) : store.saveDraft(target, text));
     handler('workbench:settings', async (_event, patch) => {
       if (!patch || typeof patch !== 'object') throw new Error('设置无效。');
+      const character = wallpaperMode && 'character' in patch ? patch.character : undefined;
+      if (wallpaperMode && 'character' in patch && !isCharacter(character)) throw new Error('请选择已支持的壁纸人物。');
+      // Character selection is a load request; only render-ready commits it.
+      if (character !== undefined) { patch = { ...patch }; delete patch.character; }
       const previous = store.data.settings;
       const changesEngine = ['ttsResident','ttsEngine','qwenRoot'].some(key => key in patch && patch[key] !== previous[key]);
       if (voiceResources.active && changesEngine) throw new Error('模型正在准备，请先取消下载或等待载入完成。');
       if (patch.ttsResident === true && !speech.status().engines[patch.ttsEngine ?? previous.ttsEngine ?? 'qwen']) throw new Error('请先下载所选播报引擎的资源，再开启常驻。');
-      await store.updateSettings(patch); registerShortcuts();
+      if (Object.keys(patch).length) await store.updateSettings(patch);
+      registerShortcuts();
       const next = store.data.settings;
       if (!next.ttsResident || next.ttsEngine !== previous.ttsEngine || next.qwenRoot !== previous.qwenRoot) chat.webContents.send('speech:stop');
-      else if ((previous.autoSpeak && !next.autoSpeak) || next.qwenVoice !== previous.qwenVoice || next.voice !== previous.voice || next.speed !== previous.speed) stopSpeech();
+      else if ((previous.autoSpeak && !next.autoSpeak) || next.character !== previous.character || next.qwenVoice !== previous.qwenVoice || next.voice !== previous.voice || next.speed !== previous.speed) stopSpeech();
       if (patch.completionSound === false) chat.webContents.send('notification:sound', { action: 'stop' });
       if (!closing && !voiceResources.active && (changesEngine || patch.ttsResident === true && speech.phase === 'error')) speech.configure(next);
+      if (character !== undefined) {
+        wallpaperStatus = { phase: 'loading', character, requestId: wallpaperStatus.requestId + 1 };
+        notifyPresentation();
+      }
       notifyWorkspace(); return workspaceSnapshot();
     });
     handler('speech:choose-qwen', async () => {
@@ -460,6 +496,8 @@ else {
       positionChat();
     });
     ipcMain.on('companion:render-ready', (event, info) => {
+      if (!trusted(event) || event.sender !== avatar.webContents) return;
+      if (wallpaperMode) confirmWallpaper(info).catch(error => console.error('[wallpaper:ready]', error.message));
       if (trusted(event) && event.sender === avatar.webContents && info?.ready === true) {
         avatar.setTitle(wallpaperMode ? 'Vibe Voice · 雨夜窗前' : 'Vibe Voice · Hiyori Live2D');
         console.info('[companion:render-ready]', JSON.stringify({ kind: info.kind, model: info.model,

@@ -11,7 +11,7 @@ export class LocalSpeech {
   status() { return { asr: existsSync(join(this.modelRoot('asr'), 'sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17/model.int8.onnx')), tts: existsSync(join(this.modelRoot('tts'), 'kokoro-int8-multi-lang-v1_1/model.int8.onnx')), loaded: [...this.workers.keys()] }; }
   run(kind, data) {
     const channel = kind === 'transcribe' || kind === 'load-asr' ? 'asr' : 'tts';
-    if (!this.status()[channel]) return Promise.reject(new Error('请在工作台的「语音与按键」中下载所需语音资源。'));
+    if (!this.status()[channel]) return Promise.reject(new Error('请在工作台的「壁纸与设置」中下载所需语音资源。'));
     let worker = this.workers.get(channel);
     if (worker?.pending) return Promise.reject(new Error('语音正在处理中，请稍候。'));
     if (!worker) {

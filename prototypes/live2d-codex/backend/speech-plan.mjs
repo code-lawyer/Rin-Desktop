@@ -2,7 +2,7 @@
 // generation changes so cached audio can never cross synthesis profiles.
 export function speechProfile(settings = {}) {
   const engine = settings.ttsEngine ?? 'qwen';
-  return JSON.stringify([1, engine, engine === 'qwen'
+  return JSON.stringify([2, engine, engine === 'qwen'
     ? [settings.qwenRoot ?? '', settings.qwenVoice ?? 'Serena']
     : [settings.voice ?? 3, settings.speed ?? 1]]);
 }

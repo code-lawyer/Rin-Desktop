@@ -2700,7 +2700,7 @@
     },
     {
       "id": "qwen",
-      "label": "自然女声 · Qwen3-TTS",
+      "label": "自然人声 · Qwen3-TTS",
       "repo": "Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice",
       "revision": "0c0e3051f131929182e2c023b9537f8b1c68adfe",
       "modelDirectory": "models/Qwen3-TTS-12Hz-1.7B-CustomVoice",

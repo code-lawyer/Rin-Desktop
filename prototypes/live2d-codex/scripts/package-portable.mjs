@@ -23,6 +23,7 @@ for (const dir of ['vendor']) await cp(join(resources,dir),join(appDir,dir),{rec
 await mkdir(join(appDir,'runtime'),{recursive:true});
 await cp(join(resources,'runtime/node.exe'),join(appDir,'runtime/node.exe'));
 for (const name of ['rainy-window-v2-4k']) await cp(join(resources,'assets',name),join(appDir,'assets',name),{recursive:true});
+for (const name of ['rainy-window-male','character-previews']) await cp(join(root,'assets',name),join(appDir,'assets',name),{recursive:true});
 await mkdir(join(appDir,'scripts'),{recursive:true});
 await cp(join(root,'scripts/wallpaper-host.ps1'),join(appDir,'scripts/wallpaper-host.ps1'));
 for (const name of ['sherpa-onnx-node','sherpa-onnx-win-x64']) await cp(join(root,'node_modules',name),join(appDir,'node_modules',name),{recursive:true});

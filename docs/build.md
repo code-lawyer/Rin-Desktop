@@ -9,16 +9,18 @@ npm test
 npm run build
 ```
 
-单元测试和前端构建不需要语音模型。原生程序需要用户自行安装的 Windows Codex CLI。应用的 Node 运行时、壁纸与 Cubism Core 从锁定的基础安装包获取，大文件不放进 Git 历史。
+单元测试和前端构建不需要语音模型。原生程序需要用户自行安装的 Windows Codex CLI。应用的 Node 运行时、默认女性壁纸与 Cubism Core 从锁定的基础安装包获取。新增男性人物运行资源和两张设置预览位于源码的 `assets/rainy-window-male` 与 `assets/character-previews`，打包时使用源码中的版本。
 
 ```powershell
 npm run resources
 ```
 
-这条命令按 `tools/release/resource-manifest.json` 下载基础安装包，校验 SHA-256 后以不注册安装项的方式解包到 `work/release-resources/版本号`。不下载语音模型或 CLI。源码树缺失的资源目录会连接到解包目录，已有目录不覆盖。请先阅读第三方许可。
+这条命令按 `tools/release/resource-manifest.json` 下载基础安装包，校验 SHA-256 后以不注册安装项的方式解包到 `work/release-resources/版本号`。不下载语音模型或 CLI。源码树缺失的运行时与 Core 目录会连接到解包目录；壁纸资源逐项补齐，已有男性素材和预览不覆盖。请先阅读第三方许可。
+
+人物切换的原生回归检查需要已安装的 Playwright，可通过 `VIBE_PLAYWRIGHT` 指定其模块路径。先运行 `npm run build`，再执行 `node prototypes/live2d-codex/scripts/verify-character-switch.mjs`；验证便携包时追加 `--package=便携包绝对目录`。检查使用独立临时数据，覆盖模型与贴图加载失败、明确重试、声线保留、快速切换和重启恢复，不发送对话或加载语音模型，结果保存在 `work/runtime/character-recovery/`。
 
 ```powershell
-$env:VIBE_RESOURCE_APP = (Resolve-Path 'work/release-resources/0.3.1/resources/app').Path
+$env:VIBE_RESOURCE_APP = (Resolve-Path 'work/release-resources/0.4.0/resources/app').Path
 $env:INNO_ISCC = 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe'
 npm run package
 ```

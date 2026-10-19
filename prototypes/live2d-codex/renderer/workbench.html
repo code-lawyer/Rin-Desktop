@@ -4,7 +4,7 @@
 <header class="titlebar"><span class="brand">Rin Desktop</span><span class="title-sub">工作台</span><div class="window-actions"><button id="back-chat">回到对话</button><button id="close" class="close" aria-label="收起工作台"><svg class="ui-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="m5 5 10 10M15 5 5 15"/></svg></button></div></header>
 <div id="notice" role="alert" hidden></div>
 <div class="layout">
-  <aside class="sidebar"><div class="section-heading"><h1>项目</h1><button id="add-project" class="icon" aria-label="添加项目文件夹" title="添加本地文件夹"><svg class="ui-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 4v12M4 10h12"/></svg></button></div><div id="projects" class="project-list" aria-label="本地项目"></div><div class="sidebar-bottom"><button id="settings-tab" aria-pressed="false">语音与按键</button><p id="connection">正在连接 Codex…</p></div></aside>
+  <aside class="sidebar"><div class="section-heading"><h1>项目</h1><button id="add-project" class="icon" aria-label="添加项目文件夹" title="添加本地文件夹"><svg class="ui-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 4v12M4 10h12"/></svg></button></div><div id="projects" class="project-list" aria-label="本地项目"></div><div class="sidebar-bottom"><button id="settings-tab" aria-pressed="false">壁纸与设置</button><p id="connection">正在连接 Codex…</p></div></aside>
   <main>
     <section id="conversations" class="page">
       <div class="page-heading"><div class="project-title"><h2 id="project-title">选择本地项目</h2><p id="project-path"></p></div><button id="remove-project" class="quiet" title="只移除工作台入口，不删除文件">移除入口</button><button id="new-thread" class="primary">新对话</button></div>
@@ -14,8 +14,18 @@
         <section class="detail-pane" aria-label="所选对话"><div id="empty-detail" class="empty"><h3>从这里接着聊</h3><p>选择一段对话查看历史，或在当前项目开始新对话。文件与会话保留在本机。</p></div><div id="detail" hidden><div class="detail-heading"><input id="thread-title" maxlength="100" aria-label="对话名称"><button id="rename" class="quiet">重命名</button></div><div class="detail-actions"><span id="thread-info"></span><button id="resume" class="primary">继续这段对话</button></div><button id="more-history" class="load-more" hidden>查看更早的消息</button><div id="history"></div></div></section></div>
     </section>
     <section id="settings" class="page settings" hidden>
-      <div class="page-heading"><div><h2>语音与按键</h2><p>本地听写、回复播报，以及随时可用的键盘入口。</p></div><button id="save-settings" class="primary">保存设置</button></div>
+      <div class="page-heading"><div><h2>壁纸与设置</h2><p>选择桌面伙伴，设置声音与日常操作。</p></div><button id="save-settings" class="primary">保存设置</button></div>
       <div class="settings-scroll">
+      <section class="setting-section" id="wallpaper-settings" aria-labelledby="wallpaper-heading">
+        <h3 id="wallpaper-heading">壁纸人物</h3>
+        <div class="character-options" role="radiogroup" aria-label="壁纸人物" aria-describedby="character-help">
+          <label class="character-option"><input type="radio" name="wallpaper-character" value="female" checked><span class="character-card"><img src="app://local/assets/character-previews/female.png" alt="雨夜窗前，穿红衬衫的黑发女生坐在扶手椅中使用笔记本电脑"><span class="character-caption"><strong>默认女生</strong><span>红衬衫 · Serena 女声</span></span></span></label>
+          <label class="character-option"><input type="radio" name="wallpaper-character" value="male"><span class="character-card"><img src="app://local/assets/character-previews/male.png" alt="雨夜窗前，戴金丝眼镜的黑色短发男青年，穿黑衬衫和西裤使用笔记本电脑"><span class="character-caption"><strong>黑衫男生</strong><span>金丝眼镜 · Dylan 男声</span></span></span></label>
+        </div>
+        <p id="character-help" class="hint">新人物载入成功后自动保存，下次启动继续使用，同时停止当前播报并切换两种引擎的默认声线。载入失败时保留原人物和声线，可点击重试；也可以在下方另选声线。</p>
+        <p id="character-status" class="hint" role="status" aria-live="polite"></p>
+        <button id="retry-character" aria-describedby="character-status" hidden>重试加载</button>
+      </section>
       <section class="setting-section" id="voice-downloads"><h3>本地语音模型</h3><p class="hint">需要语音时再下载并载入。模型直接来自 Hugging Face，不包含在应用中；已下载的模型会保留，释放模型只清空内存。</p><div id="resource-packs"></div><p id="resource-progress" class="hint" role="status" aria-live="polite" hidden></p><progress id="resource-meter" max="1" value="0" hidden aria-label="语音模型准备进度"></progress><button id="cancel-resource" hidden>取消准备</button></section>
       <section class="setting-section"><h3>当前对话</h3><div class="field-grid"><label>模型<select id="model"></select></label><label>推理强度<select id="effort"></select></label></div><p class="hint">模型设置应用于当前对话；不修改 Codex 的全局配置。</p></section>
       <section class="setting-section" id="speech-settings-section">
@@ -28,11 +38,11 @@
         <div class="residency-control"><label class="check"><input id="tts-resident" type="checkbox" aria-describedby="residency-help">常驻加载播报模型</label><span id="tts-phase" class="tts-phase" role="status">未加载</span></div>
         <p id="residency-help" class="hint">默认关闭。开启后保留模型，逐条点击气泡中的「朗读此条」才发声；关闭后停止播报并释放模型。此开关立即生效，并记住下次启动的选择。</p>
         <p id="tts-error" class="tts-error" role="alert" hidden></p><button id="retry-tts" hidden>重新加载</button>
-        <div class="field-grid"><label>播报引擎<select id="tts-engine"><option value="qwen">Qwen3-TTS · 试用</option><option value="kokoro">Kokoro · 原有轻量版</option></select></label><label id="qwen-voice-field">中文女声<select id="qwen-voice"><option value="Serena">Serena · 样音 A</option><option value="Vivian">Vivian · 样音 B</option></select></label></div>
+        <div class="field-grid"><label>播报引擎<select id="tts-engine"><option value="qwen">Qwen3-TTS · 试用</option><option value="kokoro">Kokoro · 原有轻量版</option></select></label><label id="qwen-voice-field">中文声线<select id="qwen-voice"></select></label></div>
         <p id="tts-footprint" class="hint"></p>
         <div id="qwen-resources" class="setting-row"><span id="qwen-resource-status" class="hint"></span><button id="choose-qwen">选择资源目录</button></div>
         <div class="setting-row"><span class="hint">从便携版升级：沿用已有项目、会话、草稿和设置，切换后重启。</span><button id="use-existing-data">使用已有数据目录</button></div>
-        <div id="kokoro-fields" class="field-grid" hidden><label>中文女声<select id="voice"><option value="3">女声 01 · zf_001</option><option value="4">女声 02 · zf_002</option><option value="46">女声 43 · zf_079</option><option value="48">女声 45 · zf_084</option></select></label><label>语速<select id="speed"><option value="0.9">稍慢 · 0.9×</option><option value="1">自然 · 1.0×</option><option value="1.1">稍快 · 1.1×</option></select></label></div>
+        <div id="kokoro-fields" class="field-grid" hidden><label>中文声线<select id="voice"><option value="3">女声 01 · zf_001</option><option value="4">女声 02 · zf_002</option><option value="46">女声 43 · zf_079</option><option value="48">女声 45 · zf_084</option><option value="58">男声 01 · zm_009</option><option value="59">男声 02 · zm_010</option></select></label><label>语速<select id="speed"><option value="0.9">稍慢 · 0.9×</option><option value="1">自然 · 1.0×</option><option value="1.1">稍快 · 1.1×</option></select></label></div>
         <div class="setting-row narration-choice"><label class="check"><input id="prepare-speech" type="checkbox">回复完成后提前准备语音（可选）</label></div>
         <p class="hint">默认关闭。开启后在后台生成当前回复的完整语音，占用本机算力，但不会自动发声。朗读键按一次即可：已就绪时立即播放，准备中则完成后播放。只保留最近几条的临时缓存。</p>
         <div class="setting-row narration-choice"><label class="check"><input id="auto-speak" type="checkbox">自动播报每条完整回复（可选）</label><button id="preview-voice">保存并试听</button></div>

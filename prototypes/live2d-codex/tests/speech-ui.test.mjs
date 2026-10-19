@@ -183,6 +183,16 @@ test('changing voice cancels preparation and cache cannot survive unload or a ne
   assert.deepEqual(h.played,[2,2]);assert.deepEqual(h.errors,[]);
 });
 
+test('switching to the male character discards late female speech and synthesizes with the male profile',async t=>{
+  const h=preparationHarness(t);await tick();
+  const female=h.control.readReply();await tick();
+  h.update({settings:{...h.settings,character:'male',qwenVoice:'Dylan',voice:58}});
+  h.requests[0].resolve();await female;assert.deepEqual(h.played,[]);
+  const male=h.control.readReply();await tick();
+  assert.notEqual(h.requests[0].profile,h.requests[1].profile);assert.ok(h.requests[1].profile.includes('Dylan'));
+  h.requests[1].resolve();await male;assert.deepEqual(h.played,[2]);assert.deepEqual(h.errors,[]);
+});
+
 test('stopping a pending completion during model loading does not restart on readiness',async t=>{
   const h=preparationHarness(t);await tick();h.update({speech:{phase:'loading'}});h.complete();h.handlers.stop();
   h.update({speech:{phase:'ready'}});await tick();assert.equal(h.requests.length,0);
