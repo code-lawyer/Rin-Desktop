@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; worker-src 'self' blob:; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>Vibe Voice · 桌面伙伴</title>
+  <link rel="stylesheet" href="app://local/renderer/style.css">
+</head>
+<body>
+  <main id="wallpaper-view" hidden aria-label="雨夜窗前动态壁纸"><div id="wallpaper-error" hidden></div></main>
+  <main id="avatar-view" hidden>
+    <div id="avatar-canvas" role="button" tabindex="0" aria-label="点击人物打开或收起对话，右键设置或退出"></div>
+    <button class="drag-handle interactive" id="avatar-drag" title="拖动角色" aria-label="拖动角色"><svg class="ui-icon" viewBox="0 0 20 20" aria-hidden="true"><circle cx="7" cy="5" r=".8"/><circle cx="13" cy="5" r=".8"/><circle cx="7" cy="10" r=".8"/><circle cx="13" cy="10" r=".8"/><circle cx="7" cy="15" r=".8"/><circle cx="13" cy="15" r=".8"/></svg></button>
+    <div class="avatar-error interactive" id="avatar-error" hidden></div>
+  </main>
+  <main id="chat-view" class="bubble-shell" data-side="right" hidden>
+    <div class="bubble-surface" aria-hidden="true"><div class="bubble-backdrop"></div><div class="bubble-tail"></div></div>
+    <div id="bubble-card" class="bubble-card">
+    <header id="bubble-drag" class="bubble-header" title="拖动对话窗口；双击空白处回到人物旁">
+      <svg class="ui-icon bubble-grip" viewBox="0 0 20 20" aria-hidden="true"><circle cx="7" cy="5" r=".7"/><circle cx="13" cy="5" r=".7"/><circle cx="7" cy="10" r=".7"/><circle cx="13" cy="10" r=".7"/><circle cx="7" cy="15" r=".7"/><circle cx="13" cy="15" r=".7"/></svg>
+      <span class="signal" id="connection-signal"></span><span class="speaker" id="speaker-name">CODEX</span><span id="bubble-status" class="bubble-status">连接中</span><span class="grow"></span>
+      <button id="reading-button" class="reading-button" title="临时全屏阅读，Esc 返回气泡" aria-label="展开阅读"><span id="reading-label">展开阅读</span><svg class="ui-icon reading-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 4h6v6m0-6L5 15M4 10v6h6"/></svg></button>
+      <button id="settings-button" class="icon-button" title="项目与对话设置" aria-label="项目与对话设置" aria-expanded="false"><svg class="ui-icon" viewBox="0 0 20 20" aria-hidden="true"><circle cx="4" cy="10" r="1"/><circle cx="10" cy="10" r="1"/><circle cx="16" cy="10" r="1"/></svg></button>
+      <button id="close-chat" class="icon-button" title="收起气泡" aria-label="收起气泡"><svg class="ui-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="m5 5 10 10M15 5 5 15"/></svg></button>
+    </header>
+    <div id="current-target" class="current-target"><button id="workbench-button" type="button"><span id="target-label">本地项目 / 新对话</span><span aria-hidden="true">⌄</span></button><button id="replay-reply" class="text-button" type="button" title="开启常驻加载后，可逐条朗读">语音设置</button></div>
+    <section id="context-panel" class="context-panel" hidden aria-label="项目与对话设置">
+    <div class="provider-bar"><label for="provider-select">对话来源</label><select id="provider-select"><option value="dots">凛（Dots）</option><option value="codex">Codex</option></select><button id="open-dot" class="text-button" type="button" hidden>打开凛 ↗</button><button id="reconnect-dot" class="text-button" type="button" hidden>重连</button></div>
+    <p id="dots-help" class="interaction-help" hidden>沿用凛的私人对话。进度与回复会自动出现；授权或停止任务请打开凛。</p>
+    <section id="codex-context" class="context-bar" aria-label="当前项目和模型">
+      <button id="choose-project" class="project-button" title="选择项目目录"><span class="context-label">项目</span><span id="project-name">Vibe-Voice</span><span>⌄</span></button>
+      <label class="model-field"><span class="context-label">模型</span><select id="model-select" aria-label="Codex 模型"></select></label>
+    </section>
+    <div class="appearance-settings">
+      <label id="avatar-size-label" for="avatar-size">角色大小 <output id="avatar-size-value" for="avatar-size">100%</output></label>
+      <div id="avatar-size-controls" class="size-controls"><input id="avatar-size" type="range" min="60" max="150" step="5" value="100" aria-label="角色大小"><button id="reset-avatar" class="text-button" type="button">恢复默认</button></div>
+      <p id="interaction-help" class="interaction-help">点击人物开关对话 · 拖动右上角手柄移动<br>右键人物可设置大小或退出；× 只收起对话</p>
+      <div class="bubble-placement"><span>拖动顶部可移动对话窗口</span><button id="align-chat" class="text-button" type="button">回到人物旁</button></div>
+    </div>
+    <div class="settings-footer"><span id="connection-label">正在连接</span><span id="session-label">新对话</span><button id="new-chat" class="text-button">新对话</button><button id="quit-button" class="text-button">退出</button></div>
+    </section>
+    <section id="messages" class="reply-scroll" aria-live="polite" aria-label="本轮回复">
+      <div id="reply-content"><p id="welcome" class="welcome">想一起做点什么？</p><article id="current-message" class="message assistant" data-role="assistant" hidden><div id="reply-body" class="message-body"></div></article></div>
+    </section>
+    <section id="approval" class="approval" hidden aria-live="assertive"></section>
+    <section id="login-panel" class="approval" hidden aria-label="登录 Codex">
+      <p>使用你自己的 ChatGPT 账户登录 Codex。凭据由官方 CLI 保存在本机。</p>
+      <button id="login-button" type="button">在浏览器登录 ChatGPT</button>
+      <button id="cancel-login-button" type="button" hidden>取消登录</button>
+    </section>
+    <div id="error-banner" class="error-banner" hidden role="alert"></div>
+    <div id="activity-line" class="activity-line"><span id="activity-label">准备就绪</span><button id="stop-button" class="text-button" hidden>停止</button></div>
+    <form id="composer" class="composer">
+      <textarea id="prompt" rows="1" maxlength="64000" placeholder="告诉我你的任务，或继续追问…" aria-label="给 Codex 的任务"></textarea>
+      <div id="voice-status" class="voice-status" aria-live="polite" hidden></div>
+      <div class="composer-footer"><div class="voice-actions"><button id="record-button" class="voice-button" type="button" aria-pressed="false" title="开始或完成本地听写 · Ctrl+Alt+V">听写</button><button id="cancel-recording" class="text-button" type="button" hidden>取消</button><button id="stop-speech" class="text-button" type="button" hidden>停止播报</button></div><span class="composer-hint">Enter 发送</span><button id="send-button" type="submit"><span>发送</span><svg class="ui-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 15V5m-4 4 4-4 4 4"/></svg></button></div>
+    </form>
+    </div>
+  </main>
+  <script src="app://local/vendor/live2dcubismcore.min.js"></script>
+  <script src="app://local/dist/app.js" type="module"></script>
+</body>
+</html>

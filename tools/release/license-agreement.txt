@@ -1,0 +1,24 @@
+Rin Desktop
+
+Original application code is provided under the MIT License. All third-party
+licenses remain applicable. The installer includes THIRD-PARTY-NOTICES.md,
+individual license texts, and model/runtime notices.
+
+This application contains Live2D Cubism Core and fixed bundled models.
+Live2D Cubism Core is proprietary, not covered by the MIT License. By using
+this component you accept the Live2D Proprietary Software License Agreement:
+https://www.live2d.com/eula/live2d-proprietary-software-license-agreement_en.html
+The agreement is also supplied in licenses/live2d-proprietary-agreement.html.
+Do not remove notices or redistribute these components
+under the MIT License. Rin Desktop is not affiliated with Live2D or OpenAI.
+
+The native CPU speech component contains GPL-licensed eSpeak NG code. Its
+license and corresponding-source information are included. The Python,
+Qwen, PyTorch, NVIDIA CUDA and other components retain their own terms.
+
+Codex requires your own eligible ChatGPT account and an internet connection.
+Credentials remain with the official CLI on your computer. Local dictation
+and speech synthesis run on your computer. Qwen is optional, requires a
+compatible NVIDIA GPU and stays unloaded until you explicitly enable it.
+
+Uninstalling the application preserves your conversations and user settings.

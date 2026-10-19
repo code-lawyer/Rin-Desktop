@@ -1,0 +1,19 @@
+{
+  "name": "vibe-voice",
+  "version": "0.3.0",
+  "private": true,
+  "type": "module",
+  "description": "Windows 4K wallpaper companion for Codex with local voice",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "test": "npm --prefix prototypes/live2d-codex test && node --test tests/*.test.mjs",
+    "build": "npm --prefix prototypes/live2d-codex run build",
+    "resources": "node tools/release/bootstrap-resources.mjs",
+    "package": "node tools/release/build.mjs"
+  },
+  "dependencies": {
+    "ws": "8.22.0"
+  }
+}

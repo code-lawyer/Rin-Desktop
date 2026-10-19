@@ -1,0 +1,109 @@
+{
+  "format": 1,
+  "version": "0.3.0",
+  "packs": [
+    {
+      "id": "asr",
+      "label": "中文听写 · SenseVoice",
+      "unpackedBytes": 242658931,
+      "required": [
+        "sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17/model.int8.onnx",
+        "sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17/tokens.txt"
+      ],
+      "files": [
+        {
+          "file": "Rin-Desktop-0.3.0-voice-asr-1.bin",
+          "bytes": 166900150,
+          "sha256": "f47f29752f9727d273fab4169b93eb6de1a81327bd44816557467752759310fc",
+          "url": "https://github.com/code-lawyer/Rin-Desktop/releases/download/v0.3.0/Rin-Desktop-0.3.0-voice-asr-1.bin"
+        },
+        {
+          "file": "Rin-Desktop-0.3.0-voice-asr.exe",
+          "bytes": 2125798,
+          "sha256": "0f87159af15ac371a88f579a5125bfbef462c5bc13ae926a41320e7c07c335ed",
+          "url": "https://github.com/code-lawyer/Rin-Desktop/releases/download/v0.3.0/Rin-Desktop-0.3.0-voice-asr.exe"
+        }
+      ]
+    },
+    {
+      "id": "kokoro",
+      "label": "轻量播报 · Kokoro",
+      "unpackedBytes": 217474098,
+      "required": [
+        "kokoro-int8-multi-lang-v1_1/model.int8.onnx",
+        "kokoro-int8-multi-lang-v1_1/voices.bin",
+        "kokoro-int8-multi-lang-v1_1/tokens.txt",
+        "kokoro-int8-multi-lang-v1_1/lexicon-zh.txt",
+        "kokoro-int8-multi-lang-v1_1/lexicon-us-en.txt",
+        "kokoro-int8-multi-lang-v1_1/espeak-ng-data/phondata",
+        "kokoro-int8-multi-lang-v1_1/dict/jieba.dict.utf8",
+        "kokoro-int8-multi-lang-v1_1/date-zh.fst",
+        "kokoro-int8-multi-lang-v1_1/number-zh.fst",
+        "kokoro-int8-multi-lang-v1_1/phone-zh.fst"
+      ],
+      "files": [
+        {
+          "file": "Rin-Desktop-0.3.0-voice-kokoro-1.bin",
+          "bytes": 151503096,
+          "sha256": "d3fb98974fe20a3d2b1af0f31d9e2f9e17cf27803bab4ef7066ed395d267b6f3",
+          "url": "https://github.com/code-lawyer/Rin-Desktop/releases/download/v0.3.0/Rin-Desktop-0.3.0-voice-kokoro-1.bin"
+        },
+        {
+          "file": "Rin-Desktop-0.3.0-voice-kokoro.exe",
+          "bytes": 2161081,
+          "sha256": "b4c934e8f1c0a7b87886a450f6a4fae0282fd6cc0e620e36a35123786ec76602",
+          "url": "https://github.com/code-lawyer/Rin-Desktop/releases/download/v0.3.0/Rin-Desktop-0.3.0-voice-kokoro.exe"
+        }
+      ]
+    },
+    {
+      "id": "qwen",
+      "label": "自然女声 · Qwen3-TTS",
+      "unpackedBytes": 9533840139,
+      "required": [
+        "python/python.exe",
+        "models/Qwen3-TTS-12Hz-1.7B-CustomVoice/config.json",
+        "models/Qwen3-TTS-12Hz-1.7B-CustomVoice/model.safetensors",
+        "models/Qwen3-TTS-12Hz-1.7B-CustomVoice/speech_tokenizer/model.safetensors"
+      ],
+      "files": [
+        {
+          "file": "Rin-Desktop-0.3.0-voice-qwen-1.bin",
+          "bytes": 1494904064,
+          "sha256": "810a218feca3572cb505ac57d2a4e35ddfb60e2e4a429fa7cf320ff35431e288",
+          "url": "https://github.com/code-lawyer/Rin-Desktop/releases/download/v0.3.0/Rin-Desktop-0.3.0-voice-qwen-1.bin"
+        },
+        {
+          "file": "Rin-Desktop-0.3.0-voice-qwen-2.bin",
+          "bytes": 1500000000,
+          "sha256": "ceb16f056b1e18cf48d63e9775f43bc32e6c4ac3c9d089f7b6ec0db2d8c6c826",
+          "url": "https://github.com/code-lawyer/Rin-Desktop/releases/download/v0.3.0/Rin-Desktop-0.3.0-voice-qwen-2.bin"
+        },
+        {
+          "file": "Rin-Desktop-0.3.0-voice-qwen-3.bin",
+          "bytes": 1500000000,
+          "sha256": "836fb4444db5f68833b2e0e32d0fbf99d7fa7a8ade5e04c4f46d54941fc38ee0",
+          "url": "https://github.com/code-lawyer/Rin-Desktop/releases/download/v0.3.0/Rin-Desktop-0.3.0-voice-qwen-3.bin"
+        },
+        {
+          "file": "Rin-Desktop-0.3.0-voice-qwen-4.bin",
+          "bytes": 1500000000,
+          "sha256": "2a7010c29c7ab32bf702f6db51e21768e5b2f0d1500668e24766f86d10c19419",
+          "url": "https://github.com/code-lawyer/Rin-Desktop/releases/download/v0.3.0/Rin-Desktop-0.3.0-voice-qwen-4.bin"
+        },
+        {
+          "file": "Rin-Desktop-0.3.0-voice-qwen-5.bin",
+          "bytes": 764016813,
+          "sha256": "d9bd472a6ffa2138ba179f8c360a0a8658a3168caba81a15f4c1d7c9a92799fd",
+          "url": "https://github.com/code-lawyer/Rin-Desktop/releases/download/v0.3.0/Rin-Desktop-0.3.0-voice-qwen-5.bin"
+        },
+        {
+          "file": "Rin-Desktop-0.3.0-voice-qwen.exe",
+          "bytes": 5095806,
+          "sha256": "171f43172863f38cc0ac0e6753fd36fa5104ba794071f9a0364d2bbdf8b38856",
+          "url": "https://github.com/code-lawyer/Rin-Desktop/releases/download/v0.3.0/Rin-Desktop-0.3.0-voice-qwen.exe"
+        }
+      ]
+    }
+  ]
+}

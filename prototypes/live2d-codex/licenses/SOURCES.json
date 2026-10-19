@@ -1,0 +1,381 @@
+[
+  {
+    "file": "live2d-proprietary-agreement.html",
+    "source": "https://www.live2d.com/eula/live2d-proprietary-software-license-agreement_en.html",
+    "sha256": "e7b4ffc6c636de2cfdd6d2eed6a4e43fa7034e7f15a0c3a15f1603dbb3b4c2b6"
+  },
+  {
+    "file": "Qwen-Apache-2.0.txt",
+    "source": "https://raw.githubusercontent.com/QwenLM/Qwen3-TTS/main/LICENSE",
+    "sha256": "a44a6081c73ad75f0255bb2bb5cab74ef1829565a895a24e53a4f11290ab7655"
+  },
+  {
+    "file": "cuda-12.8-eula.html",
+    "source": "https://docs.nvidia.com/cuda/archive/12.8.0/eula/index.html",
+    "sha256": "6722d4c310a2ec9ad869ede3371a648fe2cfc2baaf8e1ece2c35e1dccc05752c"
+  },
+  {
+    "file": "cudnn-9.10.2-eula.html",
+    "source": "https://docs.nvidia.com/deeplearning/cudnn/backend/v9.10.2/reference/eula.html",
+    "sha256": "f3763a5ae20aa135e6f0186ac64c22f61c049e5ef5b81122ea06dd4b9ce58707"
+  },
+  {
+    "file": "flatbuffers-LICENSE.txt",
+    "source": "https://raw.githubusercontent.com/google/flatbuffers/v25.12.19/LICENSE",
+    "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+  },
+  {
+    "file": "tokenizers-LICENSE.txt",
+    "source": "https://raw.githubusercontent.com/huggingface/tokenizers/v0.22.2/LICENSE",
+    "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+  },
+  {
+    "file": "gradio-client-LICENSE.txt",
+    "source": "https://raw.githubusercontent.com/gradio-app/gradio/gradio%406.17.3/LICENSE",
+    "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+  },
+  {
+    "file": "python-packages/accelerate-1.12.0.dist-info/licenses",
+    "source": "Python installed distribution: accelerate-1.12.0.dist-info"
+  },
+  {
+    "file": "python-packages/annotated_doc-0.0.5.dist-info/licenses",
+    "source": "Python installed distribution: annotated_doc-0.0.5.dist-info"
+  },
+  {
+    "file": "python-packages/annotated_types-0.8.0.dist-info/licenses",
+    "source": "Python installed distribution: annotated_types-0.8.0.dist-info"
+  },
+  {
+    "file": "python-packages/anyio-4.15.1.dist-info/licenses",
+    "source": "Python installed distribution: anyio-4.15.1.dist-info"
+  },
+  {
+    "file": "python-packages/brotli-1.2.0.dist-info/licenses",
+    "source": "Python installed distribution: brotli-1.2.0.dist-info"
+  },
+  {
+    "file": "python-packages/certifi-2026.7.22.dist-info/licenses",
+    "source": "Python installed distribution: certifi-2026.7.22.dist-info"
+  },
+  {
+    "file": "python-packages/cffi-2.1.1.dist-info/licenses",
+    "source": "Python installed distribution: cffi-2.1.1.dist-info"
+  },
+  {
+    "file": "python-packages/charset_normalizer-3.5.2.dist-info/licenses",
+    "source": "Python installed distribution: charset_normalizer-3.5.2.dist-info"
+  },
+  {
+    "file": "python-packages/click-8.5.0.dist-info/licenses",
+    "source": "Python installed distribution: click-8.5.0.dist-info"
+  },
+  {
+    "file": "python-packages/cloudpickle-3.1.2.dist-info/licenses",
+    "source": "Python installed distribution: cloudpickle-3.1.2.dist-info"
+  },
+  {
+    "file": "python-packages/colorama-0.4.6.dist-info/licenses",
+    "source": "Python installed distribution: colorama-0.4.6.dist-info"
+  },
+  {
+    "file": "python-packages/decorator-5.3.1.dist-info/licenses",
+    "source": "Python installed distribution: decorator-5.3.1.dist-info"
+  },
+  {
+    "file": "python-packages/einops-0.8.2.dist-info/licenses",
+    "source": "Python installed distribution: einops-0.8.2.dist-info"
+  },
+  {
+    "file": "python-packages/fastapi-0.143.3.dist-info/licenses",
+    "source": "Python installed distribution: fastapi-0.143.3.dist-info"
+  },
+  {
+    "file": "python-packages/filelock-3.32.3.dist-info/licenses",
+    "source": "Python installed distribution: filelock-3.32.3.dist-info"
+  },
+  {
+    "file": "python-packages/fsspec-2026.7.0.dist-info/licenses",
+    "source": "Python installed distribution: fsspec-2026.7.0.dist-info"
+  },
+  {
+    "file": "python-packages/gradio-6.17.3.dist-info/licenses",
+    "source": "Python installed distribution: gradio-6.17.3.dist-info"
+  },
+  {
+    "file": "python-packages/groovy-0.1.2.dist-info/licenses",
+    "source": "Python installed distribution: groovy-0.1.2.dist-info"
+  },
+  {
+    "file": "python-packages/h11-0.16.0.dist-info/licenses",
+    "source": "Python installed distribution: h11-0.16.0.dist-info"
+  },
+  {
+    "file": "python-packages/hf_gradio-0.4.1.dist-info/licenses",
+    "source": "Python installed distribution: hf_gradio-0.4.1.dist-info"
+  },
+  {
+    "file": "python-packages/httpcore-1.0.9.dist-info/licenses",
+    "source": "Python installed distribution: httpcore-1.0.9.dist-info"
+  },
+  {
+    "file": "python-packages/httpx-0.28.1.dist-info/licenses",
+    "source": "Python installed distribution: httpx-0.28.1.dist-info"
+  },
+  {
+    "file": "python-packages/huggingface_hub-0.36.2.dist-info/licenses",
+    "source": "Python installed distribution: huggingface_hub-0.36.2.dist-info"
+  },
+  {
+    "file": "python-packages/idna-3.20.dist-info/licenses",
+    "source": "Python installed distribution: idna-3.20.dist-info"
+  },
+  {
+    "file": "python-packages/jinja2-3.1.6.dist-info/licenses",
+    "source": "Python installed distribution: jinja2-3.1.6.dist-info"
+  },
+  {
+    "file": "python-packages/joblib-1.6.0.dist-info/licenses",
+    "source": "Python installed distribution: joblib-1.6.0.dist-info"
+  },
+  {
+    "file": "python-packages/lazy_loader-0.6.dist-info/licenses",
+    "source": "Python installed distribution: lazy_loader-0.6.dist-info"
+  },
+  {
+    "file": "python-packages/librosa-1.0.0.dist-info/licenses",
+    "source": "Python installed distribution: librosa-1.0.0.dist-info"
+  },
+  {
+    "file": "python-packages/llvmlite-0.50.0.dist-info/licenses",
+    "source": "Python installed distribution: llvmlite-0.50.0.dist-info"
+  },
+  {
+    "file": "python-packages/markdown_it_py-4.2.0.dist-info/licenses",
+    "source": "Python installed distribution: markdown_it_py-4.2.0.dist-info"
+  },
+  {
+    "file": "python-packages/markupsafe-3.0.3.dist-info/licenses",
+    "source": "Python installed distribution: markupsafe-3.0.3.dist-info"
+  },
+  {
+    "file": "python-packages/mdurl-0.1.2.dist-info/LICENSE",
+    "source": "Python installed distribution: mdurl-0.1.2.dist-info"
+  },
+  {
+    "file": "python-packages/mpmath-1.3.0.dist-info/LICENSE",
+    "source": "Python installed distribution: mpmath-1.3.0.dist-info"
+  },
+  {
+    "file": "python-packages/msgpack-1.2.3.dist-info/licenses",
+    "source": "Python installed distribution: msgpack-1.2.3.dist-info"
+  },
+  {
+    "file": "python-packages/narwhals-2.27.1.dist-info/licenses",
+    "source": "Python installed distribution: narwhals-2.27.1.dist-info"
+  },
+  {
+    "file": "python-packages/networkx-3.6.1.dist-info/licenses",
+    "source": "Python installed distribution: networkx-3.6.1.dist-info"
+  },
+  {
+    "file": "python-packages/numba-0.68.0.dist-info/licenses",
+    "source": "Python installed distribution: numba-0.68.0.dist-info"
+  },
+  {
+    "file": "python-packages/numpy-2.5.4.dist-info/licenses",
+    "source": "Python installed distribution: numpy-2.5.4.dist-info"
+  },
+  {
+    "file": "python-packages/opentelemetry_api-1.45.1.dist-info/licenses",
+    "source": "Python installed distribution: opentelemetry_api-1.45.1.dist-info"
+  },
+  {
+    "file": "python-packages/orjson-3.13.0.dist-info/licenses",
+    "source": "Python installed distribution: orjson-3.13.0.dist-info"
+  },
+  {
+    "file": "python-packages/packaging-26.3.dist-info/licenses",
+    "source": "Python installed distribution: packaging-26.3.dist-info"
+  },
+  {
+    "file": "python-packages/pandas-3.0.6.dist-info/LICENSE",
+    "source": "Python installed distribution: pandas-3.0.6.dist-info"
+  },
+  {
+    "file": "python-packages/pillow-12.3.0.dist-info/licenses",
+    "source": "Python installed distribution: pillow-12.3.0.dist-info"
+  },
+  {
+    "file": "python-packages/platformdirs-4.13.4.dist-info/licenses",
+    "source": "Python installed distribution: platformdirs-4.13.4.dist-info"
+  },
+  {
+    "file": "python-packages/pooch-1.9.0.dist-info/licenses",
+    "source": "Python installed distribution: pooch-1.9.0.dist-info"
+  },
+  {
+    "file": "python-packages/protobuf-7.36.2.dist-info/LICENSE",
+    "source": "Python installed distribution: protobuf-7.36.2.dist-info"
+  },
+  {
+    "file": "python-packages/psutil-7.2.2.dist-info/LICENSE",
+    "source": "Python installed distribution: psutil-7.2.2.dist-info"
+  },
+  {
+    "file": "python-packages/pycparser-3.11.dist-info/licenses",
+    "source": "Python installed distribution: pycparser-3.11.dist-info"
+  },
+  {
+    "file": "python-packages/pydantic-2.14.1.dist-info/licenses",
+    "source": "Python installed distribution: pydantic-2.14.1.dist-info"
+  },
+  {
+    "file": "python-packages/pydantic_core-2.50.1.dist-info/licenses",
+    "source": "Python installed distribution: pydantic_core-2.50.1.dist-info"
+  },
+  {
+    "file": "python-packages/pydub-0.25.1.dist-info/LICENSE",
+    "source": "Python installed distribution: pydub-0.25.1.dist-info"
+  },
+  {
+    "file": "python-packages/pygments-2.21.0.dist-info/licenses",
+    "source": "Python installed distribution: pygments-2.21.0.dist-info"
+  },
+  {
+    "file": "python-packages/python_dateutil-2.9.0.post0.dist-info/LICENSE",
+    "source": "Python installed distribution: python_dateutil-2.9.0.post0.dist-info"
+  },
+  {
+    "file": "python-packages/python_multipart-0.0.32.dist-info/licenses",
+    "source": "Python installed distribution: python_multipart-0.0.32.dist-info"
+  },
+  {
+    "file": "python-packages/pytz-2026.5.dist-info/LICENSE.txt",
+    "source": "Python installed distribution: pytz-2026.5.dist-info"
+  },
+  {
+    "file": "python-packages/pyyaml-6.0.3.dist-info/licenses",
+    "source": "Python installed distribution: pyyaml-6.0.3.dist-info"
+  },
+  {
+    "file": "python-packages/qwen_tts-0.1.1.dist-info/licenses",
+    "source": "Python installed distribution: qwen_tts-0.1.1.dist-info"
+  },
+  {
+    "file": "python-packages/regex-2026.9.29.dist-info/licenses",
+    "source": "Python installed distribution: regex-2026.9.29.dist-info"
+  },
+  {
+    "file": "python-packages/requests-2.34.2.dist-info/licenses",
+    "source": "Python installed distribution: requests-2.34.2.dist-info"
+  },
+  {
+    "file": "python-packages/rich-15.0.0.dist-info/licenses",
+    "source": "Python installed distribution: rich-15.0.0.dist-info"
+  },
+  {
+    "file": "python-packages/safehttpx-0.1.7.dist-info/licenses",
+    "source": "Python installed distribution: safehttpx-0.1.7.dist-info"
+  },
+  {
+    "file": "python-packages/safetensors-0.8.0.dist-info/licenses",
+    "source": "Python installed distribution: safetensors-0.8.0.dist-info"
+  },
+  {
+    "file": "python-packages/scikit_learn-1.9.1.dist-info/licenses",
+    "source": "Python installed distribution: scikit_learn-1.9.1.dist-info"
+  },
+  {
+    "file": "python-packages/scipy-1.18.1.dist-info/LICENSE.txt",
+    "source": "Python installed distribution: scipy-1.18.1.dist-info"
+  },
+  {
+    "file": "python-packages/semantic_version-2.10.0.dist-info/LICENSE",
+    "source": "Python installed distribution: semantic_version-2.10.0.dist-info"
+  },
+  {
+    "file": "python-packages/setuptools-78.1.0.dist-info/licenses",
+    "source": "Python installed distribution: setuptools-78.1.0.dist-info"
+  },
+  {
+    "file": "python-packages/shellingham-1.5.4.dist-info/LICENSE",
+    "source": "Python installed distribution: shellingham-1.5.4.dist-info"
+  },
+  {
+    "file": "python-packages/six-1.17.0.dist-info/LICENSE",
+    "source": "Python installed distribution: six-1.17.0.dist-info"
+  },
+  {
+    "file": "python-packages/soundfile-0.14.0.dist-info/LICENSE",
+    "source": "Python installed distribution: soundfile-0.14.0.dist-info"
+  },
+  {
+    "file": "python-packages/sox-1.5.0.dist-info/licenses",
+    "source": "Python installed distribution: sox-1.5.0.dist-info"
+  },
+  {
+    "file": "python-packages/soxr-1.1.0.dist-info/licenses",
+    "source": "Python installed distribution: soxr-1.1.0.dist-info"
+  },
+  {
+    "file": "python-packages/starlette-1.8.0.dist-info/licenses",
+    "source": "Python installed distribution: starlette-1.8.0.dist-info"
+  },
+  {
+    "file": "python-packages/sympy-1.14.0.dist-info/licenses",
+    "source": "Python installed distribution: sympy-1.14.0.dist-info"
+  },
+  {
+    "file": "python-packages/threadpoolctl-3.7.0.dist-info/licenses",
+    "source": "Python installed distribution: threadpoolctl-3.7.0.dist-info"
+  },
+  {
+    "file": "python-packages/tomlkit-0.14.0.dist-info/licenses",
+    "source": "Python installed distribution: tomlkit-0.14.0.dist-info"
+  },
+  {
+    "file": "python-packages/torch-2.9.1+cu128.dist-info/LICENSE",
+    "source": "Python installed distribution: torch-2.9.1+cu128.dist-info"
+  },
+  {
+    "file": "python-packages/torch-2.9.1+cu128.dist-info/NOTICE",
+    "source": "Python installed distribution: torch-2.9.1+cu128.dist-info"
+  },
+  {
+    "file": "python-packages/torchaudio-2.9.1+cu128.dist-info/licenses",
+    "source": "Python installed distribution: torchaudio-2.9.1+cu128.dist-info"
+  },
+  {
+    "file": "python-packages/tqdm-4.70.1.dist-info/licenses",
+    "source": "Python installed distribution: tqdm-4.70.1.dist-info"
+  },
+  {
+    "file": "python-packages/transformers-4.57.3.dist-info/licenses",
+    "source": "Python installed distribution: transformers-4.57.3.dist-info"
+  },
+  {
+    "file": "python-packages/typer-0.27.3.dist-info/licenses",
+    "source": "Python installed distribution: typer-0.27.3.dist-info"
+  },
+  {
+    "file": "python-packages/typing_extensions-4.16.0.dist-info/licenses",
+    "source": "Python installed distribution: typing_extensions-4.16.0.dist-info"
+  },
+  {
+    "file": "python-packages/typing_inspection-0.4.4.dist-info/licenses",
+    "source": "Python installed distribution: typing_inspection-0.4.4.dist-info"
+  },
+  {
+    "file": "python-packages/tzdata-2026.5.dist-info/licenses",
+    "source": "Python installed distribution: tzdata-2026.5.dist-info"
+  },
+  {
+    "file": "python-packages/urllib3-2.8.0.dist-info/licenses",
+    "source": "Python installed distribution: urllib3-2.8.0.dist-info"
+  },
+  {
+    "file": "python-packages/uvicorn-0.54.0.dist-info/licenses",
+    "source": "Python installed distribution: uvicorn-0.54.0.dist-info"
+  }
+]

@@ -1,0 +1,13 @@
+import { readFile, access } from 'node:fs/promises';
+import { join, resolve } from 'node:path';
+import { execFileSync } from 'node:child_process';
+const root=resolve(import.meta.dirname,'../..'), app=join(root,'prototypes/live2d-codex');
+const {version}=JSON.parse(await readFile(join(root,'package.json'),'utf8'));
+const stage=join(root,'release',`Rin-Desktop-${version}-win-x64`), output=join(root,'release',`v${version}`);
+const resources=process.env.VIBE_RESOURCE_APP||app;
+await access(join(resources,'runtime/node.exe'));await access(join(app,'voice-resources.json'));
+const compiler=process.env.INNO_ISCC||join(root,'work/release-build/tools/inno/ISCC.exe');await access(compiler);
+execFileSync(process.execPath,[join(app,'scripts/build.mjs')],{windowsHide:true,stdio:'inherit'});
+execFileSync(process.execPath,[join(app,'scripts/package-portable.mjs'),`--out=${stage}`],{windowsHide:true,stdio:'inherit'});
+execFileSync(compiler,[`/DVersion=${version}`,`/DSourceDir=${stage}`,`/DReleaseDir=${output}`,join(root,'tools/release/installer.iss')],{windowsHide:true,stdio:'inherit'});
+execFileSync(process.execPath,[join(root,'tools/release/lock-resources.mjs'),output],{windowsHide:true,stdio:'inherit'});
