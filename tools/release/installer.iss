@@ -5,7 +5,7 @@
   #error ReleaseDir must be supplied
 #endif
 #ifndef Version
-  #define Version "0.3.0"
+  #define Version "0.3.1"
 #endif
 [Setup]
 AppId={{215174A1-C028-4225-947F-9B15787E578D}

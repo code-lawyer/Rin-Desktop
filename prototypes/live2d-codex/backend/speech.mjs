@@ -10,7 +10,7 @@ export class LocalSpeech {
   modelRoot(channel) { return typeof this.models === 'function' ? this.models(channel) : this.models; }
   status() { return { asr: existsSync(join(this.modelRoot('asr'), 'sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17/model.int8.onnx')), tts: existsSync(join(this.modelRoot('tts'), 'kokoro-int8-multi-lang-v1_1/model.int8.onnx')), loaded: [...this.workers.keys()] }; }
   run(kind, data) {
-    const channel = kind === 'transcribe' ? 'asr' : 'tts';
+    const channel = kind === 'transcribe' || kind === 'load-asr' ? 'asr' : 'tts';
     if (!this.status()[channel]) return Promise.reject(new Error('请在工作台的「语音与按键」中下载所需语音资源。'));
     let worker = this.workers.get(channel);
     if (worker?.pending) return Promise.reject(new Error('语音正在处理中，请稍候。'));
@@ -19,7 +19,7 @@ export class LocalSpeech {
       const child = fork(fileURLToPath(new URL('./speech-worker.cjs', import.meta.url)), [this.modelRoot(channel)], { execPath: this.executable, execArgv: [], env, windowsHide: true, serialization: 'json', stdio: ['ignore', 'ignore', 'pipe', 'ipc'] });
       worker = { child, pending: null, timer: null, diagnostics: '' }; this.workers.set(channel, worker);
       child.stderr.on('data', chunk => { worker.diagnostics = (worker.diagnostics + chunk).slice(-2000); });
-      const fail = error => { if (this.workers.get(channel) === worker) this.workers.delete(channel); clearTimeout(worker.timer); worker.pending?.reject(error); worker.pending = null; };
+      const fail = error => { if (this.workers.get(channel) === worker) this.workers.delete(channel); clearTimeout(worker.timer); worker.pending?.reject(error); worker.pending = null; this.onState?.(); };
       child.on('error', fail); child.on('exit', code => { if (worker.pending) console.error('[speech:worker]', code, worker.diagnostics); fail(new Error('本地语音进程已停止，请重试。')); });
       child.on('message', response => {
         if (worker.pending?.id !== response.id) return;
@@ -27,6 +27,7 @@ export class LocalSpeech {
         if (response.ok && response.value.samplesBase64) { const bytes = Buffer.from(response.value.samplesBase64, 'base64'); response.value.samples = new Float32Array(bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength)); delete response.value.samplesBase64; }
         response.ok ? pending.resolve(response.value) : pending.reject(new Error(response.error));
         if (channel !== 'tts' || !this.retainTts) { worker.timer = setTimeout(() => this.stop(channel), this.idleMs); worker.timer.unref(); }
+        this.onState?.();
       });
     }
     clearTimeout(worker.timer);
@@ -49,6 +50,6 @@ export class LocalSpeech {
   // Kokoro's native call is synchronous. Discard its result in the renderer and
   // drain that call before another utterance; keep the loaded model resident.
   async cancelTts() { await this.workers.get('tts')?.done; }
-  stop(channel = 'tts', message = '已停止播报。') { const worker = this.workers.get(channel); if (!worker) return; this.workers.delete(channel); clearTimeout(worker.timer); worker.pending?.reject(new Error(message)); worker.pending = null; worker.child.kill(); }
+  stop(channel = 'tts', message = '已停止播报。') { const worker = this.workers.get(channel); if (!worker) return; this.workers.delete(channel); clearTimeout(worker.timer); worker.pending?.reject(new Error(message)); worker.pending = null; worker.child.kill(); this.onState?.(); }
   close() { this.stop('asr'); this.stop('tts'); }
 }

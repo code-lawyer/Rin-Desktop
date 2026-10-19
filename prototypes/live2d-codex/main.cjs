@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, protocol, screen, Tray, Menu, nativeImage, dialog, globalShortcut, shell, net } = require('electron');
+const { app, BrowserWindow, ipcMain, protocol, screen, Tray, Menu, nativeImage, dialog, globalShortcut, shell, net, session } = require('electron');
 const { join, resolve, relative, extname, sep } = require('node:path');
 const { readFile, writeFile, mkdir, rename } = require('node:fs/promises');
 const { pathToFileURL } = require('node:url');
@@ -227,7 +227,27 @@ else {
     const { ResidentSpeech } = await import(pathToFileURL(join(root, 'backend/resident-speech.mjs')).href);
     store = new WorkspaceStore(storageDir); await store.load();
     const { VoiceResources, MODEL_FOLDERS } = await import(pathToFileURL(join(root, 'backend/voice-resources.mjs')).href);
-    voiceResources = new VoiceResources(join(storageDir, 'voice-resources'), JSON.parse(await readFile(join(root, 'voice-resources.json'), 'utf8')), { fetch: (url, options) => net.fetch(url, options) });
+    const { upstreamProxyEnvironment } = await import(pathToFileURL(join(root, 'backend/voice-runtime.mjs')).href);
+    voiceResources = new VoiceResources(join(storageDir, 'voice-resources'), JSON.parse(await readFile(join(root, 'voice-resources.json'), 'utf8')), {
+      fetch: (url, options) => net.fetch(url, options),
+      runtimeEnvironment: () => upstreamProxyEnvironment(url => session.defaultSession.resolveProxy(url)),
+      activate: async (id, signal) => {
+        signal.throwIfAborted();
+        if (closing) throw new Error('应用正在退出。');
+        if (id === 'asr') await speech.loadAsr();
+        else {
+          stopSpeech();
+          const patch = { ttsEngine: id, ttsResident: true };
+          if (id === 'qwen' && !speech.status().engines.qwen) patch.qwenRoot = voiceResources.directory('qwen');
+          await store.updateSettings(patch);
+          signal.throwIfAborted();
+          if (closing) throw new Error('应用正在退出。');
+          await speech.configure(store.data.settings);
+          if (speech.phase === 'error') throw new Error(speech.error);
+        }
+        notifyWorkspace();
+      }
+    });
     voiceResources.on('state', notifyWorkspace);
     const bundledQwen = join(root, 'runtime/qwen'), localQwen = resolve(root, '../qwen-tts-evaluation');
     const qwenRoot = argument('qwen-root') ?? (require('node:fs').existsSync(bundledQwen) ? bundledQwen : !packaged && require('node:fs').existsSync(localQwen) ? localQwen : voiceResources.directory('qwen'));
@@ -321,14 +341,20 @@ else {
     handler('workbench:snapshot', workspaceSnapshot);
     handler('resources:download', (_event, id) => {
       if (changingData || closing) throw new Error('应用正在切换数据或退出，请稍后重试。');
-      const download = voiceResources.start(id);
-      download.then(async () => {
-        if (closing) return;
-        if (id === 'qwen') await store.updateSettings({ qwenRoot: voiceResources.directory('qwen') });
-        if (store.data.settings.ttsEngine === id) speech.configure(store.data.settings);
-        notifyWorkspace();
-      }).catch(error => { console.error('[resources]', error.message); });
+      if (captureTarget) throw new Error('请先结束当前听写。');
+      const status = speech.status();
+      const download = voiceResources.start(id, { existing: id === 'asr' ? status.asr : !!status.engines[id] });
+      download.catch(error => { console.error('[resources]', error.message); });
       return workspaceSnapshot();
+    });
+    handler('resources:unload', async (_event, id) => {
+      voiceResources.pack(id);
+      if (changingData || closing || voiceResources.active || captureTarget) throw new Error('请先完成当前语音操作。');
+      if (id === 'asr') speech.unloadAsr();
+      else if (store.data.settings.ttsEngine === id) {
+        stopSpeech(); await store.updateSettings({ ttsResident: false }); await speech.configure(store.data.settings);
+      }
+      notifyWorkspace(); return workspaceSnapshot();
     });
     handler('resources:cancel', () => { voiceResources.cancel(); return workspaceSnapshot(); });
     handler('workbench:add', async () => { const picked = await dialog.showOpenDialog(workbench, { title: '添加本地项目', defaultPath: backend.state.cwd, properties: ['openDirectory'] }); if (picked.canceled) return null; const result = await store.add(picked.filePaths[0]); notifyWorkspace(); return result; });
@@ -343,13 +369,15 @@ else {
     handler('workbench:settings', async (_event, patch) => {
       if (!patch || typeof patch !== 'object') throw new Error('设置无效。');
       const previous = store.data.settings;
+      const changesEngine = ['ttsResident','ttsEngine','qwenRoot'].some(key => key in patch && patch[key] !== previous[key]);
+      if (voiceResources.active && changesEngine) throw new Error('模型正在准备，请先取消下载或等待载入完成。');
       if (patch.ttsResident === true && !speech.status().engines[patch.ttsEngine ?? previous.ttsEngine ?? 'qwen']) throw new Error('请先下载所选播报引擎的资源，再开启常驻。');
       await store.updateSettings(patch); registerShortcuts();
       const next = store.data.settings;
       if (!next.ttsResident || next.ttsEngine !== previous.ttsEngine || next.qwenRoot !== previous.qwenRoot) chat.webContents.send('speech:stop');
       else if ((previous.autoSpeak && !next.autoSpeak) || next.qwenVoice !== previous.qwenVoice || next.voice !== previous.voice || next.speed !== previous.speed) stopSpeech();
       if (patch.completionSound === false) chat.webContents.send('notification:sound', { action: 'stop' });
-      if (['ttsResident','ttsEngine','qwenRoot'].some(key => key in patch)) speech.configure(next);
+      if (!closing && !voiceResources.active && (changesEngine || patch.ttsResident === true && speech.phase === 'error')) speech.configure(next);
       notifyWorkspace(); return workspaceSnapshot();
     });
     handler('speech:choose-qwen', async () => {
@@ -466,11 +494,17 @@ else {
     registerShortcuts(); speech.configure(store.data.settings); notifyWorkspace();
     await backend.connect();
     if (argument('show') === 'workbench') showWorkbench();
-  }).catch(error => { console.error('[companion:startup]', error.stack); dialog.showErrorBox('桌面伙伴未能启动', error.message); closing = true; app.exit(1); });
+  }).catch(error => {
+    // Closing the CLI during startup rejects its connection promise. A native
+    // error dialog here would block the pending quit until somebody dismissed it.
+    if (closing) return;
+    console.error('[companion:startup]', error.stack); dialog.showErrorBox('桌面伙伴未能启动', error.message); closing = true; app.exit(1);
+  });
   app.on('before-quit', event => {
     if (closing) return; event.preventDefault(); closing = true;
     globalShortcut.unregisterAll(); tray?.destroy(); clearTimeout(captureTimer);
-    Promise.allSettled([voiceResources?.close(), speech?.close(), wallpaperHost?.close(), backend?.close(), store?.queue, characterBox ? saveAppearance() : Promise.resolve()]).finally(() => app.exit(0));
+    Promise.allSettled([voiceResources?.close(), speech?.close(), wallpaperHost?.close(), backend?.close(), store?.queue, characterBox ? saveAppearance() : Promise.resolve()])
+      .then(() => speech?.close()).finally(() => app.exit(0));
   });
   app.on('window-all-closed', () => { if (closing) app.quit(); });
 }

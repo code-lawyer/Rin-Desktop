@@ -1,7 +1,7 @@
-# Corresponding source — Rin Desktop 0.3.0
+# Corresponding source — Rin Desktop 0.3.1
 
 These materials accompany the same-version binary release at
-https://github.com/code-lawyer/Rin-Desktop/releases/tag/v0.3.0 .
+https://github.com/code-lawyer/Rin-Desktop/releases/tag/v0.3.1 .
 `SOURCES.json` records each original archive, URL and SHA-256. Original source
 archives preserve upstream licenses, notices and build scripts. No warranty is
 provided. GPL/LGPL recipients may modify, rebuild, replace and redistribute the
@@ -55,42 +55,7 @@ which are also applied to CPU builds). When building from an archive, add
 `--skip_tests` alone only skips running tests. General compiler/SDK/build tools
 are not shipped in this source attachment.
 
-## libsndfile 1.2.2 (LGPL-2.1-or-later)
-
-This release replaces the upstream Python wheel's multi-codec DLL with a build
-from the supplied unmodified 1.2.2 source, with external codecs and MPEG disabled.
-The build uses LLVM-MinGW 20261006 (Clang 23.1.3), CMake 4.4.4 and Ninja 1.13.2.
-`build-sndfile.mjs` is the build script; its options are also readable without
-Node. LLVM and MinGW runtime notices are retained. Source changes: none.
-
-Set `BUILD_SHARED_LIBS=ON`, `ENABLE_EXTERNAL_LIBS=OFF`, `ENABLE_MPEG=OFF`,
-`ENABLE_EXPERIMENTAL=OFF`, `BUILD_PROGRAMS=OFF`, `BUILD_EXAMPLES=OFF`,
-`BUILD_TESTING=OFF`, `BUILD_REGTEST=OFF`, `ENABLE_CPACK=OFF`, Release mode.
-CMake 4 needs `CMAKE_POLICY_VERSION_MINIMUM=3.5` for this upstream release.
-Copy output `libsndfile.dll` as
-`<Qwen resource directory>/python/Lib/site-packages/_soundfile_data/libsndfile_x64.dll`.
-The default Qwen directory is `%LOCALAPPDATA%/VibeVoice/voice-resources/qwen-0.3.0`;
-users may select another complete resource directory in voice settings.
-It is dynamically loaded and may be replaced with an ABI-compatible rebuild.
-
-## Python-soxr 1.1.0 and libsoxr (LGPL-2.1-or-later)
-
-The PyPI sdist contains the complete libsoxr/PFFFT source, wrapper, generated
-version files and CMake scripts. The separate libsoxr archive records the
-upstream submodule revision. Nanobind 2.12.0, its robin-map source/notices and
-scikit-build-core 0.12.2 are provided as reconstruction material; the original
-wheel's unpinned nanobind build version is not proven byte-for-byte.
-
-Use full CPython 3.12 x64 development files (headers and python3.lib), a compatible
-C++17 compiler, and an isolated build environment. Modify `libsoxr/src` as needed.
-Install `scikit-build-core==0.12.2`, `nanobind==2.12.0`, setuptools,
-`setuptools_scm[toml]`, and numpy, then from the extracted soxr source run:
-
-```powershell
-python -m pip wheel --no-deps --no-build-isolation . -w wheelhouse -Ccmake.define.USE_SYSTEM_LIBSOXR=OFF
-```
-
-After closing the application/Qwen process, replace the installed `soxr` folder
-under `<Qwen resource directory>/python/Lib/site-packages` with the rebuilt
-wheel's directory, including the rebuilt `soxr_ext.pyd`; preserve licenses.
-No integrity check prevents modification or loading compatible rebuilt modules.
+Model weights and the optional Qwen Python environment are not distributed in
+this release. The application downloads them from their upstream publishers
+only after the user selects Download and load model. Their original upstream
+licenses remain applicable.

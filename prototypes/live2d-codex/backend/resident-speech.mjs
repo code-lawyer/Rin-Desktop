@@ -9,6 +9,7 @@ export class ResidentSpeech extends EventEmitter {
   constructor(models, { executable, qwenRoot = '', factory } = {}) {
     super(); this.models = models; this.executable = executable; this.qwenRoot = qwenRoot;
     this.asr = new LocalSpeech(models, { executable });
+    this.asr.onState = () => this.emit('state',this.status());
     this.factory = factory ?? ((engine, root) => engine === 'qwen'
       ? new QwenSpeech(root) : new KokoroResident(models, executable));
     this.settings = {}; this.worker = null; this.revision = 0;
@@ -56,6 +57,8 @@ export class ResidentSpeech extends EventEmitter {
     return task;
   }
   transcribe(data) { return this.asr.transcribe(data); }
+  async loadAsr() { try { await this.asr.run('load-asr', {}); } catch(error) { this.asr.stop('asr'); throw error; } this.emit('state', this.status()); }
+  unloadAsr() { this.asr.stop('asr'); this.emit('state', this.status()); }
   async synthesize(text, settings = this.settings) {
     if (typeof text !== 'string' || !text.trim() || text.length > 2000) throw new Error('播报片段长度无效。');
     if (!this.settings.ttsResident) throw new Error('语音未加载，请在工作台开启「常驻加载播报模型」。');

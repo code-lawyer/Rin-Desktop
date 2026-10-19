@@ -16,7 +16,7 @@
     <section id="settings" class="page settings" hidden>
       <div class="page-heading"><div><h2>语音与按键</h2><p>本地听写、回复播报，以及随时可用的键盘入口。</p></div><button id="save-settings" class="primary">保存设置</button></div>
       <div class="settings-scroll">
-      <section class="setting-section" id="voice-downloads"><h3>语音资源 · 按需下载</h3><p class="hint">只使用文字对话无需下载。首次启用听写或播报时选择对应资源；下载后保存在本机，后续直接复用。</p><div id="resource-packs"></div><p id="resource-progress" class="hint" role="status" aria-live="polite" hidden></p><progress id="resource-meter" max="1" value="0" hidden aria-label="语音资源下载进度"></progress><button id="cancel-resource" hidden>取消下载</button></section>
+      <section class="setting-section" id="voice-downloads"><h3>本地语音模型</h3><p class="hint">需要语音时再下载并载入。模型直接来自 Hugging Face，不包含在应用中；已下载的模型会保留，释放模型只清空内存。</p><div id="resource-packs"></div><p id="resource-progress" class="hint" role="status" aria-live="polite" hidden></p><progress id="resource-meter" max="1" value="0" hidden aria-label="语音模型准备进度"></progress><button id="cancel-resource" hidden>取消准备</button></section>
       <section class="setting-section"><h3>当前对话</h3><div class="field-grid"><label>模型<select id="model"></select></label><label>推理强度<select id="effort"></select></label></div><p class="hint">模型设置应用于当前对话；不修改 Codex 的全局配置。</p></section>
       <section class="setting-section" id="speech-settings-section">
         <h3>回复提醒</h3>

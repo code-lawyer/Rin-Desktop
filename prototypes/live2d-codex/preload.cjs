@@ -18,6 +18,7 @@ contextBridge.exposeInMainWorld('companion', {
   chooseModel: model => ipcRenderer.invoke('companion:model', model),
   workspace: () => ipcRenderer.invoke('workbench:snapshot'),
   downloadResource: id => ipcRenderer.invoke('resources:download', id),
+  unloadResource: id => ipcRenderer.invoke('resources:unload', id),
   cancelDownload: () => ipcRenderer.invoke('resources:cancel'),
   useData: () => ipcRenderer.invoke('workbench:use-data'),
   addProject: () => ipcRenderer.invoke('workbench:add'),

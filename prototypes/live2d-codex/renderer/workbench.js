@@ -134,24 +134,29 @@ function updateSpeechStatus() {
 function updateResourceStatus() {
   const resource = workspace.resources, speech = workspace.speech ?? {}, host = $('resource-packs');
   if (!resource) return;
-  const active = ['downloading','verifying','installing'].includes(resource.phase);
+  const active = ['downloading','verifying','installing','runtime','loading'].includes(resource.phase);
+  for (const id of ['tts-resident','tts-engine','choose-qwen']) $(id).disabled = active;
   const format = bytes => bytes >= 1024 ** 3 ? `${(bytes / 1024 ** 3).toFixed(2)} GiB` : `${Math.ceil(bytes / 1024 ** 2)} MiB`;
   for (const pack of resource.packs) {
     let row = [...host.children].find(row => row.dataset.resource === pack.id);
     if (!row) {
       row = node('div', undefined, 'setting-row'); row.dataset.resource = pack.id;
       row.append(node('span', undefined, 'hint'), node('button'));
-      row.lastChild.onclick = act(async () => { acceptWorkspace(await run(api.downloadResource(pack.id))); updateResourceStatus(); }); host.append(row);
+      row.lastChild.onclick = act(async () => { acceptWorkspace(await run(row.lastChild.dataset.action === 'unload' ? api.unloadResource(pack.id) : api.downloadResource(pack.id))); updateResourceStatus(); }); host.append(row);
     }
     const installed = pack.installed || (pack.id === 'asr' ? speech.asr : speech.engines?.[pack.id]);
-    row.firstChild.textContent = `${pack.label} · ${installed ? '本机已有' : `下载 ${format(pack.bytes)} · 解包 ${format(pack.unpackedBytes)}`}`;
-    row.lastChild.textContent = installed ? '已就绪' : active && resource.id === pack.id ? '正在处理…' : '下载';
-    row.lastChild.disabled = installed || active;
+    const loaded = pack.id === 'asr' ? speech.loaded?.includes('asr') : speech.engine === pack.id && speech.loaded?.includes('tts');
+    row.firstChild.textContent = `${pack.label} · ${loaded ? '已载入' : installed ? '已下载 · 未载入' : `模型 ${format(pack.bytes)} · Hugging Face${pack.runtimeBytes ? `；首次另需约 ${format(pack.runtimeBytes)} 运行依赖` : ''}`}`;
+    row.lastChild.dataset.action = loaded ? 'unload' : 'load';
+    row.lastChild.textContent = active && resource.id === pack.id ? (resource.phase === 'loading' ? '正在载入…' : '正在准备…') : loaded ? '释放模型' : installed ? '载入模型' : resource.id === pack.id && ['error','cancelled'].includes(resource.phase) ? '继续下载并载入' : '下载并载入模型';
+    row.lastChild.disabled = active;
   }
-  const phases = {downloading:'正在下载',verifying:'正在校验',installing:'正在安装资源，请稍候',ready:'资源已就绪，可启用听写或常驻播报'};
+  const phases = {downloading:'正在下载',verifying:'正在校验',installing:'正在准备模型文件',runtime:'正在准备语音运行环境',loading:'正在载入模型',ready:'模型已载入，可以使用语音功能',cancelled:'已取消，已下载的内容会保留'};
   $('resource-progress').hidden = resource.phase === 'idle';
-  $('resource-progress').textContent = resource.error || `${phases[resource.phase] || ''}${resource.phase === 'downloading' ? ` · ${format(resource.received)} / ${format(resource.total)}` : ''}`;
-  $('resource-meter').hidden = !active; $('resource-meter').value = resource.total ? resource.received / resource.total : 0;
+  $('resource-progress').textContent = resource.error || `${resource.stage || phases[resource.phase] || ''}${resource.phase === 'downloading' && resource.total ? ` · ${Math.min(100,Math.floor(100 * resource.received / resource.total))}% · ${format(resource.received)} / ${format(resource.total)}` : ''}`;
+  $('resource-meter').hidden = !active;
+  if (resource.phase === 'downloading' && resource.total) $('resource-meter').value = Math.min(1, resource.received / resource.total);
+  else $('resource-meter').removeAttribute('value');
   $('cancel-resource').hidden = !resource.cancelable;
 }
 async function saveSpeechChoice(patch) {
