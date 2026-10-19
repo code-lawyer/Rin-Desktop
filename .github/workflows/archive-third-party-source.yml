@@ -1,0 +1,53 @@
+name: Archive third-party source
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Application version, for example 0.3.1
+        required: true
+        type: string
+      destination_release_id:
+        description: Existing developer source release ID
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  archive:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      VERSION: ${{ inputs.version }}
+      DESTINATION_ID: ${{ inputs.destination_release_id }}
+    steps:
+      - name: Copy and verify the corresponding source archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          [[ "$DESTINATION_ID" =~ ^[0-9]+$ ]]
+          archive="Third-Party-Corresponding-Source-$VERSION.zip"
+          source_tag="v$VERSION"
+          destination_tag="third-party-source-v$VERSION"
+          source_release=$(gh api "repos/$GH_REPO/releases/tags/$source_tag")
+          source_asset=$(jq -ce --arg name "$archive" '.assets[] | select(.name == $name and .state == "uploaded")' <<< "$source_release")
+          digest=$(jq -r '.digest' <<< "$source_asset")
+          size=$(jq -r '.size' <<< "$source_asset")
+          [[ "$digest" =~ ^sha256:[a-f0-9]{64}$ ]]
+          destination=$(gh api "repos/$GH_REPO/releases/$DESTINATION_ID")
+          [[ $(jq -r '.tag_name' <<< "$destination") == "$destination_tag" ]]
+          existing=$(jq -c --arg name "$archive" '[.assets[] | select(.name == $name)]' <<< "$destination")
+          if [[ $(jq 'length' <<< "$existing") == 0 ]]; then
+            temporary=$(mktemp -d)
+            trap 'rm -rf -- "$temporary"' EXIT
+            gh release download "$source_tag" --repo "$GH_REPO" --pattern "$archive" --dir "$temporary"
+            printf '%s  %s\n' "${digest#sha256:}" "$temporary/$archive" | sha256sum --check -
+            gh release upload "$destination_tag" "$temporary/$archive" --repo "$GH_REPO"
+          fi
+          gh api "repos/$GH_REPO/releases/$DESTINATION_ID" | jq -e \
+            --arg name "$archive" --arg digest "$digest" --argjson size "$size" \
+            'any(.assets[]; .name == $name and .digest == $digest and .size == $size and .state == "uploaded")'
