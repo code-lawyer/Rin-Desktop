@@ -1,7 +1,7 @@
 import { spawn, execFileSync } from 'node:child_process';
-import { existsSync, readFileSync, mkdirSync, openSync, closeSync } from 'node:fs';
+import { existsSync, readFileSync, mkdirSync, openSync, closeSync, statSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { resolve, join } from 'node:path';
+import { resolve, join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 export const projectRoot = resolve(import.meta.dirname, '../..');
@@ -40,7 +40,7 @@ export function launchPlan(args = [], root = projectRoot) {
   };
 }
 
-export function inspectLaunch(plan, { platform = process.platform, nodeVersion = process.versions.node } = {}) {
+export function inspectLaunch(plan, { platform = process.platform, nodeVersion = process.versions.node, env = process.env } = {}) {
   const problems = [], appRequire = createRequire(join(plan.appRoot, 'package.json'));
   let version = null, electron = null;
   if (platform !== 'win32') problems.push('Rin Desktop currently requires Windows x64.');
@@ -54,8 +54,14 @@ export function inspectLaunch(plan, { platform = process.platform, nodeVersion =
   try { appRequire.resolve('esbuild'); }
   catch { problems.push('Build dependencies are missing. Run npm --prefix prototypes/live2d-codex ci.'); }
   try {
-    electron = appRequire('electron');
-    if (typeof electron !== 'string' || !existsSync(electron)) throw new Error('missing executable');
+    // Requiring Electron can run its installer when the binary is missing.
+    // Status and --check must only inspect the installed package metadata.
+    const electronRoot = dirname(appRequire.resolve('electron/package.json'));
+    const pathFile = join(electronRoot, 'path.txt');
+    const executable = existsSync(pathFile) ? readFileSync(pathFile, 'utf8').trim() : '';
+    if (!executable && !env.ELECTRON_OVERRIDE_DIST_PATH) throw new Error('missing executable path');
+    electron = join(env.ELECTRON_OVERRIDE_DIST_PATH || join(electronRoot, 'dist'), executable || 'electron');
+    if (!statSync(electron).isFile()) throw new Error('missing executable');
   } catch { electron = null; problems.push('Electron is unavailable. Run npm --prefix prototypes/live2d-codex ci without ELECTRON_SKIP_BINARY_DOWNLOAD.'); }
   const resources = ['vendor/live2dcubismcore.min.js'];
   if (plan.mode === 'avatar') resources.push('assets/hiyori/Hiyori.model3.json');

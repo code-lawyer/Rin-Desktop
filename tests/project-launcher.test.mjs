@@ -56,6 +56,25 @@ async function processFixture(t) {
   return { root, appRoot: root, buildScript, electron: process.execPath, args: [] };
 }
 
+test('read-only launch inspection never loads Electron installation hooks', async t => {
+  const fixture = await processFixture(t), plan = launchPlan([], fixture.root);
+  const electronRoot = join(plan.appRoot, 'node_modules/electron'), marker = join(fixture.root, 'installer-ran');
+  await mkdir(electronRoot, { recursive: true });
+  await writeFile(join(electronRoot, 'package.json'), JSON.stringify({ name: 'electron', main: 'index.js' }));
+  await writeFile(join(electronRoot, 'index.js'), `require('node:fs').writeFileSync(${JSON.stringify(marker)}, 'unexpected install'); throw new Error('Installer must never execute');`);
+  const options = { platform: 'win32', nodeVersion: '24.0.0', env: {} };
+  assert.equal(inspectLaunch(plan, options).electron, null);
+  await writeFile(join(electronRoot, 'path.txt'), 'electron.exe');
+  assert.equal(inspectLaunch(plan, options).electron, null);
+  await mkdir(join(electronRoot, 'dist'));
+  const binary = join(electronRoot, 'dist/electron.exe'); await writeFile(binary, 'fixture');
+  assert.equal(inspectLaunch(plan, options).electron, binary);
+  const override = join(fixture.root, 'override'); await mkdir(override);
+  await writeFile(join(override, 'electron.exe'), 'fixture override');
+  assert.equal(inspectLaunch(plan, { ...options, env: { ELECTRON_OVERRIDE_DIST_PATH: override } }).electron, join(override, 'electron.exe'));
+  assert.equal(existsSync(marker), false, 'metadata checks must not invoke the package entry point');
+});
+
 test('a failed source build rejects before an application can run', async t => {
   const plan = await processFixture(t), marker = join(plan.root, 'app-started');
   await writeFile(plan.buildScript, 'process.exit(9);\n');
