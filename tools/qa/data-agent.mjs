@@ -1,0 +1,20 @@
+import { existsSync } from 'node:fs';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { resolve, join } from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
+
+const bundledApp = resolve(import.meta.dirname, '../resources/app');
+const bundled = existsSync(join(bundledApp, 'portable.json'));
+const root = resolve(import.meta.dirname, '../..');
+const app = bundled ? bundledApp : join(root, 'prototypes/live2d-codex');
+const tests = ['data-safety','submission-safety','agent-protocol','agent-contract','companion','draft-session','rpc','provider-switch'].map(name => `tests/${name}.test.mjs`);
+const build = bundled ? JSON.parse(await readFile(join(app, 'portable.json'), 'utf8')).testBuild?.id : 'source';
+const runId = new Date().toISOString().replaceAll(':','-') + '-' + randomUUID().slice(0,8);
+const output = bundled ? join(process.env.LOCALAPPDATA || process.env.TEMP, 'VibeVoice/test-reports', build || 'test', runId) : join(root, 'work/qa/data-agent-release', runId);
+await mkdir(join(output,'tmp'), { recursive: true });
+const result = spawnSync(process.execPath, ['--test', ...tests], { cwd: app, windowsHide: true, encoding: 'utf8', env: { ...process.env, TEMP: join(output,'tmp'), TMP: join(output,'tmp'), TMPDIR: join(output,'tmp') }, maxBuffer: 8 * 1024 * 1024 });
+await writeFile(join(output,'tests.log'), (result.stdout || '') + (result.stderr || '') + (result.error?.message || ''));
+const summary = { build, createdAt: new Date().toISOString(), passed: result.status === 0, exitCode: result.status, scope: 'offline contracts only; no accounts, CLI execution, models or hardware', tests, output };
+await writeFile(join(output,'result.json'), JSON.stringify(summary,null,2));
+console.log(JSON.stringify(summary,null,2));process.exitCode = result.status === 0 ? 0 : 1;

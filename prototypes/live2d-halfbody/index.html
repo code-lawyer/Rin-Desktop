@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Rin · 女生 Live2D 半身预览</title><link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <main>
+    <section class="stage" aria-label="人物预览">
+      <div class="brand">RIN <span>CHARACTER STUDY / 01</span></div>
+      <div class="ambient"></div><div id="canvas"></div>
+      <div class="stage-note"><span class="dot"></span><span id="render-status">正在加载人物…</span></div>
+      <div id="error" role="alert" hidden><p id="error-message"></p><button id="retry">重新加载人物</button></div>
+      <div class="stage-bottom"><span>女生半身样例</span><span>原有壁纸保持不变</span></div>
+    </section>
+    <aside>
+      <div class="eyebrow">LIVE2D / 动作预览</div>
+      <h1>雨夜，醒来。</h1>
+      <p class="intro">试着让她转过头，再听一段话。<br>目光、眨眼和发尾随动作自然变化。</p>
+      <fieldset id="controls" disabled>
+        <legend class="sr-only">动作与语音控制</legend>
+        <div class="section-label">01 <span>目光与动作</span></div>
+        <div class="segmented" role="group" aria-label="动作模式">
+          <button data-mode="auto" aria-pressed="true">自动演示</button>
+          <button data-mode="follow" aria-pressed="false">跟随鼠标</button>
+          <button data-mode="manual" aria-pressed="false">手动调节</button>
+        </div>
+        <label class="slider">左右转头 <output id="yaw-value">0%</output><input id="yaw" type="range" min="-100" max="100" value="0" step="1"></label>
+        <label class="slider">抬头低头 <output id="pitch-value">0%</output><input id="pitch" type="range" min="-100" max="100" value="0" step="1"></label>
+        <label class="slider">发丝轻风 <output id="wind-value">35%</output><input id="wind" type="range" min="0" max="1" value=".35" step=".01"></label>
+        <div class="row"><button class="subtle" id="blink">眨一下眼</button><button class="subtle" id="reset">回到正面</button></div>
+        <div class="section-label audio-label">02 <span>听她说话</span></div>
+        <p class="quote">“晚上好，我是凛。现在的我，可以轻轻转头，也会眨眼了。你听到的每一句话，都会带动我的嘴唇。窗外的雨还在下，我就在这里陪着你。”</p>
+        <button class="primary" id="play"><span>▷</span> 播放语音样例</button>
+        <div class="row audio-actions"><button class="subtle" id="stop" disabled>停止播放</button><label class="upload">试用自己的音频<input id="upload" type="file" accept="audio/*"></label></div>
+        <div class="meter-label"><span id="audio-status" role="status">本地女声 · 待播放</span><span>口型幅度</span></div>
+        <div class="meter"><div id="mouth-meter"></div></div>
+      </fieldset>
+      <p class="footnote">小角度半身绑定样例 · 可连续调节<br>音频仅在本机播放，关闭页面即可结束预览。</p>
+    </aside>
+  </main>
+  <script src="/cubism-core.js"></script><script type="module" src="/preview.js"></script>
+</body>
+</html>

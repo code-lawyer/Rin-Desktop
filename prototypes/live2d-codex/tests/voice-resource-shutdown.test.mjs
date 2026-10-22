@@ -1,17 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import vm from 'node:vm';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { VoiceResources } from '../backend/voice-resources.mjs';
 import { ResidentSpeech } from '../backend/resident-speech.mjs';
+import { activateVoiceResource } from '../backend/voice-activation.mjs';
 
 // Exercise the application's real activation boundary with controllable I/O.
-const main = (await readFile(new URL('../main.cjs', import.meta.url), 'utf8')).replaceAll('\r\n', '\n');
-const start = main.indexOf('async (id, signal) => {', main.indexOf('activate:'));
-const end = main.indexOf('\n      }\n    });', start);
-assert.ok(start >= 0 && end > start, 'Actual activate callback was not found');
-const source = main.slice(start, end + '\n      }'.length);
 const manifest = JSON.parse(await readFile(new URL('../voice-resources.json', import.meta.url), 'utf8'));
 const deferred = () => {
   let resolve, reject;
@@ -33,12 +28,15 @@ for (const stage of ['saving', 'loading']) {
         if (stage === 'saving') { entered.resolve(); await saved.promise; }
       }
     };
-    const context = { closing: false, speech, store, stopSpeech() {}, notifyWorkspace() {}, voiceResources: null };
-    const activate = vm.runInNewContext(`(${source})`, context);
-    const resources = context.voiceResources = new VoiceResources(resolve('unused-shutdown-fixture'), manifest, { activate });
+    let closing = false;
+    const activate = (id, signal) => activateVoiceResource(id, signal, {
+      speech, store, stopSpeech() {}, notifyWorkspace() {}, isClosing: () => closing,
+      qwenDirectory: () => resources.directory('qwen')
+    });
+    const resources = new VoiceResources(resolve('unused-shutdown-fixture'), manifest, { activate });
     const operation = resources.start('qwen', { existing: true });
     const rejected = assert.rejects(operation, /退出/);
-    await entered.promise; context.closing = true;
+    await entered.promise; closing = true;
     const resourceClose = resources.close(), earlySpeechClose = speech.close(); saved.resolve();
     await Promise.allSettled([resourceClose, earlySpeechClose]); await speech.close(); await rejected;
     assert.equal(resources.active, null); assert.equal(speech.worker, null); assert.equal(speech.phase, 'unloaded');

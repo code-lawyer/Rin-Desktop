@@ -4,7 +4,12 @@
 <header class="titlebar"><span class="brand">Rin Desktop</span><span class="title-sub">工作台</span><div class="window-actions"><button id="back-chat">回到对话</button><button id="close" class="close" aria-label="收起工作台"><svg class="ui-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="m5 5 10 10M15 5 5 15"/></svg></button></div></header>
 <div id="notice" role="alert" hidden></div>
 <div class="layout">
-  <aside class="sidebar"><div class="section-heading"><h1>项目</h1><button id="add-project" class="icon" aria-label="添加项目文件夹" title="添加本地文件夹"><svg class="ui-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 4v12M4 10h12"/></svg></button></div><div id="projects" class="project-list" aria-label="本地项目"></div><div class="sidebar-bottom"><button id="settings-tab" aria-pressed="false">壁纸与设置</button><p id="connection">正在连接 Codex…</p></div></aside>
+  <aside class="sidebar">
+    <div class="agent-picker"><label for="agent-select">Agent</label><div class="agent-controls"><select id="agent-select"></select><button id="agent-reconnect" class="icon" aria-label="重新连接 Agent" title="重新连接 Agent"><svg class="ui-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M16 8a6.2 6.2 0 1 0-.6 5M16 3v5h-5"/></svg></button></div></div>
+    <div class="section-heading"><h1>项目</h1><button id="add-project" class="icon" aria-label="添加项目文件夹" title="添加本地文件夹"><svg class="ui-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 4v12M4 10h12"/></svg></button></div>
+    <div id="projects" class="project-list" aria-label="本地项目"></div>
+    <div class="sidebar-bottom"><button id="settings-tab" aria-pressed="false"><svg class="ui-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M4 3v5m0 4v5M10 3v9m0 4v1M16 3v1m0 4v9M2 8h4m2 4h4m2-8h4"/></svg>壁纸与设置</button><p id="connection" role="status">正在连接 Agent…</p><details id="agent-details" hidden><summary>连接帮助</summary><p id="agent-help" class="hint"></p></details></div>
+  </aside>
   <main>
     <section id="conversations" class="page">
       <div class="page-heading"><div class="project-title"><h2 id="project-title">选择本地项目</h2><p id="project-path"></p></div><button id="remove-project" class="quiet" title="只移除工作台入口，不删除文件">移除入口</button><button id="new-thread" class="primary">新对话</button></div>
@@ -14,43 +19,51 @@
         <section class="detail-pane" aria-label="所选对话"><div id="empty-detail" class="empty"><h3>从这里接着聊</h3><p>选择一段对话查看历史，或在当前项目开始新对话。文件与会话保留在本机。</p></div><div id="detail" hidden><div class="detail-heading"><input id="thread-title" maxlength="100" aria-label="对话名称"><button id="rename" class="quiet">重命名</button></div><div class="detail-actions"><span id="thread-info"></span><button id="resume" class="primary">继续这段对话</button></div><button id="more-history" class="load-more" hidden>查看更早的消息</button><div id="history"></div></div></section></div>
     </section>
     <section id="settings" class="page settings" hidden>
-      <div class="page-heading"><div><h2>壁纸与设置</h2><p>选择桌面伙伴，设置声音与日常操作。</p></div><button id="save-settings" class="primary">保存设置</button></div>
+      <div class="page-heading"><div><h2>壁纸与设置</h2><p>按分类调整，保留你的使用习惯。</p></div><button id="save-settings" class="primary">保存设置</button></div>
+      <nav class="settings-nav" aria-label="设置分类"><button type="button" data-setting-target="wallpaper-settings" aria-pressed="true">壁纸</button><button type="button" data-setting-target="remote-settings" aria-pressed="false">遥控器</button><button type="button" data-setting-target="playback-settings" aria-pressed="false">声音与听写</button><button type="button" data-setting-target="conversation-settings" aria-pressed="false">对话</button><button type="button" data-setting-target="shortcut-settings" aria-pressed="false">键盘</button><button type="button" data-setting-target="data-settings" aria-pressed="false">数据</button></nav>
       <div class="settings-scroll">
-      <section class="setting-section" id="wallpaper-settings" aria-labelledby="wallpaper-heading">
+      <section class="setting-section" id="wallpaper-settings" data-settings-group="wallpaper" aria-labelledby="wallpaper-heading">
         <h3 id="wallpaper-heading">壁纸人物</h3>
         <div class="character-options" role="radiogroup" aria-label="壁纸人物" aria-describedby="character-help">
           <label class="character-option"><input type="radio" name="wallpaper-character" value="female" checked><span class="character-card"><img src="app://local/assets/character-previews/female.png" alt="雨夜窗前，穿红衬衫的黑发女生坐在扶手椅中使用笔记本电脑"><span class="character-caption"><strong>默认女生</strong><span>红衬衫 · Serena 女声</span></span></span></label>
           <label class="character-option"><input type="radio" name="wallpaper-character" value="male"><span class="character-card"><img src="app://local/assets/character-previews/male.png" alt="雨夜窗前，戴金丝眼镜的黑色短发男青年，穿黑衬衫和西裤使用笔记本电脑"><span class="character-caption"><strong>黑衫男生</strong><span>金丝眼镜 · Dylan 男声</span></span></span></label>
         </div>
-        <p id="character-help" class="hint">新人物载入成功后自动保存，下次启动继续使用，同时停止当前播报并切换两种引擎的默认声线。载入失败时保留原人物和声线，可点击重试；也可以在下方另选声线。</p>
+        <p id="character-help" class="hint">选择后自动保存，同时切换默认声线。加载失败会保留原人物。</p>
         <p id="character-status" class="hint" role="status" aria-live="polite"></p>
         <button id="retry-character" aria-describedby="character-status" hidden>重试加载</button>
       </section>
-      <section class="setting-section" id="voice-downloads"><h3>本地语音模型</h3><p class="hint">需要语音时再下载并载入。模型直接来自 Hugging Face，不包含在应用中；已下载的模型会保留，释放模型只清空内存。</p><div id="resource-packs"></div><p id="resource-progress" class="hint" role="status" aria-live="polite" hidden></p><progress id="resource-meter" max="1" value="0" hidden aria-label="语音模型准备进度"></progress><button id="cancel-resource" hidden>取消准备</button></section>
-      <section class="setting-section"><h3>当前对话</h3><div class="field-grid"><label>模型<select id="model"></select></label><label>推理强度<select id="effort"></select></label></div><p class="hint">模型设置应用于当前对话；不修改 Codex 的全局配置。</p></section>
-      <section class="setting-section" id="speech-settings-section">
-        <h3>回复提醒</h3>
-        <div class="setting-row"><label class="check"><input id="completion-sound" type="checkbox">回复完整后播放提示音</label><button id="preview-completion-sound">试听提示音</button></div>
-        <p class="hint">每轮回复完成后响一次，收起气泡也能听到。无需加载语音模型；听到后可打开对话，点击「朗读此条」。开关立即生效。</p>
-      </section>
-      <section class="setting-section">
-        <h3>回复播报</h3>
-        <div class="residency-control"><label class="check"><input id="tts-resident" type="checkbox" aria-describedby="residency-help">常驻加载播报模型</label><span id="tts-phase" class="tts-phase" role="status">未加载</span></div>
-        <p id="residency-help" class="hint">默认关闭。开启后保留模型，逐条点击气泡中的「朗读此条」才发声；关闭后停止播报并释放模型。此开关立即生效，并记住下次启动的选择。</p>
+      <section class="setting-section" id="playback-settings" data-settings-group="voice" hidden>
+        <h3>回复朗读</h3>
+        <div class="residency-control"><label class="check"><input id="tts-resident" type="checkbox" aria-describedby="residency-help">启用语音朗读</label><span id="tts-phase" class="tts-phase" role="status">未加载</span></div>
+        <p id="residency-help" class="hint">开启后模型保留在内存。对话中点击「朗读」播放；关闭后释放模型。</p>
         <p id="tts-error" class="tts-error" role="alert" hidden></p><button id="retry-tts" hidden>重新加载</button>
         <div class="field-grid"><label>播报引擎<select id="tts-engine"><option value="qwen">Qwen3-TTS · 试用</option><option value="kokoro">Kokoro · 原有轻量版</option></select></label><label id="qwen-voice-field">中文声线<select id="qwen-voice"></select></label></div>
-        <p id="tts-footprint" class="hint"></p>
-        <div id="qwen-resources" class="setting-row"><span id="qwen-resource-status" class="hint"></span><button id="choose-qwen">选择资源目录</button></div>
-        <div class="setting-row"><span class="hint">从便携版升级：沿用已有项目、会话、草稿和设置，切换后重启。</span><button id="use-existing-data">使用已有数据目录</button></div>
         <div id="kokoro-fields" class="field-grid" hidden><label>中文声线<select id="voice"><option value="3">女声 01 · zf_001</option><option value="4">女声 02 · zf_002</option><option value="46">女声 43 · zf_079</option><option value="48">女声 45 · zf_084</option><option value="58">男声 01 · zm_009</option><option value="59">男声 02 · zm_010</option></select></label><label>语速<select id="speed"><option value="0.9">稍慢 · 0.9×</option><option value="1">自然 · 1.0×</option><option value="1.1">稍快 · 1.1×</option></select></label></div>
-        <div class="setting-row narration-choice"><label class="check"><input id="prepare-speech" type="checkbox">回复完成后提前准备语音（可选）</label></div>
-        <p class="hint">默认关闭。开启后在后台生成当前回复的完整语音，占用本机算力，但不会自动发声。朗读键按一次即可：已就绪时立即播放，准备中则完成后播放。只保留最近几条的临时缓存。</p>
-        <div class="setting-row narration-choice"><label class="check"><input id="auto-speak" type="checkbox">自动播报每条完整回复（可选）</label><button id="preview-voice">保存并试听</button></div>
-        <p class="hint">每条回复完整准备后连续播放；长回复需要更久。关闭自动播报即可逐条选择。停止、切换对话或开始听写会取消待播放请求。停止播报不会卸载常驻模型；关闭常驻开关才释放模型和音频缓存。</p>
+        <div class="setting-row narration-choice"><label class="check"><input id="auto-speak" type="checkbox">自动朗读完整回复</label><button id="preview-voice">保存并试听</button></div>
+        <details class="setting-details"><summary>准备方式与资源占用</summary><label class="check"><input id="prepare-speech" type="checkbox">回复完成后提前准备语音</label><p class="hint">提前准备会占用算力，但不会自动发声。长回复需要更久；停止朗读、切换对话或开始听写会取消待播放内容。</p><p id="tts-footprint" class="hint"></p></details>
       </section>
-      <section class="setting-section"><h3>本地听写</h3><p id="model-status" class="hint"></p><label>录音设备<select id="microphone"><option value="">系统默认麦克风</option></select></label><p class="hint">听写独立按需加载，不受播报开关影响。点击气泡的「听写」开始，再点一次结束；文字填入输入框，由你确认发送。单次最长 60 秒。</p><button id="refresh-microphones">刷新录音设备</button></section>
-      <section class="setting-section"><h3>全局快捷键</h3><p id="shortcut-errors" class="tts-error" role="alert" hidden></p><div class="key-fields" id="shortcuts"></div><p class="hint">点击输入框后按下组合键，保存后生效。Esc 取消录入，Backspace 清除。短按一次执行操作，连发会被忽略；再次触发前请松开约 1.2 秒。冲突时仍可使用托盘与屏幕按钮。</p><p class="hint">听写键按一次开始，再按一次结束；识别完成后，发送键只提交当前草稿，不处理权限审批。朗读键只读当前完整回复，气泡收起也能播放；语音模型未加载时打开设置，不自动加载。</p></section>
-      <section class="setting-section"><h3>遥控器按键映射</h3><label class="check"><input id="remote-enabled" type="checkbox">启用额外按键映射（可选）</label><p class="hint">小米遥控器配对到 Windows 并能输出键盘按键后，在下方为同一组操作录入按键，保存后生效。新增的呼出、发送、朗读映射默认留空，由你指定。映射对所有键盘设备生效。无需遥控器也能使用全部功能；录音来自电脑麦克风。</p><div class="key-fields" id="remote-keys"></div><p class="hint">工作台内可用 Tab 切换焦点、方向键选择列表、Enter 确认、Esc 返回。没有识别到遥控器按键时，使用普通快捷键即可。</p></section>
+      <section class="setting-section" id="dictation-settings" data-settings-group="voice" hidden><h3>语音听写</h3><p id="model-status" class="hint"></p><div class="microphone-source"><strong>遥控器麦克风</strong><p id="remote-microphone-status" class="hint" role="status" aria-live="polite">遥控器麦克风未连接</p></div><label>电脑麦克风<select id="microphone"><option value="">系统默认麦克风</option></select></label><div class="setting-row"><p class="hint">用于「电脑听写」。按一下开始，再按一下结束；最长 60 秒。</p><button id="refresh-microphones">刷新设备</button></div></section>
+      <section class="setting-section" id="speech-settings-section" data-settings-group="voice" hidden>
+        <h3>回复提醒</h3>
+        <div class="setting-row"><label class="check"><input id="completion-sound" type="checkbox">回复完整后播放提示音</label><button id="preview-completion-sound">试听提示音</button></div>
+      </section>
+      <section class="setting-section" id="voice-downloads" data-settings-group="voice" hidden><details class="setting-details"><summary>管理本地语音模型</summary><p class="hint">已有模型直接使用。新模型来自 Hugging Face；释放模型只清空内存。</p><div id="resource-packs"></div><p id="resource-progress" class="hint" role="status" aria-live="polite" hidden></p><progress id="resource-meter" max="1" value="0" hidden aria-label="语音模型准备进度"></progress><button id="cancel-resource" hidden>取消准备</button><div id="qwen-resources" class="setting-row"><span id="qwen-resource-status" class="hint"></span><button id="choose-qwen">选择已有 Qwen 目录</button></div></details></section>
+      <section class="setting-section" id="conversation-settings" data-settings-group="conversation" hidden><h3>当前对话</h3><div class="field-grid"><label>模型<select id="model"></select></label><label>推理强度<select id="effort"></select></label></div><p class="hint">应用于当前 Agent 会话。</p><p id="permission-hint" class="hint"></p></section>
+      <section class="setting-section" id="shortcut-settings" data-settings-group="keyboard" hidden><h3>全局快捷键</h3><p id="shortcut-errors" class="tts-error" role="alert" hidden></p><div class="key-fields" id="shortcuts"></div><p class="hint">点击输入框后按组合键，保存后生效。Esc 取消，Backspace 清除。</p><details class="setting-details"><summary>使用说明</summary><p class="hint">短按一次执行；松开约 1.2 秒后可再次触发。听写键按一次开始、再按一次结束；发送只提交草稿，不处理权限审批。冲突时可使用托盘或屏幕按钮。</p></details></section>
+      <section class="setting-section" id="remote-settings" data-settings-group="remote" hidden aria-labelledby="rc003-heading">
+        <div class="setting-row remote-heading"><div><h3 id="rc003-heading">遥控器</h3><strong id="rc003-name">连接你的 RC003 遥控器</strong></div><span id="rc003-status" class="remote-status" role="status" aria-live="polite">未连接</span></div>
+        <p id="rc003-detail" class="hint"></p>
+        <div class="remote-connection-actions"><button id="rc003-scan">搜索遥控器</button><button id="rc003-reconnect" hidden>重新连接</button><button id="rc003-disconnect" hidden>断开连接</button><button id="rc003-forget" class="quiet" hidden>清除连接记录</button></div>
+        <div id="rc003-devices" class="remote-devices" aria-label="找到的遥控器"></div>
+        <label class="check"><input type="checkbox" id="rc003-auto">下次启动自动连接</label>
+        <p id="rc003-error" class="tts-error" role="alert"></p><p id="rc003-audio" class="hint" role="status" aria-live="polite"></p>
+        <div class="remote-guide"><h4>在草稿框中</h4><dl id="rc003-guide"></dl><p class="hint">上下键选择其他控件；菜单键默认打开工作台。权限请求仍需选择具体操作并确认两次。</p></div>
+        <details id="rc003-mapping" class="setting-details"><summary>自定义按钮功能</summary><p class="hint">选择后立即保存。语音转成草稿后，由你确认发送。</p>
+        <div id="rc003-buttons" class="key-fields remote-buttons"></div>
+        <div class="setting-row"><p id="rc003-last" class="hint" role="status" aria-live="polite"></p><button id="rc003-reset" class="quiet">恢复默认功能</button></div></details>
+      </section>
+      <section class="setting-section" data-settings-group="keyboard" hidden><details class="setting-details"><summary>兼容其他按键设备</summary><p class="hint">RC003 使用「遥控器」分类连接。以下通用按键对所有键盘生效，听写使用电脑麦克风。</p><label class="check"><input id="remote-enabled" type="checkbox">启用通用按键</label><div class="key-fields" id="remote-keys"></div></details></section>
+      <section class="setting-section" id="data-settings" data-settings-group="data" hidden><h3>本地数据</h3><p class="hint">沿用便携版中的项目、会话、草稿和设置。选择后重启应用。</p><button id="use-existing-data">使用已有数据目录</button></section>
       </div>
     </section>
   </main>

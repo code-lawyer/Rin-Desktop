@@ -1,0 +1,1438 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-10-21",
+  "expected": {
+    "G": 6,
+    "R": 36,
+    "B": 28,
+    "T": 24,
+    "S": 5,
+    "D": 16,
+    "K": 12
+  },
+  "records": [
+    {
+      "legacyId": "G-01",
+      "title": "离开键盘进行核心操作",
+      "disposition": "partial",
+      "taskIds": [
+        "UI-01",
+        "REM-03",
+        "REM-04"
+      ],
+      "reason": "日常遥控导航、按住说话、草稿和显式操作已接入源码；完整实机流程待验。",
+      "localArchive": "docs/history/controller-v0.2/00-project-charter.md"
+    },
+    {
+      "legacyId": "G-02",
+      "title": "控制目标明确",
+      "disposition": "partial",
+      "taskIds": [
+        "BASE-03",
+        "DATA-01",
+        "AGT-06"
+      ],
+      "reason": "已具备草稿目标绑定；未知提交与跨后端仍待验收。",
+      "localArchive": "docs/history/controller-v0.2/00-project-charter.md"
+    },
+    {
+      "legacyId": "G-03",
+      "title": "跨工具保持操作一致",
+      "disposition": "partial",
+      "taskIds": [
+        "AGT-02",
+        "AGT-03",
+        "AGT-04",
+        "AGT-05"
+      ],
+      "reason": "多后端源码不代表一致契约已验收。",
+      "localArchive": "docs/history/controller-v0.2/00-project-charter.md"
+    },
+    {
+      "legacyId": "G-04",
+      "title": "语音本地处理",
+      "disposition": "partial",
+      "taskIds": [
+        "BASE-03",
+        "BASE-04",
+        "REM-05"
+      ],
+      "reason": "现有本地引擎已交付；遥控语料及离线矩阵待补。",
+      "localArchive": "docs/history/controller-v0.2/00-project-charter.md"
+    },
+    {
+      "legacyId": "G-05",
+      "title": "控制安装复杂度",
+      "disposition": "partial",
+      "taskIds": [
+        "BASE-05",
+        "REM-06"
+      ],
+      "reason": "原生设备组件已进入打包脚本，不增加 Python 安装；独立安装验收待做。",
+      "localArchive": "docs/history/controller-v0.2/00-project-charter.md"
+    },
+    {
+      "legacyId": "G-06",
+      "title": "保留熟悉的工作界面",
+      "disposition": "pending",
+      "taskIds": [
+        "DEC-02"
+      ],
+      "reason": "原 TUI 共存要求不能被桌面聊天界面等同替代，列入路线决策。",
+      "localArchive": "docs/history/controller-v0.2/00-project-charter.md"
+    },
+    {
+      "legacyId": "R-01",
+      "title": "Windows 11 x64 运行",
+      "disposition": "partial",
+      "taskIds": [
+        "BASE-05",
+        "REL-01"
+      ],
+      "reason": "已有单机安装证据，干净系统矩阵未完成。",
+      "localArchive": "docs/history/controller-v0.2/01-product-requirements.md"
+    },
+    {
+      "legacyId": "R-02",
+      "title": "首次配置可诊断",
+      "disposition": "partial",
+      "taskIds": [
+        "ORG-02",
+        "BASE-04",
+        "REM-06"
+      ],
+      "reason": "源码/CLI/模型与应用内设备状态已有提示；独立安装与硬件异常待验。",
+      "localArchive": "docs/history/controller-v0.2/01-product-requirements.md"
+    },
+    {
+      "legacyId": "R-03",
+      "title": "已验证按钮输入",
+      "disposition": "partial",
+      "taskIds": [
+        "BASE-06",
+        "REM-02",
+        "REM-05"
+      ],
+      "reason": "来源过滤、按键生命周期和去重已进主应用；实机连发与普通键盘共存待验。",
+      "localArchive": "docs/history/controller-v0.2/01-product-requirements.md"
+    },
+    {
+      "legacyId": "R-04",
+      "title": "录音起止明确",
+      "disposition": "partial",
+      "taskIds": [
+        "REM-01",
+        "REM-03"
+      ],
+      "reason": "按住/松开、限时、取消与识别回填已接入主应用，仍待真实录音验收。",
+      "localArchive": "docs/history/controller-v0.2/01-product-requirements.md"
+    },
+    {
+      "legacyId": "R-05",
+      "title": "麦克风备用输入",
+      "disposition": "covered",
+      "taskIds": [
+        "BASE-03"
+      ],
+      "reason": "普通麦克风听写是已交付能力。",
+      "localArchive": "docs/history/controller-v0.2/01-product-requirements.md"
+    },
+    {
+      "legacyId": "R-06",
+      "title": "音频质量反馈",
+      "disposition": "partial",
+      "taskIds": [
+        "REM-03",
+        "REM-05"
+      ],
+      "reason": "生产音频质量与截断提示需要专门验收。",
+      "localArchive": "docs/history/controller-v0.2/01-product-requirements.md"
+    },
+    {
+      "legacyId": "R-07",
+      "title": "本地转写",
+      "disposition": "partial",
+      "taskIds": [
+        "BASE-03",
+        "BASE-04",
+        "REM-05"
+      ],
+      "reason": "本地 ASR 已有；完整断网/遥控矩阵待补。",
+      "localArchive": "docs/history/controller-v0.2/01-product-requirements.md"
+    },
+    {
+      "legacyId": "R-08",
+      "title": "草稿检查",
+      "disposition": "partial",
+      "taskIds": [
+        "BASE-03",
+        "DATA-02"
+      ],
+      "reason": "草稿可编辑确认，全部异常/重录组合未逐项验收。",
+      "localArchive": "docs/history/controller-v0.2/01-product-requirements.md"
+    },
+    {
+      "legacyId": "R-09",
+      "title": "录音绑定目标",
+      "disposition": "partial",
+      "taskIds": [
+        "BASE-03",
+        "REM-03",
+        "AGT-06"
+      ],
+      "reason": "现有捕获目标机制保留；遥控和跨后端需补证据。",
+      "localArchive": "docs/history/controller-v0.2/01-product-requirements.md"
+    },
+    {
+      "legacyId": "R-10",
+      "title": "显式提交",
+      "disposition": "partial",
+      "taskIds": [
+        "BASE-03",
+        "REM-04",
+        "DATA-01"
+      ],
+      "reason": "显式发送存在；设备连发和未知提交尚需闭环。",
+      "localArchive": "docs/history/controller-v0.2/01-product-requirements.md"
+    },
+    {
+      "legacyId": "R-11",
+      "title": "提交不明可处理",
+      "disposition": "pending",
+      "taskIds": [
+        "DATA-01"
+      ],
+      "reason": "需要明确 Unknown、保留草稿及恢复对账，不以普通错误提示代替。",
+      "localArchive": "docs/history/controller-v0.2/01-product-requirements.md"
+    },
+    {
+      "legacyId": "R-12",
+      "title": "项目登记",
+      "disposition": "partial",
+      "taskIds": [
+        "BASE-02",
+        "DATA-02"
+      ],
+      "reason": "项目登记已有，路径别名/失效组合需补验收。",
+      "localArchive": "docs/history/controller-v0.2/01-product-requirements.md"
+    },
+    {
+      "legacyId": "R-13",
+      "title": "任务创建",
+      "disposition": "covered",
+      "taskIds": [
+        "BASE-02"
+      ],
+      "reason": "Codex 原生会话创建有实现与发布记录。",
+      "localArchive": "docs/history/controller-v0.2/01-product-requirements.md"
+    },
+    {
+      "legacyId": "R-14",
+      "title": "任务选择和恢复",
+      "disposition": "partial",
+      "taskIds": [
+        "BASE-02",
+        "AGT-03",
+        "AGT-04",
+        "AGT-05"
+      ],
+      "reason": "Codex 恢复已具备；新后端逐家验收未完成。",
+      "localArchive": "docs/history/controller-v0.2/01-product-requirements.md"
+    },
+    {
+      "legacyId": "R-15",
+      "title": "切换不停止后台任务",
+      "disposition": "deferred",
+      "taskIds": [
+        "DEC-02",
+        "FUT-04"
+      ],
+      "reason": "当前单活动后端不满足旧多任务后台并发要求。",
+      "localArchive": "docs/history/controller-v0.2/01-product-requirements.md"
+    },
+    {
+      "legacyId": "R-16",
+      "title": "中断",
+      "disposition": "partial",
+      "taskIds": [
+        "BASE-02",
+        "FIX-02",
+        "AGT-02"
+      ],
+      "reason": "中断路径已有；连接关闭竞态已修复，新协议完整取消矩阵仍待补。",
+      "localArchive": "docs/history/controller-v0.2/01-product-requirements.md"
+    },
+    {
+      "legacyId": "R-17",
+      "title": "保留原 CLI 界面",
+      "disposition": "pending",
+      "taskIds": [
+        "DEC-02"
+      ],
+      "reason": "壁纸工作台不是旧原 TUI 共存能力的通过证据。",
+      "localArchive": "docs/history/controller-v0.2/01-product-requirements.md"
+    },
+    {
+      "legacyId": "R-18",
+      "title": "全遥控菜单",
+      "disposition": "partial",
+      "taskIds": [
+        "UI-01"
+      ],
+      "reason": "通用焦点导航、下拉选择和独立审批确认已实现；完整菜单实机验收待做。",
+      "localArchive": "docs/history/controller-v0.2/01-product-requirements.md"
+    },
+    {
+      "legacyId": "R-19",
+      "title": "模型选择",
+      "disposition": "partial",
+      "taskIds": [
+        "BASE-02",
+        "AGT-02"
+      ],
+      "reason": "Codex 模型设置已有，新后端能力与生效范围需逐家确认。",
+      "localArchive": "docs/history/controller-v0.2/01-product-requirements.md"
+    },
+    {
+      "legacyId": "R-20",
+      "title": "运行中模型限制",
+      "disposition": "partial",
+      "taskIds": [
+        "BASE-02",
+        "AGT-02"
+      ],
+      "reason": "已有忙碌状态限制；各后端的下一轮语义待统一验收。",
+      "localArchive": "docs/history/controller-v0.2/01-product-requirements.md"
+    },
+    {
+      "legacyId": "R-21",
+      "title": "状态区分",
+      "disposition": "partial",
+      "taskIds": [
+        "BASE-01",
+        "REM-03",
+        "DATA-01"
+      ],
+      "reason": "设备连接与录音阶段已独立展示；未知提交状态仍归 DATA-01。",
+      "localArchive": "docs/history/controller-v0.2/01-product-requirements.md"
+    },
+    {
+      "legacyId": "R-22",
+      "title": "明确审批处理",
+      "disposition": "partial",
+      "taskIds": [
+        "BASE-02",
+        "UI-01",
+        "AGT-02"
+      ],
+      "reason": "审批 UI 存在，遥控独立动作和新后端差异待验。",
+      "localArchive": "docs/history/controller-v0.2/01-product-requirements.md"
+    },
+    {
+      "legacyId": "R-23",
+      "title": "断连恢复",
+      "disposition": "partial",
+      "taskIds": [
+        "REM-02",
+        "REM-05"
+      ],
+      "reason": "生产连接代际、断线取消、重连和休眠恢复已有代码与离线回归；实机待验。",
+      "localArchive": "docs/history/controller-v0.2/01-product-requirements.md"
+    },
+    {
+      "legacyId": "R-24",
+      "title": "进程退出处理",
+      "disposition": "partial",
+      "taskIds": [
+        "FIX-02",
+        "AGT-02"
+      ],
+      "reason": "未使用任意前台 Shell 投递；连接关闭和重复释放回归已通过，新协议完整退出矩阵仍在 AGT-02。",
+      "localArchive": "docs/history/controller-v0.2/01-product-requirements.md"
+    },
+    {
+      "legacyId": "R-25",
+      "title": "本地持久化",
+      "disposition": "superseded",
+      "taskIds": [
+        "DATA-02",
+        "BASE-03"
+      ],
+      "reason": "采用 JSON 队列写入及持久草稿，旧 SQLite/内存草稿设计被当前实现替代。",
+      "localArchive": "docs/history/controller-v0.2/01-product-requirements.md"
+    },
+    {
+      "legacyId": "R-26",
+      "title": "日志和诊断",
+      "disposition": "partial",
+      "taskIds": [
+        "SEC-01"
+      ],
+      "reason": "新后端缓存与日志范围还需按实现核对。",
+      "localArchive": "docs/history/controller-v0.2/01-product-requirements.md"
+    },
+    {
+      "legacyId": "R-27",
+      "title": "普通输入共存",
+      "disposition": "partial",
+      "taskIds": [
+        "BASE-06",
+        "REM-02",
+        "REM-05"
+      ],
+      "reason": "普通输入共存已有基础，设备来源与休眠矩阵仍待测。",
+      "localArchive": "docs/history/controller-v0.2/01-product-requirements.md"
+    },
+    {
+      "legacyId": "R-28",
+      "title": "版本兼容提示",
+      "disposition": "partial",
+      "taskIds": [
+        "AGT-02",
+        "AGT-03",
+        "AGT-04",
+        "AGT-05"
+      ],
+      "reason": "缺少所有后端的稳定兼容矩阵，探针历史版本不等于当前承诺。",
+      "localArchive": "docs/history/controller-v0.2/01-product-requirements.md"
+    },
+    {
+      "legacyId": "R-29",
+      "title": "Codex 集成",
+      "disposition": "partial",
+      "taskIds": [
+        "BASE-02",
+        "FIX-02",
+        "DEC-02"
+      ],
+      "reason": "桌面 Codex 主路径和关闭竞态修复已有；旧 TUI 共存仍需 DEC-02 决定。",
+      "localArchive": "docs/history/controller-v0.2/01-product-requirements.md"
+    },
+    {
+      "legacyId": "R-30",
+      "title": "Claude 集成",
+      "disposition": "partial",
+      "taskIds": [
+        "AGT-01",
+        "AGT-03",
+        "DEC-01"
+      ],
+      "reason": "Claude 源码已有，账户及主应用全流程未完成验收。",
+      "localArchive": "docs/history/controller-v0.2/01-product-requirements.md"
+    },
+    {
+      "legacyId": "R-31",
+      "title": "升级卸载",
+      "disposition": "partial",
+      "taskIds": [
+        "BASE-05",
+        "REL-01"
+      ],
+      "reason": "旧版保留数据有记录，新源码升级/回滚仍需重新验。",
+      "localArchive": "docs/history/controller-v0.2/01-product-requirements.md"
+    },
+    {
+      "legacyId": "R-32",
+      "title": "语音控制模式",
+      "disposition": "deferred",
+      "taskIds": [
+        "FUT-01"
+      ],
+      "reason": "有限语音控制后置，普通听写不解释为操作命令。",
+      "localArchive": "docs/history/controller-v0.2/01-product-requirements.md"
+    },
+    {
+      "legacyId": "R-33",
+      "title": "自定义按钮",
+      "disposition": "partial",
+      "taskIds": [
+        "BASE-06",
+        "REM-04"
+      ],
+      "reason": "应用内按按钮名称选择功能并立即保存；旧通用按键配置保留。",
+      "localArchive": "docs/history/controller-v0.2/01-product-requirements.md"
+    },
+    {
+      "legacyId": "R-34",
+      "title": "原生 BLE 音频",
+      "disposition": "partial",
+      "taskIds": [
+        "REM-01",
+        "REM-02",
+        "REM-05"
+      ],
+      "reason": "原生 ATVV 已接入应用 SenseVoice/草稿，产品稳定性仍待真实矩阵。",
+      "localArchive": "docs/history/controller-v0.2/01-product-requirements.md"
+    },
+    {
+      "legacyId": "R-35",
+      "title": "收藏与查找",
+      "disposition": "partial",
+      "taskIds": [
+        "BASE-02",
+        "AGT-06"
+      ],
+      "reason": "历史查找/命名已有基础，多后端同名隔离待验。",
+      "localArchive": "docs/history/controller-v0.2/01-product-requirements.md"
+    },
+    {
+      "legacyId": "R-36",
+      "title": "已有 CLI 账户登录",
+      "disposition": "pending",
+      "taskIds": [
+        "DEC-01",
+        "AGT-03",
+        "AGT-04",
+        "AGT-05"
+      ],
+      "reason": "旧账户约束与当前可选 API Key 源码存在差异，不能视为自动获准改变计费。",
+      "localArchive": "docs/history/controller-v0.2/01-product-requirements.md"
+    },
+    {
+      "legacyId": "B-01",
+      "title": "检测环境、版本、硬件和项目指令",
+      "disposition": "covered",
+      "taskIds": [
+        "ORG-01"
+      ],
+      "reason": "已有环境、代码及目录基线。",
+      "localArchive": "docs/history/controller-v0.2/08-implementation-backlog.md"
+    },
+    {
+      "legacyId": "B-02",
+      "title": "Codex最小控制探针",
+      "disposition": "partial",
+      "taskIds": [
+        "BASE-02",
+        "DEC-02",
+        "FIX-02"
+      ],
+      "reason": "独立探针与桌面后端存在，旧完整 S-01 尚非全部通过。",
+      "localArchive": "docs/history/controller-v0.2/08-implementation-backlog.md"
+    },
+    {
+      "legacyId": "B-03",
+      "title": "RC003事件/音频探针",
+      "disposition": "partial",
+      "taskIds": [
+        "REM-01",
+        "REM-02",
+        "REM-05"
+      ],
+      "reason": "诊断保留；生产设备组件和主应用接线已实现，可靠性待实测。",
+      "localArchive": "docs/history/controller-v0.2/08-implementation-backlog.md"
+    },
+    {
+      "legacyId": "B-04",
+      "title": "ASR两候选评测",
+      "disposition": "superseded",
+      "taskIds": [
+        "BASE-03",
+        "BASE-04",
+        "REM-05"
+      ],
+      "reason": "现选 SenseVoice；旧双 Whisper 候选不是当前默认任务，实际语料评估仍保留。",
+      "localArchive": "docs/history/controller-v0.2/08-implementation-backlog.md"
+    },
+    {
+      "legacyId": "B-05",
+      "title": "Claude路径和认证核查",
+      "disposition": "partial",
+      "taskIds": [
+        "AGT-03",
+        "DEC-01"
+      ],
+      "reason": "SDK/原生 CLI 路径存在，认证约束需与当前产品重新对齐。",
+      "localArchive": "docs/history/controller-v0.2/08-implementation-backlog.md"
+    },
+    {
+      "legacyId": "B-06",
+      "title": "M0技术决策",
+      "disposition": "superseded",
+      "taskIds": [
+        "ORG-04"
+      ],
+      "reason": "技术主线已成为 Electron/Node/本地 worker，归入当前架构与决策。",
+      "localArchive": "docs/history/controller-v0.2/08-implementation-backlog.md"
+    },
+    {
+      "legacyId": "B-07",
+      "title": "建立最小目录与构建",
+      "disposition": "covered",
+      "taskIds": [
+        "BASE-05",
+        "ORG-02"
+      ],
+      "reason": "已具备源码构建、测试和安装链。",
+      "localArchive": "docs/history/controller-v0.2/08-implementation-backlog.md"
+    },
+    {
+      "legacyId": "B-08",
+      "title": "Controller状态和操作校验",
+      "disposition": "partial",
+      "taskIds": [
+        "BASE-03",
+        "DATA-01",
+        "REM-04"
+      ],
+      "reason": "已有状态、草稿及遥控动作；未知提交仍归 DATA-01。",
+      "localArchive": "docs/history/controller-v0.2/08-implementation-backlog.md"
+    },
+    {
+      "legacyId": "B-09",
+      "title": "SQLite索引和设置",
+      "disposition": "superseded",
+      "taskIds": [
+        "DATA-02"
+      ],
+      "reason": "SQLite 计划被 JSON 存储实现替代，迁移与故障验收仍保留。",
+      "localArchive": "docs/history/controller-v0.2/08-implementation-backlog.md"
+    },
+    {
+      "legacyId": "B-10",
+      "title": "Codex Agent Adapter",
+      "disposition": "partial",
+      "taskIds": [
+        "BASE-02",
+        "FIX-02"
+      ],
+      "reason": "已交付 Codex 适配器，FIX-02 已修复连接中关闭；完整当前源码真实验收另行记录。",
+      "localArchive": "docs/history/controller-v0.2/08-implementation-backlog.md"
+    },
+    {
+      "legacyId": "B-11",
+      "title": "小面板与导航",
+      "disposition": "partial",
+      "taskIds": [
+        "BASE-01",
+        "UI-01"
+      ],
+      "reason": "壁纸气泡/工作台已加入遥控焦点导航；完整实机操作待验。",
+      "localArchive": "docs/history/controller-v0.2/08-implementation-backlog.md"
+    },
+    {
+      "legacyId": "B-12",
+      "title": "CLI界面生命周期",
+      "disposition": "pending",
+      "taskIds": [
+        "DEC-02",
+        "FIX-02"
+      ],
+      "reason": "桌面与专属 CLI 后端生命周期存在；旧 TUI 共用契约需明确后续定位。",
+      "localArchive": "docs/history/controller-v0.2/08-implementation-backlog.md"
+    },
+    {
+      "legacyId": "B-13",
+      "title": "模型面板",
+      "disposition": "covered",
+      "taskIds": [
+        "BASE-02"
+      ],
+      "reason": "Codex 模型面板与设置具备；新增工具范围由 AGT 任务承担。",
+      "localArchive": "docs/history/controller-v0.2/08-implementation-backlog.md"
+    },
+    {
+      "legacyId": "B-14",
+      "title": "M1验证",
+      "disposition": "partial",
+      "taskIds": [
+        "REM-04",
+        "UI-01"
+      ],
+      "reason": "键鼠路径存在，纯遥控 T-01 未通过。",
+      "localArchive": "docs/history/controller-v0.2/08-implementation-backlog.md"
+    },
+    {
+      "legacyId": "B-15",
+      "title": "Device Adapter",
+      "disposition": "partial",
+      "taskIds": [
+        "REM-01",
+        "REM-02"
+      ],
+      "reason": "原生设备服务由主应用统一拥有；探针保留为独立诊断。",
+      "localArchive": "docs/history/controller-v0.2/08-implementation-backlog.md"
+    },
+    {
+      "legacyId": "B-16",
+      "title": "Speech模块和ASR worker",
+      "disposition": "partial",
+      "taskIds": [
+        "BASE-03",
+        "BASE-04",
+        "FIX-01",
+        "REM-03"
+      ],
+      "reason": "遥控解码已连接现有本地 ASR worker；取消晚到结果有离线回归。",
+      "localArchive": "docs/history/controller-v0.2/08-implementation-backlog.md"
+    },
+    {
+      "legacyId": "B-17",
+      "title": "录音目标与草稿交互",
+      "disposition": "partial",
+      "taskIds": [
+        "BASE-03",
+        "REM-03",
+        "AGT-06"
+      ],
+      "reason": "电脑与设备录音共用目标互斥，远端识别回填原草稿；跨后端实机验收待补。",
+      "localArchive": "docs/history/controller-v0.2/08-implementation-backlog.md"
+    },
+    {
+      "legacyId": "B-18",
+      "title": "提交与失联恢复",
+      "disposition": "pending",
+      "taskIds": [
+        "DATA-01"
+      ],
+      "reason": "未知提交及失联对账未收口。",
+      "localArchive": "docs/history/controller-v0.2/08-implementation-backlog.md"
+    },
+    {
+      "legacyId": "B-19",
+      "title": "M2实机验证",
+      "disposition": "pending",
+      "taskIds": [
+        "REM-05"
+      ],
+      "reason": "尚无完整 RC003 主应用和连续实机验收。",
+      "localArchive": "docs/history/controller-v0.2/08-implementation-backlog.md"
+    },
+    {
+      "legacyId": "B-20",
+      "title": "Claude Adapter",
+      "disposition": "partial",
+      "taskIds": [
+        "AGT-01",
+        "AGT-02",
+        "AGT-03"
+      ],
+      "reason": "已有 Claude 源码与独立探针；完整契约和桌面验收未完成。",
+      "localArchive": "docs/history/controller-v0.2/08-implementation-backlog.md"
+    },
+    {
+      "legacyId": "B-21",
+      "title": "双工具任务切换",
+      "disposition": "partial",
+      "taskIds": [
+        "AGT-06"
+      ],
+      "reason": "provider 选择与存储字段已有，目标隔离验收待补。",
+      "localArchive": "docs/history/controller-v0.2/08-implementation-backlog.md"
+    },
+    {
+      "legacyId": "B-22",
+      "title": "M3契约与实机验证",
+      "disposition": "pending",
+      "taskIds": [
+        "AGT-03",
+        "AGT-04",
+        "AGT-05"
+      ],
+      "reason": "逐家真实主应用验收仍未完成。",
+      "localArchive": "docs/history/controller-v0.2/08-implementation-backlog.md"
+    },
+    {
+      "legacyId": "B-23",
+      "title": "首次配置与诊断",
+      "disposition": "partial",
+      "taskIds": [
+        "BASE-04",
+        "ORG-02",
+        "REM-06"
+      ],
+      "reason": "设备连接状态、原生组件准备和打包已接入；独立安装验收待做。",
+      "localArchive": "docs/history/controller-v0.2/08-implementation-backlog.md"
+    },
+    {
+      "legacyId": "B-24",
+      "title": "设置和退出恢复",
+      "disposition": "partial",
+      "taskIds": [
+        "DATA-02",
+        "FIX-02",
+        "REL-01"
+      ],
+      "reason": "设置保存与迁移已有，关闭竞态已修复；新版本安装恢复仍待验收。",
+      "localArchive": "docs/history/controller-v0.2/08-implementation-backlog.md"
+    },
+    {
+      "legacyId": "B-25",
+      "title": "CI和打包",
+      "disposition": "covered",
+      "taskIds": [
+        "BASE-05",
+        "ORG-04"
+      ],
+      "reason": "原 CI/打包已存在，本轮增加台账文档检查。",
+      "localArchive": "docs/history/controller-v0.2/08-implementation-backlog.md"
+    },
+    {
+      "legacyId": "B-26",
+      "title": "干净安装与卸载",
+      "disposition": "partial",
+      "taskIds": [
+        "BASE-05",
+        "REL-01"
+      ],
+      "reason": "旧安装验收有证据；新源码与干净系统矩阵待做。",
+      "localArchive": "docs/history/controller-v0.2/08-implementation-backlog.md"
+    },
+    {
+      "legacyId": "B-27",
+      "title": "依赖清单与隐私核验",
+      "disposition": "partial",
+      "taskIds": [
+        "SEC-01"
+      ],
+      "reason": "发布版许可/隐私记录保留，新 SDK 路线需要补审。",
+      "localArchive": "docs/history/controller-v0.2/08-implementation-backlog.md"
+    },
+    {
+      "legacyId": "B-28",
+      "title": "发布验收和用户指南",
+      "disposition": "partial",
+      "taskIds": [
+        "ORG-04",
+        "REL-03"
+      ],
+      "reason": "开发交接文档补齐，下一安装版发布验收未完成。",
+      "localArchive": "docs/history/controller-v0.2/08-implementation-backlog.md"
+    },
+    {
+      "legacyId": "T-01",
+      "title": "选项目任务→说需求→检查→发送→中断→切任务",
+      "disposition": "pending",
+      "taskIds": [
+        "REM-03",
+        "REM-04",
+        "UI-01"
+      ],
+      "reason": "完整日常遥控流程未测。",
+      "localArchive": "docs/history/controller-v0.2/09-test-and-acceptance.md"
+    },
+    {
+      "legacyId": "T-02",
+      "title": "普通麦克风对照、静音、低电平",
+      "disposition": "partial",
+      "taskIds": [
+        "BASE-03",
+        "REM-03"
+      ],
+      "reason": "电脑麦克风基础成立，静音低电平矩阵待补。",
+      "localArchive": "docs/history/controller-v0.2/09-test-and-acceptance.md"
+    },
+    {
+      "legacyId": "T-03",
+      "title": "同键快速重复、系统连发、旧连接事件",
+      "disposition": "partial",
+      "taskIds": [
+        "BASE-06",
+        "REM-02"
+      ],
+      "reason": "逻辑去重已有，实际确认重复提交待验。",
+      "localArchive": "docs/history/controller-v0.2/09-test-and-acceptance.md"
+    },
+    {
+      "legacyId": "T-04",
+      "title": "准备时先释放、超长录音、丢释放、断连",
+      "disposition": "pending",
+      "taskIds": [
+        "REM-03",
+        "REM-05"
+      ],
+      "reason": "超长/丢音频/双释放/断线取消已有代码，完整硬件异常矩阵未测。",
+      "localArchive": "docs/history/controller-v0.2/09-test-and-acceptance.md"
+    },
+    {
+      "legacyId": "T-05",
+      "title": "录音后/识别中切任务",
+      "disposition": "partial",
+      "taskIds": [
+        "BASE-03",
+        "REM-03",
+        "AGT-06"
+      ],
+      "reason": "现有草稿测试覆盖一部分，遥控和 provider 切换待验。",
+      "localArchive": "docs/history/controller-v0.2/09-test-and-acceptance.md"
+    },
+    {
+      "legacyId": "T-06",
+      "title": "ASR失败、取消、旧结果、并发临时文件",
+      "disposition": "partial",
+      "taskIds": [
+        "BASE-03",
+        "FIX-01",
+        "REM-03"
+      ],
+      "reason": "本地转写及部分取消已有，完整失败路径未收口。",
+      "localArchive": "docs/history/controller-v0.2/09-test-and-acceptance.md"
+    },
+    {
+      "legacyId": "T-07",
+      "title": "用户编辑与追加片段同时发生",
+      "disposition": "partial",
+      "taskIds": [
+        "BASE-03",
+        "DATA-02"
+      ],
+      "reason": "草稿版本基础有测试，全面并发编辑矩阵待补。",
+      "localArchive": "docs/history/controller-v0.2/09-test-and-acceptance.md"
+    },
+    {
+      "legacyId": "T-08",
+      "title": "接收后丢回执、提交超时、崩溃恢复",
+      "disposition": "pending",
+      "taskIds": [
+        "DATA-01"
+      ],
+      "reason": "提交未知、超时、恢复的端到端证据待建。",
+      "localArchive": "docs/history/controller-v0.2/09-test-and-acceptance.md"
+    },
+    {
+      "legacyId": "T-09",
+      "title": "改焦点到别的终端/应用",
+      "disposition": "partial",
+      "taskIds": [
+        "BASE-02",
+        "REM-04"
+      ],
+      "reason": "会话 ID 投递已有，设备动作需加入故障注入。",
+      "localArchive": "docs/history/controller-v0.2/09-test-and-acceptance.md"
+    },
+    {
+      "legacyId": "T-10",
+      "title": "同名项目、目录失效、路径别名",
+      "disposition": "partial",
+      "taskIds": [
+        "DATA-02",
+        "AGT-06"
+      ],
+      "reason": "稳定 ID 已用，路径别名和跨后端同名需补。",
+      "localArchive": "docs/history/controller-v0.2/09-test-and-acceptance.md"
+    },
+    {
+      "legacyId": "T-11",
+      "title": "任务恢复失败、历史会话关闭",
+      "disposition": "partial",
+      "taskIds": [
+        "BASE-02",
+        "AGT-02"
+      ],
+      "reason": "Codex 恢复存在，新后端恢复失败需专门测试。",
+      "localArchive": "docs/history/controller-v0.2/09-test-and-acceptance.md"
+    },
+    {
+      "legacyId": "T-12",
+      "title": "两任务后台运行及同目录互斥",
+      "disposition": "deferred",
+      "taskIds": [
+        "DEC-02",
+        "FUT-04"
+      ],
+      "reason": "多个后台任务未作为当前已实现能力。",
+      "localArchive": "docs/history/controller-v0.2/09-test-and-acceptance.md"
+    },
+    {
+      "legacyId": "T-13",
+      "title": "精确中断与后端无响应",
+      "disposition": "partial",
+      "taskIds": [
+        "BASE-02",
+        "FIX-02",
+        "AGT-02"
+      ],
+      "reason": "中断与连接关闭回归已有；新协议全部工具/审批取消场景仍需验收。",
+      "localArchive": "docs/history/controller-v0.2/09-test-and-acceptance.md"
+    },
+    {
+      "legacyId": "T-14",
+      "title": "手工CLI输入与面板同时提交",
+      "disposition": "pending",
+      "taskIds": [
+        "DEC-02"
+      ],
+      "reason": "原 TUI 与面板并发提交不是当前已交付承诺。",
+      "localArchive": "docs/history/controller-v0.2/09-test-and-acceptance.md"
+    },
+    {
+      "legacyId": "T-15",
+      "title": "模型不可用、运行中选择、TUI不同步",
+      "disposition": "partial",
+      "taskIds": [
+        "BASE-02",
+        "AGT-02"
+      ],
+      "reason": "模型设置已有，新后端差异待验。",
+      "localArchive": "docs/history/controller-v0.2/09-test-and-acceptance.md"
+    },
+    {
+      "legacyId": "T-16",
+      "title": "CLI审批显示和响应",
+      "disposition": "partial",
+      "taskIds": [
+        "BASE-02",
+        "UI-01",
+        "AGT-02"
+      ],
+      "reason": "审批入口已有，设备动作及多 CLI 权限矩阵待验。",
+      "localArchive": "docs/history/controller-v0.2/09-test-and-acceptance.md"
+    },
+    {
+      "legacyId": "T-17",
+      "title": "进程退出和残留Shell",
+      "disposition": "partial",
+      "taskIds": [
+        "FIX-02",
+        "AGT-02"
+      ],
+      "reason": "连接中关闭、旧连接释放与重入关闭的离线回归通过；多CLI真实退出和新安装验收仍未完成。",
+      "localArchive": "docs/history/controller-v0.2/09-test-and-acceptance.md"
+    },
+    {
+      "legacyId": "T-18",
+      "title": "日志、内存/临时音频、断网识别",
+      "disposition": "partial",
+      "taskIds": [
+        "BASE-03",
+        "SEC-01",
+        "REM-05"
+      ],
+      "reason": "本地语音已有，新缓存/日志/离线矩阵待验。",
+      "localArchive": "docs/history/controller-v0.2/09-test-and-acceptance.md"
+    },
+    {
+      "legacyId": "T-19",
+      "title": "普通键盘、终端快捷键、睡眠唤醒",
+      "disposition": "pending",
+      "taskIds": [
+        "REM-02",
+        "REM-05"
+      ],
+      "reason": "真实键盘共存与休眠恢复待补。",
+      "localArchive": "docs/history/controller-v0.2/09-test-and-acceptance.md"
+    },
+    {
+      "legacyId": "T-20",
+      "title": "版本不支持、缺工具、登录失效",
+      "disposition": "partial",
+      "taskIds": [
+        "ORG-02",
+        "AGT-02"
+      ],
+      "reason": "缺依赖诊断已有，各后端不兼容/登录失效待验。",
+      "localArchive": "docs/history/controller-v0.2/09-test-and-acceptance.md"
+    },
+    {
+      "legacyId": "T-21",
+      "title": "干净安装、升级、回滚、卸载",
+      "disposition": "partial",
+      "taskIds": [
+        "BASE-05",
+        "REL-01"
+      ],
+      "reason": "旧安装范围通过，新源码及干净系统范围未验。",
+      "localArchive": "docs/history/controller-v0.2/09-test-and-acceptance.md"
+    },
+    {
+      "legacyId": "T-22",
+      "title": "全菜单方向/确认/取消、大字号/DPI",
+      "disposition": "pending",
+      "taskIds": [
+        "UI-01",
+        "UI-02"
+      ],
+      "reason": "全遥控菜单、DPI 完整矩阵待验。",
+      "localArchive": "docs/history/controller-v0.2/09-test-and-acceptance.md"
+    },
+    {
+      "legacyId": "T-23",
+      "title": "最小双工具契约",
+      "disposition": "pending",
+      "taskIds": [
+        "AGT-02",
+        "AGT-03"
+      ],
+      "reason": "新增工具未完成最小主应用契约。",
+      "localArchive": "docs/history/controller-v0.2/09-test-and-acceptance.md"
+    },
+    {
+      "legacyId": "T-24",
+      "title": "现有CLI账户与计费来源",
+      "disposition": "pending",
+      "taskIds": [
+        "DEC-01",
+        "AGT-03",
+        "AGT-04",
+        "AGT-05"
+      ],
+      "reason": "不把独立免费模型或握手当成既有账户复用成功。",
+      "localArchive": "docs/history/controller-v0.2/09-test-and-acceptance.md"
+    },
+    {
+      "legacyId": "S-01",
+      "title": "Codex 控制与原 CLI 共存",
+      "disposition": "partial",
+      "taskIds": [
+        "BASE-02",
+        "DEC-02",
+        "FIX-02"
+      ],
+      "reason": "已有独立控制与桌面后端，原共存门槛尚有缺口。",
+      "localArchive": "docs/history/controller-v0.2/06-integration-spikes.md"
+    },
+    {
+      "legacyId": "S-02",
+      "title": "Claude 控制、登录与界面",
+      "disposition": "partial",
+      "taskIds": [
+        "AGT-01",
+        "AGT-03",
+        "DEC-01"
+      ],
+      "reason": "已有 Claude SDK 探针和源码，完整账户/主应用验收待补。",
+      "localArchive": "docs/history/controller-v0.2/06-integration-spikes.md"
+    },
+    {
+      "legacyId": "S-03",
+      "title": "RC003 按钮和音频",
+      "disposition": "partial",
+      "taskIds": [
+        "REM-01",
+        "REM-02",
+        "REM-05"
+      ],
+      "reason": "真实按键音频诊断成功，尚非生产验收。",
+      "localArchive": "docs/history/controller-v0.2/06-integration-spikes.md"
+    },
+    {
+      "legacyId": "S-04",
+      "title": "本地 ASR",
+      "disposition": "partial",
+      "taskIds": [
+        "BASE-03",
+        "REM-05"
+      ],
+      "reason": "SenseVoice 已选用，固定语料/百次指标未完成。",
+      "localArchive": "docs/history/controller-v0.2/06-integration-spikes.md"
+    },
+    {
+      "legacyId": "S-05",
+      "title": "安装、许可与进程生命周期",
+      "disposition": "partial",
+      "taskIds": [
+        "BASE-05",
+        "SEC-01",
+        "REL-01"
+      ],
+      "reason": "发布版已有审查，新 CLI 与设备分发仍待验。",
+      "localArchive": "docs/history/controller-v0.2/06-integration-spikes.md"
+    },
+    {
+      "legacyId": "D-01",
+      "title": "Windows与RC003优先",
+      "disposition": "partial",
+      "taskIds": [
+        "REM-02",
+        "REM-05"
+      ],
+      "reason": "Windows/RC003 继续为主线；硬件兼容范围以实测为准。",
+      "localArchive": "docs/history/controller-v0.2/11-decisions-and-risks.md"
+    },
+    {
+      "legacyId": "D-02",
+      "title": "本地识别优先，模型可首次联网下载，录音不上传",
+      "disposition": "covered",
+      "taskIds": [
+        "BASE-03",
+        "BASE-04"
+      ],
+      "reason": "本地语音与按需下载已落实。",
+      "localArchive": "docs/history/controller-v0.2/11-decisions-and-risks.md"
+    },
+    {
+      "legacyId": "D-03",
+      "title": "原CLI界面加小面板",
+      "disposition": "superseded",
+      "taskIds": [
+        "BASE-01",
+        "DEC-02"
+      ],
+      "reason": "当前主界面已变为壁纸气泡工作台，原 TUI 共存另列决策。",
+      "localArchive": "docs/history/controller-v0.2/11-decisions-and-risks.md"
+    },
+    {
+      "legacyId": "D-04",
+      "title": "先Codex，跑通后接Claude",
+      "disposition": "partial",
+      "taskIds": [
+        "BASE-02",
+        "AGT-03"
+      ],
+      "reason": "Codex 主线保留，新工具先完成验收再发布。",
+      "localArchive": "docs/history/controller-v0.2/11-decisions-and-risks.md"
+    },
+    {
+      "legacyId": "D-05",
+      "title": "按钮表达操作意图，由控制器执行",
+      "disposition": "covered",
+      "taskIds": [
+        "BASE-06",
+        "REM-04"
+      ],
+      "reason": "操作意图映射到应用接口，设备产品化仍待完成。",
+      "localArchive": "docs/history/controller-v0.2/11-decisions-and-risks.md"
+    },
+    {
+      "legacyId": "D-06",
+      "title": "语音先草稿，再确认发送",
+      "disposition": "covered",
+      "taskIds": [
+        "BASE-03"
+      ],
+      "reason": "听写先进入草稿，用户确认后发送。",
+      "localArchive": "docs/history/controller-v0.2/11-decisions-and-risks.md"
+    },
+    {
+      "legacyId": "D-07",
+      "title": "模型选择列P0，语音控制语法P1",
+      "disposition": "partial",
+      "taskIds": [
+        "BASE-02",
+        "FUT-01"
+      ],
+      "reason": "Codex 模型面板已具备，语音控制继续后置。",
+      "localArchive": "docs/history/controller-v0.2/11-decisions-and-risks.md"
+    },
+    {
+      "legacyId": "D-08",
+      "title": "miremote流程参考，SayAll桥接候选，不整体fork",
+      "disposition": "superseded",
+      "taskIds": [
+        "REM-01",
+        "REM-02"
+      ],
+      "reason": "已有原生 Raw Input/ATVV 独立诊断；不整体 fork 桥接器。",
+      "localArchive": "docs/history/controller-v0.2/11-decisions-and-risks.md"
+    },
+    {
+      "legacyId": "D-09",
+      "title": "C#/.NET LTS/WPF",
+      "disposition": "superseded",
+      "taskIds": [
+        "ORG-04"
+      ],
+      "reason": "现行应用采用 Electron，C# 仅用于 Windows 辅助/探针。",
+      "localArchive": "docs/history/controller-v0.2/11-decisions-and-risks.md"
+    },
+    {
+      "legacyId": "D-10",
+      "title": "不自动审批，原CLI人工处理",
+      "disposition": "superseded",
+      "taskIds": [
+        "BASE-02",
+        "UI-01",
+        "AGT-02"
+      ],
+      "reason": "当前桌面承接明确审批；不自动批准的原则继续保留。",
+      "localArchive": "docs/history/controller-v0.2/11-decisions-and-risks.md"
+    },
+    {
+      "legacyId": "D-11",
+      "title": "草稿默认内存，索引和设置持久化",
+      "disposition": "superseded",
+      "taskIds": [
+        "DATA-02"
+      ],
+      "reason": "当前实现保存会话草稿及后端消息缓存，隐私说明必须与实现一致。",
+      "localArchive": "docs/history/controller-v0.2/11-decisions-and-risks.md"
+    },
+    {
+      "legacyId": "D-12",
+      "title": "同目录默认一轮请求，最多3个活动任务",
+      "disposition": "deferred",
+      "taskIds": [
+        "DEC-02",
+        "FUT-04"
+      ],
+      "reason": "当前是单活动后端，旧最多三任务并发未实现。",
+      "localArchive": "docs/history/controller-v0.2/11-decisions-and-risks.md"
+    },
+    {
+      "legacyId": "D-13",
+      "title": "两工具沿用已有CLI账户登录，不走独立API计费",
+      "disposition": "pending",
+      "taskIds": [
+        "DEC-01"
+      ],
+      "reason": "已有账户原则保留；可选 API Key 新源码需明确产品边界。",
+      "localArchive": "docs/history/controller-v0.2/11-decisions-and-risks.md"
+    },
+    {
+      "legacyId": "D-14",
+      "title": "开始 M0 技术验证",
+      "disposition": "covered",
+      "taskIds": [
+        "ORG-01",
+        "BASE-02",
+        "REM-01"
+      ],
+      "reason": "原 M0 开始授权属于历史记录，实际验证已有新证据。",
+      "localArchive": "docs/history/controller-v0.2/11-decisions-and-risks.md"
+    },
+    {
+      "legacyId": "D-15",
+      "title": "仅信任独立测试目录 [历史本机路径]",
+      "disposition": "superseded",
+      "taskIds": [
+        "ORG-03"
+      ],
+      "reason": "历史特定测试目录授权不自动扩展到新目录；探针使用显式运行和独立 fixture。",
+      "localArchive": "docs/history/controller-v0.2/11-decisions-and-risks.md"
+    },
+    {
+      "legacyId": "D-16",
+      "title": "以 Codex 0.159.2 为当前探针版本，固定可执行文件并核对版本",
+      "disposition": "superseded",
+      "taskIds": [
+        "AGT-02",
+        "AGT-03",
+        "AGT-04",
+        "AGT-05"
+      ],
+      "reason": "历史 CLI 版本只作当时证据，当前版本兼容须重新测试。",
+      "localArchive": "docs/history/controller-v0.2/11-decisions-and-risks.md"
+    },
+    {
+      "legacyId": "K-01",
+      "title": "命令进入错误会话或Shell",
+      "disposition": "pending",
+      "taskIds": [
+        "DATA-01",
+        "REM-04",
+        "AGT-06"
+      ],
+      "reason": "目标误投递风险持续作为发布阻断。",
+      "localArchive": "docs/history/controller-v0.2/11-decisions-and-risks.md"
+    },
+    {
+      "legacyId": "K-02",
+      "title": "丢回执导致重复需求",
+      "disposition": "pending",
+      "taskIds": [
+        "DATA-01"
+      ],
+      "reason": "未知回执和重复提交仍需专门处理。",
+      "localArchive": "docs/history/controller-v0.2/11-decisions-and-risks.md"
+    },
+    {
+      "legacyId": "K-03",
+      "title": "后端和CLI不同步",
+      "disposition": "pending",
+      "taskIds": [
+        "DEC-02",
+        "AGT-02"
+      ],
+      "reason": "协议及原 TUI 共存语义须明确。",
+      "localArchive": "docs/history/controller-v0.2/11-decisions-and-risks.md"
+    },
+    {
+      "legacyId": "K-04",
+      "title": "快速转写覆盖音频/草稿",
+      "disposition": "partial",
+      "taskIds": [
+        "BASE-03",
+        "REM-03"
+      ],
+      "reason": "草稿保护已有基础，设备输入并发仍待验证。",
+      "localArchive": "docs/history/controller-v0.2/11-decisions-and-risks.md"
+    },
+    {
+      "legacyId": "K-05",
+      "title": "桥接吞键或多进程争BLE",
+      "disposition": "pending",
+      "taskIds": [
+        "REM-02",
+        "REM-06"
+      ],
+      "reason": "生产设备连接所有权和桥接器冲突待做。",
+      "localArchive": "docs/history/controller-v0.2/11-decisions-and-risks.md"
+    },
+    {
+      "legacyId": "K-06",
+      "title": "普通键盘被误吞",
+      "disposition": "pending",
+      "taskIds": [
+        "REM-02",
+        "REM-05"
+      ],
+      "reason": "普通键盘来源过滤与实机共存待验。",
+      "localArchive": "docs/history/controller-v0.2/11-decisions-and-risks.md"
+    },
+    {
+      "legacyId": "K-07",
+      "title": "两代理改同工作树",
+      "disposition": "deferred",
+      "taskIds": [
+        "DEC-02",
+        "FUT-04"
+      ],
+      "reason": "当前单活动后端；扩展并发前必须解决。",
+      "localArchive": "docs/history/controller-v0.2/11-decisions-and-risks.md"
+    },
+    {
+      "legacyId": "K-08",
+      "title": "本地识别误听否定/术语",
+      "disposition": "pending",
+      "taskIds": [
+        "REM-05"
+      ],
+      "reason": "固定中文语料的否定与术语指标待验。",
+      "localArchive": "docs/history/controller-v0.2/11-decisions-and-risks.md"
+    },
+    {
+      "legacyId": "K-09",
+      "title": "CLI/协议升级破坏接口",
+      "disposition": "pending",
+      "taskIds": [
+        "AGT-02",
+        "REL-01"
+      ],
+      "reason": "每次协议升级需兼容及安装回归。",
+      "localArchive": "docs/history/controller-v0.2/11-decisions-and-risks.md"
+    },
+    {
+      "legacyId": "K-10",
+      "title": "首次安装复杂",
+      "disposition": "partial",
+      "taskIds": [
+        "ORG-02",
+        "BASE-04",
+        "REM-06"
+      ],
+      "reason": "源码/模型诊断已有，设备安装链待建。",
+      "localArchive": "docs/history/controller-v0.2/11-decisions-and-risks.md"
+    },
+    {
+      "legacyId": "K-11",
+      "title": "意外云上传/正文日志",
+      "disposition": "pending",
+      "taskIds": [
+        "SEC-01"
+      ],
+      "reason": "新后端消息缓存、正文日志、凭据边界仍需审核。",
+      "localArchive": "docs/history/controller-v0.2/11-decisions-and-risks.md"
+    },
+    {
+      "legacyId": "K-12",
+      "title": "开源资源许可不适配",
+      "disposition": "pending",
+      "taskIds": [
+        "SEC-01",
+        "REL-03"
+      ],
+      "reason": "新 SDK/设备组件的许可随发布持续核对。",
+      "localArchive": "docs/history/controller-v0.2/11-decisions-and-risks.md"
+    }
+  ]
+}

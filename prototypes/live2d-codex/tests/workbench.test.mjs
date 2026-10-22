@@ -8,7 +8,7 @@ import { speechChunks } from '../renderer/speech-ui.js';
 import { LocalSpeech } from '../backend/speech.mjs';
 import { currentReply } from '../renderer/current-reply.mjs';
 async function fixture(t) {
-  const root = resolve(import.meta.dirname, '../../../work/runtime/workbench-unit-tests'); await mkdir(root,{recursive:true}); const dir = await mkdtemp(join(root,'case-')); if (!dir.startsWith(root+sep)) throw new Error('Unexpected fixture path');
+  const root = resolve(import.meta.dirname, '../../../work/qa/workbench-unit-tests'); await mkdir(root,{recursive:true}); const dir = await mkdtemp(join(root,'case-')); if (!dir.startsWith(root+sep)) throw new Error('Unexpected fixture path');
   t.after(() => rm(dir,{recursive:true,force:true})); const store = new WorkspaceStore(dir); await store.load(); const second = join(dir,'second'); await mkdir(second); return {dir,second,store};
 }
 test('project removal never deletes files; drafts remain isolated across projects and threads after restart',async t => {
@@ -19,6 +19,19 @@ test('project removal never deletes files; drafts remain isolated across project
   const reloaded = new WorkspaceStore(dir); await reloaded.load(); targets.forEach((target,i)=>assert.equal(reloaded.draft(target),`draft-${i}`));
   await assert.rejects(store.remove(a.id,dir),/先切换/);
   await writeFile(join(second,'keep.txt'),'user file'); await store.remove(b.id,dir); assert.equal(await readFile(join(second,'keep.txt'),'utf8'),'user file');
+});
+
+test('remote settings and dictation receipt IDs persist alongside existing draft data',async t=>{
+  const {dir,store}=await fixture(t);await store.add(dir);const target={cwd:dir,threadId:'one'};
+  await store.saveDraft(target,'手写文字');await store.appendDictation(target,'听写文字','capture-one');
+  await store.appendDictation(target,'听写文字','capture-one');assert.equal(store.draft(target),'手写文字 听写文字');
+  await store.saveDraft(target,'手写文字和修改 听写文字');
+  await store.updateSettings({rc003:{device:{id:'test-remote',name:'RC003'},autoConnect:true,buttons:{home:'chat',menu:'remoteSettings'}}});
+  const reload=new WorkspaceStore(dir);await reload.load();
+  assert.deepEqual(reload.draftSnapshot(target),{text:'手写文字和修改 听写文字',dictationIds:['capture-one']});
+  assert.equal(reload.data.settings.rc003.buttons.menu,'remoteSettings');assert.equal(reload.data.settings.rc003.autoConnect,true);
+  await reload.appendDictation(target,'听写文字','capture-two');assert.equal(reload.draft(target),'手写文字和修改 听写文字 听写文字');
+  await reload.saveDraft(target,'');assert.equal(reload.draft(target),'');
 });
 
 test('legacy Codex drafts keep their keys while Dots drafts persist in a separate namespace', async t => {
@@ -58,6 +71,12 @@ test('completion alerts migrate on and persist independently of speech model res
   await assert.rejects(reload.updateSettings({completionSound:'true'}),/提示音开关/);
   const legacy=JSON.parse(await readFile(store.file,'utf8')); delete legacy.settings.completionSound; await writeFile(store.file,JSON.stringify(legacy));
   await reload.load(); assert.equal(reload.data.settings.completionSound,true);
+});
+test('playback volume persists independently and invalid values never replace the saved setting',async t=>{
+  const {dir,store}=await fixture(t);await store.updateSettings({playbackVolume:.6});
+  const reload=new WorkspaceStore(dir);await reload.load();assert.equal(reload.data.settings.playbackVolume,.6);
+  for(const value of [-1,1.1,NaN,'50'])await assert.rejects(reload.updateSettings({playbackVolume:value}),/音量/);
+  assert.equal(reload.data.settings.playbackVolume,.6);assert.equal(reload.data.settings.ttsResident,false);
 });
 
 test('background preparation defaults off, migrates off and persists independently of automatic playback',async t=>{

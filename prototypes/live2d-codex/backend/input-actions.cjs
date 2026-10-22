@@ -19,7 +19,7 @@ function withoutKeyRepeat(action, now = Date.now) {
   let last = -Infinity;
   return () => { const time = now(), repeated = time - last < 1200; last = time; if (!repeated) return action(); };
 }
-function registerInputActions(native, settings, handlers, { suspended = false, now = Date.now, resumeAt = 0 } = {}) {
+function registerInputActions(native, settings, handlers, { suspended = false, now = Date.now, resumeAt = 0, reserved = new Set() } = {}) {
   native.unregisterAll();
   if (suspended) return [];
   const errors = [], seen = new Map();
@@ -27,6 +27,7 @@ function registerInputActions(native, settings, handlers, { suspended = false, n
   for (const [id, key] of bindings) {
     if (!INPUT_ACTIONS[id] || typeof handlers[id] !== 'function' || !key) continue;
     const canonical = acceleratorKey(key);
+    if(canonical.split('+').some(part=>reserved.has(part))){errors.push(`${key} 包含 RC003 使用的按键，连接期间暂停此全局快捷键；断开后恢复。`);continue;}
     if (seen.has(canonical)) { if (seen.get(canonical) !== id) errors.push(`${key} 被分配给两个操作，请更换其中一个。`); continue; }
     seen.set(canonical, id);
     const invoke = withoutKeyRepeat(() => { if (now() >= resumeAt) return handlers[id](); }, now);

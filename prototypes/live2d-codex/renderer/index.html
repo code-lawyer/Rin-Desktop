@@ -24,13 +24,14 @@
       <button id="settings-button" class="icon-button" title="项目与对话设置" aria-label="项目与对话设置" aria-expanded="false"><svg class="ui-icon" viewBox="0 0 20 20" aria-hidden="true"><circle cx="4" cy="10" r="1"/><circle cx="10" cy="10" r="1"/><circle cx="16" cy="10" r="1"/></svg></button>
       <button id="close-chat" class="icon-button" title="收起气泡" aria-label="收起气泡"><svg class="ui-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="m5 5 10 10M15 5 5 15"/></svg></button>
     </header>
-    <div id="current-target" class="current-target"><button id="workbench-button" type="button"><span id="target-label">本地项目 / 新对话</span><span aria-hidden="true">⌄</span></button><button id="replay-reply" class="text-button" type="button" title="开启常驻加载后，可逐条朗读">语音设置</button></div>
+    <div id="current-target" class="current-target"><button id="workbench-button" type="button"><span id="target-label">本地项目 / 新对话</span><svg class="ui-icon context-chevron" viewBox="0 0 20 20" aria-hidden="true"><path d="m6 8 4 4 4-4"/></svg></button></div>
+    <div id="bubble-content" class="bubble-content">
     <section id="context-panel" class="context-panel" hidden aria-label="项目与对话设置">
-    <div class="provider-bar"><label for="provider-select">对话来源</label><select id="provider-select"><option value="dots">凛（Dots）</option><option value="codex">Codex</option></select><button id="open-dot" class="text-button" type="button" hidden>打开凛 ↗</button><button id="reconnect-dot" class="text-button" type="button" hidden>重连</button></div>
+    <div class="provider-bar"><label for="provider-select">Agent</label><select id="provider-select"></select><button id="open-dot" class="text-button" type="button" hidden>打开凛 ↗</button><button id="reconnect-dot" class="text-button" type="button">重连</button></div>
     <p id="dots-help" class="interaction-help" hidden>沿用凛的私人对话。进度与回复会自动出现；授权或停止任务请打开凛。</p>
-    <section id="codex-context" class="context-bar" aria-label="当前项目和模型">
-      <button id="choose-project" class="project-button" title="选择项目目录"><span class="context-label">项目</span><span id="project-name">Vibe-Voice</span><span>⌄</span></button>
-      <label class="model-field"><span class="context-label">模型</span><select id="model-select" aria-label="Codex 模型"></select></label>
+    <section id="agent-context" class="context-bar" aria-label="当前项目和模型">
+      <button id="choose-project" class="project-button" title="选择项目目录"><span class="context-label">项目</span><span id="project-name">Vibe-Voice</span><svg class="ui-icon context-chevron" viewBox="0 0 20 20" aria-hidden="true"><path d="m6 8 4 4 4-4"/></svg></button>
+      <label class="model-field"><span class="context-label">模型</span><select id="model-select" aria-label="Agent 模型"></select></label>
     </section>
     <div class="appearance-settings">
       <label id="avatar-size-label" for="avatar-size">角色大小 <output id="avatar-size-value" for="avatar-size">100%</output></label>
@@ -43,18 +44,33 @@
     <section id="messages" class="reply-scroll" aria-live="polite" aria-label="本轮回复">
       <div id="reply-content"><p id="welcome" class="welcome">想一起做点什么？</p><article id="current-message" class="message assistant" data-role="assistant" hidden><div id="reply-body" class="message-body"></div></article></div>
     </section>
-    <section id="approval" class="approval" hidden aria-live="assertive"></section>
-    <section id="login-panel" class="approval" hidden aria-label="登录 Codex">
-      <p>使用你自己的 ChatGPT 账户登录 Codex。凭据由官方 CLI 保存在本机。</p>
-      <button id="login-button" type="button">在浏览器登录 ChatGPT</button>
-      <button id="cancel-login-button" type="button" hidden>取消登录</button>
+    <section id="login-panel" class="login-panel" hidden aria-labelledby="login-title">
+      <h3 id="login-title">连接帮助</h3>
+      <p id="login-help">使用你自己的 ChatGPT 账户登录 Codex。凭据由官方 CLI 保存在本机。</p>
+      <div class="login-actions"><button id="login-button" class="primary-button" type="button">在浏览器登录 ChatGPT</button>
+      <button id="login-reconnect" class="primary-button" type="button" hidden>重新连接</button>
+      <button id="cancel-login-button" class="secondary-button" type="button" hidden>取消登录</button></div>
     </section>
     <div id="error-banner" class="error-banner" hidden role="alert"></div>
+    <div id="submission-panel" class="error-banner" hidden role="status">
+      <p id="submission-message"></p>
+      <details><summary>查看已保留的原稿</summary><pre id="submission-copy"></pre></details>
+      <button id="submission-check" class="text-button" type="button">核查发送结果</button>
+      <button id="submission-release" class="text-button" type="button" hidden>我已核对，保留草稿</button>
+    </div>
+    </div>
+    <section id="approval" class="approval" hidden aria-live="assertive"></section>
     <div id="activity-line" class="activity-line"><span id="activity-label">准备就绪</span><button id="stop-button" class="text-button" hidden>停止</button></div>
+    <section id="reply-player" class="reply-player" aria-label="回复朗读">
+      <button id="replay-reply" class="player-button" type="button" title="朗读当前完整回复"><svg class="ui-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="m7 4 9 6-9 6Z"/></svg><span id="replay-label">朗读</span></button>
+      <button id="stop-speech" class="text-button" type="button" hidden>停止</button>
+      <span id="playback-status" class="playback-status" role="status" hidden></span>
+      <label class="playback-volume" title="播报音量；遥控器音量键也可调节"><svg class="ui-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M4 8h3l4-4v12l-4-4H4Zm10-1a5 5 0 0 1 0 6m2-8a8 8 0 0 1 0 10"/></svg><input id="playback-volume" type="range" min="0" max="100" step="10" value="100" aria-label="播报音量"><output id="playback-volume-value" for="playback-volume">100%</output></label>
+    </section>
     <form id="composer" class="composer">
       <textarea id="prompt" rows="1" maxlength="64000" placeholder="告诉我你的任务，或继续追问…" aria-label="给 Codex 的任务"></textarea>
-      <div id="voice-status" class="voice-status" aria-live="polite" hidden></div>
-      <div class="composer-footer"><div class="voice-actions"><button id="record-button" class="voice-button" type="button" aria-pressed="false" title="开始或完成本地听写 · Ctrl+Alt+V">听写</button><button id="cancel-recording" class="text-button" type="button" hidden>取消</button><button id="stop-speech" class="text-button" type="button" hidden>停止播报</button></div><span class="composer-hint">Enter 发送</span><button id="send-button" type="submit"><span>发送</span><svg class="ui-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 15V5m-4 4 4-4 4 4"/></svg></button></div>
+      <div class="composer-feedback"><span id="voice-status" class="voice-status" aria-live="polite" hidden></span><span id="composer-hint" class="composer-hint">Enter 发送 · Shift + Enter 换行</span></div>
+      <div class="composer-footer"><div class="voice-actions"><button id="record-button" class="voice-button" type="button" aria-pressed="false" title="使用电脑麦克风听写 · Ctrl+Alt+V">电脑听写</button><button id="cancel-recording" class="text-button" type="button" hidden>取消听写</button><button id="clear-draft" class="text-button" type="button" hidden>清空</button></div><button id="send-button" type="submit"><span>发送</span><svg class="ui-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 15V5m-4 4 4-4 4 4"/></svg></button></div>
     </form>
     </div>
   </main>

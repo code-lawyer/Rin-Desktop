@@ -2,13 +2,27 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { installSpeech } from '../renderer/speech-ui.js';
 
+test('computer dictation shortcut preserves the remote microphone cancel control', async t => {
+  const old={document:globalThis.document,window:globalThis.window};
+  t.after(()=>{for(const [key,value] of Object.entries(old))value===undefined?delete globalThis[key]:globalThis[key]=value;});
+  const nodes=new Map(),calls=[];let onRemote;
+  const get=id=>{if(!nodes.has(id))nodes.set(id,{hidden:true,textContent:'',setAttribute(){}});return nodes.get(id);};
+  globalThis.document={getElementById:get,addEventListener(){}};globalThis.window={addEventListener(){}};
+  const api={workspace:async()=>({ok:true,value:{settings:{},speech:{phase:'ready'}}}),onWorkspace(){},onSpeech(){},onRemote:fn=>onRemote=fn,
+    remote:async command=>{calls.push(command);return {ok:true,value:{audio:'idle'}};},capture:async()=>calls.push('computer-capture')};
+  const control=installSpeech({api,state:()=>({status:'idle',threadId:'one',messages:[]}),insert(){},error:assert.fail,measure(){}});
+  await new Promise(resolve=>setImmediate(resolve));onRemote({audio:'listening'});await get('record-button').onclick();
+  assert.equal(calls.includes('computer-capture'),false);assert.equal(get('cancel-recording').hidden,false);assert.match(get('voice-status').textContent,/遥控器/);
+  await get('cancel-recording').onclick();assert.equal(calls.at(-1),'cancel');
+});
+
 test('a short multi-sentence reply is generated as one utterance before playback', async t => {
   const old = {document:globalThis.document,window:globalThis.window,AudioContext:globalThis.AudioContext};
   t.after(() => { for (const [key,value] of Object.entries(old)) value === undefined ? delete globalThis[key] : globalThis[key]=value; });
   const nodes = new Map(), requests = [], played = [];
   globalThis.document = {getElementById:id => { if (!nodes.has(id)) nodes.set(id,{hidden:true,setAttribute(){}}); return nodes.get(id); },addEventListener(){}};
   globalThis.window = {addEventListener(){}};
-  globalThis.AudioContext = class {destination={};async resume(){} createBuffer(){return {copyToChannel(){}};} createBufferSource(){return {connect(){},start(){played.push(true);queueMicrotask(()=>this.onended?.());},stop(){this.onended?.();}};}};
+  globalThis.AudioContext = class {destination={};async resume(){} createGain(){return {gain:{value:1},connect(){}};} createBuffer(){return {copyToChannel(){}};} createBufferSource(){return {connect(){},start(){played.push(true);queueMicrotask(()=>this.onended?.());},stop(){this.onended?.();}};}};
   const text = '事情已经处理好了。先确认当前项目和对话，再发送下一条任务。听到提示音以后，按下朗读键，就能继续听回复。';
   const api = {workspace:async()=>({ok:true,value:{settings:{ttsResident:true},speech:{phase:'ready'}}}),onWorkspace(){},onSpeech(){},stopSpeech:async()=>({ok:true}),
     synthesize:async text=>{requests.push(text);return {ok:true,value:{samples:[0,0],sampleRate:24000}};}};
@@ -27,7 +41,7 @@ test('automatic narration prepares a whole reply, deduplicates completion events
   globalThis.window={addEventListener(){}};
   globalThis.AudioContext=class {
     destination={}; async resume() {}
-    createBuffer(){return {copyToChannel(){}};}
+    createGain(){return {gain:{value:1},connect(){}};} createBuffer(){return {copyToChannel(){}};}
     createBufferSource(){return {connect(){},start(){played.push(Date.now());this.timer=setTimeout(()=>this.onended?.(),12);},stop(){clearTimeout(this.timer);this.onended?.();}};}
   };
   const delay=ms=>new Promise(r=>setTimeout(r,ms));
@@ -60,7 +74,7 @@ test('resident manual mode stays silent until the current reply is requested, an
   const nodes=new Map(),handlers={},requested=[],windows=[]; let workspaceHandler;
   const get=id=>{if(!nodes.has(id))nodes.set(id,{hidden:true,textContent:'',setAttribute(){}});return nodes.get(id);};
   globalThis.document={getElementById:get,addEventListener(){}};globalThis.window={addEventListener(){}};
-  globalThis.AudioContext=class {destination={};async resume(){} createBuffer(){return {copyToChannel(){}};} createBufferSource(){return {connect(){},start(){queueMicrotask(()=>this.onended?.());},stop(){this.onended?.();}};}};
+  globalThis.AudioContext=class {destination={};async resume(){} createGain(){return {gain:{value:1},connect(){}};} createBuffer(){return {copyToChannel(){}};} createBufferSource(){return {connect(){},start(){queueMicrotask(()=>this.onended?.());},stop(){this.onended?.();}};}};
   const delay=()=>new Promise(r=>setImmediate(r));
   const initial={version:1,settings:{ttsResident:true,autoSpeak:false,ttsEngine:'qwen'},speech:{phase:'ready'}};
   const api={workspace:async()=>({ok:true,value:initial}),onWorkspace:f=>{workspaceHandler=f;},onSpeech:(name,f)=>handlers[name]=f,
@@ -68,14 +82,14 @@ test('resident manual mode stays silent until the current reply is requested, an
   const state={threadId:'one',status:'idle',messages:[{role:'assistant',text:'这一条回复。',complete:true}]};
   const control=installSpeech({api,state:()=>state,insert(){},error:e=>assert.fail(e),measure(){}}); await delay();
   handlers.reply({threadId:'one',text:'这一条回复。'});await delay();assert.deepEqual(requested,[]);
-  assert.equal(get('replay-reply').textContent,'朗读此条');
+  assert.equal(get('replay-label').textContent,'朗读');
   workspaceHandler({...initial,speech:{phase:'loading'}});
   assert.equal(get('replay-reply').disabled,false,'An explicitly loading model can queue one read request');
   await control.readReply();assert.deepEqual(requested,['这一条回复。'],'Manual read refreshes an authoritative ready snapshot before the delayed push');
   state.status='working';control.refresh();assert.equal(get('replay-reply').disabled,true);
   workspaceHandler({version:3,settings:{...initial.settings,ttsResident:false},speech:{phase:'unloaded'}});
   workspaceHandler({...initial,version:2});
-  assert.equal(get('replay-reply').textContent,'语音设置');await get('replay-reply').onclick();assert.deepEqual(windows,['speech-settings']);
+  assert.equal(get('replay-label').textContent,'朗读');await get('replay-reply').onclick();assert.deepEqual(windows,['speech-settings']);
   handlers.reply({threadId:'one',text:'不能自动加载。',preview:true});await delay();assert.equal(requested.length,1);
 });
 
@@ -85,7 +99,7 @@ test('manual read action waits for a complete idle reply, ignores re-entry and w
   const nodes=new Map(),handlers={},requested=[],windows=[],errors=[]; let completeAudio;
   const get=id=>{if(!nodes.has(id))nodes.set(id,{hidden:true,textContent:'',setAttribute(){}});return nodes.get(id);};
   globalThis.document={getElementById:get,addEventListener(){}};globalThis.window={addEventListener(){}};
-  globalThis.AudioContext=class {destination={};async resume(){} createBuffer(){return {copyToChannel(){}};} createBufferSource(){return {connect(){},start(){completeAudio=()=>this.onended?.();},stop(){this.onended?.();}};}};
+  globalThis.AudioContext=class {destination={};async resume(){} createGain(){return {gain:{value:1},connect(){}};} createBuffer(){return {copyToChannel(){}};} createBufferSource(){return {connect(){},start(){completeAudio=()=>this.onended?.();},stop(){this.onended?.();}};}};
   const delay=()=>new Promise(r=>setImmediate(r));
   const api={workspace:async()=>({ok:true,value:{settings:{ttsResident:true,autoSpeak:false},speech:{phase:'ready'}}}),onWorkspace(){},onSpeech:(name,f)=>handlers[name]=f,
     stopSpeech:async()=>({ok:true}),synthesize:async text=>{requested.push(text);return {ok:true,value:{samples:[0,0],sampleRate:24000}};},windowAction:action=>windows.push(action)};
@@ -125,14 +139,48 @@ test('dictation opens the microphone without waiting for ongoing native TTS synt
 });
 
 const tick = () => new Promise(resolve=>setImmediate(resolve));
+
+test('stopping reply playback preserves the active remote microphone progress',async t=>{
+  const old={document:globalThis.document,window:globalThis.window};
+  t.after(()=>{for(const [key,value] of Object.entries(old))value===undefined?delete globalThis[key]:globalThis[key]=value;});
+  const nodes=new Map(),handlers={};let onRemote;
+  const get=id=>{if(!nodes.has(id))nodes.set(id,{hidden:true,textContent:'',setAttribute(){}});return nodes.get(id);};
+  globalThis.document={getElementById:get,addEventListener(){}};globalThis.window={addEventListener(){}};
+  const api={workspace:async()=>({ok:true,value:{settings:{},speech:{}}}),onWorkspace(){},onSpeech:(event,handler)=>handlers[event]=handler,
+    onRemote:handler=>onRemote=handler,stopSpeech:async()=>({ok:true})};
+  installSpeech({api,state:()=>({status:'idle',messages:[]}),insert(){},error:assert.fail,measure(){}});
+  await tick();onRemote({phase:'connected',audio:'starting'});
+  handlers.stop();
+  assert.match(get('voice-status').textContent,/遥控器.*麦克风/);
+  assert.equal(get('voice-status').hidden,false);
+  assert.equal(get('record-button').disabled,true);
+});
+
 const gate = () => {let resolve;const promise=new Promise(r=>resolve=r);return {promise,resolve};};
+test('playback volume changes the live GainNode, persists and keeps a stable read label',async t=>{
+  const old={document:globalThis.document,window:globalThis.window,AudioContext:globalThis.AudioContext};
+  t.after(()=>{for(const [key,value] of Object.entries(old))value===undefined?delete globalThis[key]:globalThis[key]=value;});
+  const nodes=new Map(),saved=[],gain={gain:{value:1},connect(){}},errors=[];let output,workspaceListener;
+  const get=id=>{if(!nodes.has(id))nodes.set(id,{hidden:true,textContent:'',setAttribute(){}});return nodes.get(id);};
+  globalThis.document={getElementById:get,addEventListener(){}};globalThis.window={addEventListener(){}};
+  globalThis.AudioContext=class {destination={};async resume(){}createGain(){return gain;}createBuffer(){return {copyToChannel(){}};}createBufferSource(){return {connect:node=>output=node,start(){},stop(){this.onended?.();},disconnect(){}};}};
+  let workspace={version:1,settings:{ttsResident:true,playbackVolume:.7},speech:{phase:'ready'}};
+  const api={workspace:async()=>({ok:true,value:workspace}),onWorkspace:fn=>workspaceListener=fn,onSpeech(){},stopSpeech:async()=>({ok:true}),synthesize:async()=>({ok:true,value:{samples:[.5,-.5],sampleRate:24000}}),setPlaybackVolume:async value=>{saved.push(value);workspace={...workspace,version:workspace.version+1,settings:{...workspace.settings,playbackVolume:value}};workspaceListener(workspace);return {ok:true,value:workspace};}};
+  const control=installSpeech({api,state:()=>({status:'idle',threadId:'one',messages:[{role:'assistant',text:'可以朗读。',complete:true}]}),insert(){},error:value=>errors.push(value),measure(){}});
+  await tick();const playing=control.readReply();await tick();assert.equal(output,gain);assert.equal(gain.gain.value,.7);
+  await control.adjustVolume(-.1);assert.equal(gain.gain.value,.6);assert.equal(get('playback-volume-value').textContent,'60%');
+  get('playback-volume').value='20';get('playback-volume').oninput();assert.equal(gain.gain.value,.2);await get('playback-volume').onchange();
+  await control.adjustVolume(-1);assert.equal(gain.gain.value,0);await control.adjustVolume(2);assert.equal(gain.gain.value,1);
+  assert.deepEqual(saved,[.6,.2,0,1]);assert.equal(get('replay-label').textContent,'朗读');assert.equal(get('voice-status').textContent,'');
+  await get('stop-speech').onclick();await playing;assert.deepEqual(errors,[]);
+});
 function preparationHarness(t, text='第一句。第二句。', extra={}) {
   const old={document:globalThis.document,window:globalThis.window,AudioContext:globalThis.AudioContext};
   t.after(()=>{for(const [key,value] of Object.entries(old)) value===undefined?delete globalThis[key]:globalThis[key]=value;});
   const nodes=new Map(),handlers={},requests=[],played=[],errors=[];let workspaceListener;
   const get=id=>{if(!nodes.has(id))nodes.set(id,{hidden:true,setAttribute(){}});return nodes.get(id);};
   globalThis.document={getElementById:get,addEventListener(){}};globalThis.window={addEventListener(){}};
-  globalThis.AudioContext=class {destination={};async resume(){} createBuffer(_n,length){return {length,copyToChannel(){}};} createBufferSource(){return {connect(){},disconnect(){},start(){played.push(this.buffer.length);queueMicrotask(()=>this.onended?.());},stop(){this.onended?.();}};}};
+  globalThis.AudioContext=class {destination={};async resume(){} createGain(){return {gain:{value:1},connect(){}};} createBuffer(_n,length){return {length,copyToChannel(){}};} createBufferSource(){return {connect(){},disconnect(){},start(){played.push(this.buffer.length);queueMicrotask(()=>this.onended?.());},stop(){this.onended?.();}};}};
   let workspace={version:1,settings:{ttsResident:true,ttsEngine:'qwen',qwenVoice:'Serena',prepareSpeech:true,autoSpeak:false,...extra},speech:{phase:'ready'}};
   const state={cwd:'project',threadId:'one',status:'idle',messages:[{role:'assistant',id:'reply',turnId:'turn',text,complete:true,turnStatus:'completed'}]};
   const api={workspace:async()=>({ok:true,value:workspace}),onWorkspace:f=>workspaceListener=f,onSpeech:(name,f)=>handlers[name]=f,

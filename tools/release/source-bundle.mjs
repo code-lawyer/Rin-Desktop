@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile, readdir, cp, rename, unlink } from 'node:fs/promises';
+import { mkdir, readFile, writeFile, rename, unlink } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';

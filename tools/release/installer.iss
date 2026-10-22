@@ -5,22 +5,30 @@
   #error ReleaseDir must be supplied
 #endif
 #ifndef Version
-  #define Version "0.4.0"
+  #define Version "0.5.0"
 #endif
 [Setup]
+#ifdef TestBuild
+AppId={{768217DB-EA93-4F63-930D-66001B45C188}
+AppName=Rin Desktop Test
+DefaultDirName={localappdata}\Programs\RinDesktop-Test
+DefaultGroupName=Rin Desktop Test
+OutputBaseFilename=Rin-Desktop-{#Version}-Test-{#TestBuild}-Setup
+#else
 AppId={{215174A1-C028-4225-947F-9B15787E578D}
 AppName=Rin Desktop
+DefaultDirName={localappdata}\Programs\RinDesktop
+DefaultGroupName=Rin Desktop
+OutputBaseFilename=Rin-Desktop-{#Version}-Setup
+#endif
 AppVersion={#Version}
 AppPublisher=code-lawyer
 AppPublisherURL=https://github.com/code-lawyer/Rin-Desktop
-DefaultDirName={localappdata}\Programs\RinDesktop
-DefaultGroupName=Rin Desktop
 PrivilegesRequired=lowest
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 MinVersion=10.0.17763
 OutputDir={#ReleaseDir}
-OutputBaseFilename=Rin-Desktop-{#Version}-Setup
 Compression=zip/1
 SolidCompression=no
 WizardStyle=modern
@@ -38,8 +46,13 @@ Name: "desktopicon"; Description: "Create a desktop shortcut"; Flags: checkedonc
 [Files]
 Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 [Icons]
+#ifdef TestBuild
+Name: "{group}\Rin Desktop Test"; Filename: "{app}\VibeVoice.exe"; Check: not IsPortableMode
+Name: "{autodesktop}\Rin Desktop Test"; Filename: "{app}\VibeVoice.exe"; Tasks: desktopicon; Check: not IsPortableMode
+#else
 Name: "{group}\Rin Desktop"; Filename: "{app}\VibeVoice.exe"; Check: not IsPortableMode
 Name: "{autodesktop}\Rin Desktop"; Filename: "{app}\VibeVoice.exe"; Tasks: desktopicon; Check: not IsPortableMode
+#endif
 [Run]
 Filename: "{app}\VibeVoice.exe"; Description: "Open Rin Desktop"; Flags: nowait postinstall skipifsilent; Check: not IsPortableMode
 [Code]
