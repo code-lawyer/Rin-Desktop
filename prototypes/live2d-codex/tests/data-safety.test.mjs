@@ -101,6 +101,31 @@ test('case variants and a directory junction share one project and retain confli
   await reload.saveDraft(b, 'merged explicitly'); assert.equal(reload.draft(a), 'merged explicitly');
 });
 
+test('a missing project below an existing junction keeps its canonical draft identity', async t => {
+  const { root, store } = await fixture(t);
+  const parent = join(root, 'canonical-parent'), alias = join(root, 'junction-parent');
+  const directory = join(parent, 'temporary', 'project');
+  await fs.mkdir(directory, { recursive: true });
+  await fs.symlink(parent, alias, process.platform === 'win32' ? 'junction' : 'dir');
+  const selected = join(alias, 'temporary', 'project'), project = await store.add(selected);
+  const target = { cwd: selected, threadId: 'retained' }, canonical = { ...target, cwd: project.cwd };
+  const originalKey = draftKey(target);
+  await store.saveDraft(target, 'keep through the missing suffix');
+  await fs.rmdir(directory); await fs.rmdir(join(parent, 'temporary'));
+  assert.equal(await fs.realpath(alias), await fs.realpath(parent), 'the alias parent still exists');
+  assert.equal(draftKey(target), originalKey);
+  assert.equal(store.draft(target), 'keep through the missing suffix');
+  const reload = new WorkspaceStore(join(store.file, '..')); await reload.load();
+  assert.equal(reload.draft(target), 'keep through the missing suffix');
+  assert.equal(reload.draft(canonical), 'keep through the missing suffix');
+  assert.equal(reload.project(project.id).cwd, project.cwd);
+  assert.equal(reload.data.projects.length, 2);
+  await assert.rejects(reload.add(selected));
+  await reload.saveDraft(target, 'edited while the project is missing');
+  assert.equal(reload.draft(canonical), 'edited while the project is missing');
+  assert.equal(Object.keys(reload.data.drafts).length, 1, 'aliases do not fork the saved draft');
+});
+
 test('corrupt or missing primary with recovery artifacts fails closed and leaves every byte intact', async t => {
   const { root, store, target } = await fixture(t); await store.saveDraft(target, 'original'); await store.saveDraft(target, 'latest');
   const backup = await fs.readFile(store.file + '.bak');

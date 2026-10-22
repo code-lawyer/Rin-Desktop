@@ -11,11 +11,11 @@ import { NativeAgent } from '../backend/native-agent.mjs';
 const deferred = () => { let resolve, reject; const promise = new Promise((a,b) => { resolve=a; reject=b; }); return { promise, resolve, reject }; };
 async function fixture(t, io) {
   const root = await fs.mkdtemp(join(tmpdir(), 'rin-submission-')); t.after(() => fs.rm(root, { recursive: true, force: true }));
-  const store = new WorkspaceStore(root, { io }); await store.load(); await store.add(root);
+  const store = new WorkspaceStore(root, { io }); await store.load(); const project = await store.add(root);
   const agent = new CodexCompanion({ projectRoot: root, storageDir: root });
   Object.assign(agent.state, { connection: 'ready', status: 'idle', threadId: 'thread' });
   agent.rpc = { closed: false }; const guard = new SubmissionGuard(store);
-  return { root, store, agent, guard, target: { provider: 'codex', cwd: root, threadId: 'thread' } };
+  return { root, project, store, agent, guard, target: { provider: 'codex', cwd: root, threadId: 'thread' } };
 }
 
 test('accepted request with lost receipt survives restart; reconciliation reads history and never resends', async t => {
@@ -126,10 +126,9 @@ test('the originating target is checked before saving or dispatching a stale ren
 
 for (const status of ['pending', 'unknown']) for (const field of ['target', 'originalTarget']) {
   test(`${status} receipt from another provider keeps its ${field} project reachable`, async t => {
-    const { root, store } = await fixture(t);
+    const { root, project, store } = await fixture(t);
     const active = join(root, 'active-project'); await fs.mkdir(active); await store.add(active);
-    const project = store.data.projects.find(project => project.cwd === root);
-    const draft = { provider: 'grok', cwd: root, threadId: 'old-thread' };
+    const draft = { provider: 'grok', cwd: project.cwd, threadId: 'old-thread' };
     await store.saveDraft(draft, 'preserve this original');
     await store.transaction(data => {
       const other = { provider: 'grok', cwd: active, threadId: 'new-thread' };
@@ -140,31 +139,29 @@ for (const status of ['pending', 'unknown']) for (const field of ['target', 'ori
     });
     const before = await fs.readFile(store.file);
     await assert.rejects(store.remove(project.id, active), /发送结果未确定.*核查/);
-    assert.equal(store.project(project.id).cwd, root);
+    assert.equal(store.project(project.id).cwd, project.cwd);
     assert.equal(store.draft(draft), 'preserve this original');
     assert.deepEqual(await fs.readFile(store.file), before);
   });
 }
 
 test('a submission queued before removal is protected by the same storage transaction order', async t => {
-  const { root, store, target } = await fixture(t);
+  const { root, project, store, target } = await fixture(t);
   const active = join(root, 'active-project'); await fs.mkdir(active); await store.add(active);
-  const project = store.data.projects.find(project => project.cwd === root);
   const pending = store.transaction(data => {
     data.submissions = { codex: { id: 'queued', status: 'unknown', text: 'original', target, originalTarget: target } };
     store.setDraft(data, target, 'original');
   });
   const removing = store.remove(project.id, active);
   await assert.rejects(removing, /发送结果未确定/); await pending;
-  assert.equal(store.project(project.id).cwd, root);
+  assert.equal(store.project(project.id).cwd, project.cwd);
   assert.equal(store.draft(target), 'original');
 });
 
 for (const status of ['confirmed', 'released', 'not-sent']) {
   test(`${status} receipt permits removal without deleting its draft or journal`, async t => {
-    const { root, store, target } = await fixture(t);
+    const { root, project, store, target } = await fixture(t);
     const active = join(root, 'active-project'); await fs.mkdir(active); await store.add(active);
-    const project = store.data.projects.find(project => project.cwd === root);
     await store.saveDraft(target, 'retained draft');
     const record = { id: 'handled', status, text: 'retained draft', target, originalTarget: target };
     await store.transaction(data => { data.submissions = { codex: record }; });
