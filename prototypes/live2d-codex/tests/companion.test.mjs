@@ -3,14 +3,14 @@ import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
-import { join, dirname, resolve, sep } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join, sep } from 'node:path';
+import { tmpdir } from 'node:os';
 import { AvatarRpc } from '../backend/rpc.mjs';
 import { CodexCompanion, cliEnvironment } from '../backend/codex.mjs';
 import { approvalResult } from '../backend/approvals.mjs';
 
 async function fixture(t) {
-  const base = resolve(dirname(fileURLToPath(import.meta.url)), '../../../work/runtime/avatar-unit-tests');
+  const base = join(tmpdir(), 'rin-companion-unit-tests');
   await mkdir(base, { recursive: true });
   const directory = await mkdtemp(join(base, 'case-'));
   if (!directory.startsWith(base + sep)) throw new Error('Test directory escaped workspace.');

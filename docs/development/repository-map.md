@@ -1,0 +1,56 @@
+# 文件地图与整理处置
+
+2026-10-21 整理前枚举了 66,846 个文件、8,722 个目录，约 19.78 GB；其中多数为依赖、模型、安装产物或私人运行资料。368 个项目文本文件保存了内容备份；完整逐文件元数据及迁移校验在本机 `work/project-organization-2026-10-21`，不会同步到 GitHub。
+
+## 目录责任与处置
+
+| 区域 | 责任 | 本轮处置与后续约定 |
+| --- | --- | --- |
+| 根目录、`.git`、`.github` | 统一入口、仓库、CI | 保留原 Git 历史/origin；增加开发入口与文档检查 |
+| `docs/development` | 当前开发手册、台账、进度、技术决策 | 新建为公共维护入口；生成页从 JSON 更新 |
+| `docs` 的构建/隐私/许可/发布记录 | 面向使用、构建与分发的规范 | 保持公共路径；根索引指向当前手册 |
+| `docs/history/controller-v0.2` | 旧控制器方案及示例 | 13 篇旧文档、3 个旧 schema/example、1 篇早期选型笔记实际迁入；只作历史，不当现行存储格式 |
+| 其他 `docs/history`、`research`、`evidence` | 历史、研究、原始验收 | 保留本地；相关链接随移动修正；不混入公共手册依赖 |
+| `prototypes/live2d-codex/backend` | 当前桌面后端、Agent、语音、状态 | 保留位置，仍是主应用的一部分 |
+| `prototypes/live2d-halfbody` | 女生精细半身样例预览 | 独立本机页面；素材在 artwork，未替换主应用人物或接入发布 |
+| 主应用 `renderer`、`preload.cjs`、`main.cjs` | UI、IPC和协调 | 文件整理阶段保留业务行为；后续审查修复继续保留既有改动，并统一回复契约/实验标识 |
+| 主应用 `scripts`、`tests` | 构建、打包、测试与兼容入口 | 常规命令由根npm统一；旧check已转发维护工具或只显示归档说明 |
+| 主应用 `assets`、`licenses` | 运行资源与许可 | 不搬迁、不改变素材；公开范围按已有白名单 |
+| 主应用 `models/runtime/vendor/node_modules/dist` | 模型、可恢复环境与构建产物 | 不上传、不批量删除；只允许正常构建更新 dist |
+| `prototypes/dots-bridge`、私人 Dots 后端 | 本机私人扩展 | 原地保留，与公共发布隔离 |
+| `prototypes/qwen-tts-evaluation` | 旧 Qwen 评估及源码回退环境 | main 和资源清单工具仍引用，保留路径，不误归为废弃 |
+| `tools/project` | 启动、状态、台账生成与检查 | 当前公共开发工具 |
+| `tools/probes` | 协议验证 | 既有 Codex 探针保留；新增 `cli-agents` 接收原 work 中 2 个可复用探针 |
+| `tools/qa` | 合成缺陷复现、共享输出边界与GUI验收 | 五个GUI维护用例统一显式运行，输出按次写私人work/qa |
+| `tools/remote-diagnostics` | RC003 独立诊断 | 保留为独立诊断；生产组件在主应用 native/backend，已接入打包脚本 |
+| `tools/release` | 资源、源码审计、许可、安装器 | 沿用原发布链；0.5.0 的公开源码和安装器继续发布到原仓库 |
+| `tools/psd2live-*` | 第三方美术制作工具 | 保留本机，不视为本项目源码，不搬运行库 |
+| `tests` | 根协议/输入/开发工具回归 | 新增台账及探针帮助入口测试 |
+| `artwork` | 母图、图层、可编辑工程及制作脚本 | 完整保留；只有获准运行资产进入公共应用 |
+| `release` | 既有安装包、便携目录和对应源码产物 | 原地保留，不能用新构建覆盖旧版本 |
+| `work/runtime` | 日用数据、设备环境与原始诊断 | 保留现有路径；源码入口仍使用原数据 |
+| `work/qa` | 新的开发验证运行输出 | 按模块/运行分目录，与工具源码分开；Git 忽略 |
+| 其余 `work` | 旧验收、备份、schema、缓存、研究 | 保留原记录；新增说明指向当前工具；可复用代码不再只藏在这里 |
+
+这些区域覆盖全部原顶层目录。维护者可以保留本地大目录，不需要把依赖文件逐个搬成“统一源码”。未来增加顶层目录时同步[机器可读目录规则](repository-layout.json)。
+
+## 实际迁移
+
+共 20 个文件，均先检查源/目标位于仓库内部、目标不存在、源为普通文件，再逐文件移动并校验原始 SHA-256；随后只对需要继续使用的路径/链接做适配。
+
+| 原位置 | 当前权威位置 | 兼容与证据 |
+| --- | --- | --- |
+| `docs/00-*` 至 `docs/12-*`（13 篇） | `docs/history/controller-v0.2` | 旧正文保留，链接重定位；当前手册提供完整新路线 |
+| `docs/examples`（3 个文件） | 历史方案目录的 `examples` | 明确不是现行应用 schema |
+| `work/notes/simple-mic-selection-2026-09-30.md` | 历史方案目录的 `notes` | 保留当时选型结论，不作为当前硬件进度 |
+| `work/cli-agent-validation-2026-10-19/claude-probe.mjs` | [Claude 探针](../../tools/probes/cli-agents/claude-probe.mjs) | 原位置为薄兼容入口；历史 fixture/报告不搬，新的输出进入 work/qa |
+| 同目录 `acp-probe.mjs` | [ACP 探针](../../tools/probes/cli-agents/acp-probe.mjs) | 去掉个人 CLI 绝对路径；复用主应用 SDK；显式 `--run` 才执行真实验收 |
+| `work/project-audit-2026-10-20/reproduce-findings.mjs` | [已知缺陷复现](../../tools/qa/reproduce-known-issues.mjs) | 原位置为薄兼容入口；原结果保持；新运行单独出报告 |
+
+本轮没有移动主应用和大运行目录，因为这会同时影响构建引用、资源查找、模型回退、私人通道与既有数据；保持位置是经过引用核查的处置结果。文件组织完成的含义是每类文件有责任、入口、保留或归档决定，必要源码已迁入维护区，旧事项有可施工去向，而不是把所有目录改名。
+
+后续代码审查修复又收敛了15个旧check工具：4个迁入`tools/qa/gui/cases`；原人物切换工具也迁入同一维护区，这五个旧路径保留转发入口。其余11个历史说明桩已移至`work/archive/project-quality-2026-10-21/retired-entrypoints`，不再占用维护目录。原16份完整验收源码保存在`work/archive/gui-acceptance-2026-10-21`并附SHA-256清单，历史运行结果保持原位。详见[GUI工具清单](../../tools/qa/gui/README.md)和[质量审查与清理](quality-audit.md)。
+
+## 原始记录与复原
+
+本机整理目录保存 `inventory-before.json`、`before`、`moves.json` 和最终验证结果。原始证据中的旧路径表示当时环境，不能据此认为现在仍应从旧位置维护源码。需要撤销时按具体移动记录和后续修改逐文件恢复，不重置整个工作区。

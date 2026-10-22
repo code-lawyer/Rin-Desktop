@@ -1,7 +1,14 @@
 import { renderReply } from './reply-document.mjs';
 import { isTaskBusy } from '../backend/task-state.mjs';
 import characters from '../backend/character-profiles.cjs';
+import catalog from '../backend/agent-catalog.cjs';
+import { populateAgentPicker } from './agent-picker.mjs';
+import { installRemoteSettings, installRemoteNavigation } from './remote-ui.mjs';
+import { installSettingsNavigation } from './settings-navigation.mjs';
 const api = window.companion, $ = id => document.getElementById(id);
+installRemoteSettings(api); installRemoteNavigation(api,{notice:text=>notice(text)});
+const settingsNavigation = installSettingsNavigation(document);
+populateAgentPicker($('agent-select'));
 let workspace = { projects: [], settings: {} }, current, projectId, selected, threads = [], listCursor, historyCursor, listVersion = 0, historyVersion = 0, noticeTimer, searchTimer, settingsDirty = false, ready = false;
 const node = (tag, text, cls) => { const n = document.createElement(tag); if (text !== undefined) n.textContent = text; if (cls) n.className = cls; return n; };
 for (const [id, voice] of Object.entries(characters.QWEN_VOICES)) $('qwen-voice').append(Object.assign(node('option', voice.label), { value: id }));
@@ -12,18 +19,32 @@ const act = action => event => { Promise.resolve().then(() => action(event)).cat
 // Never replace a newer snapshot with that stale response.
 function acceptWorkspace(value) { if ((value.version ?? 0) < (workspace.version ?? 0)) return false; workspace = value; return true; }
 const busy = () => isTaskBusy(current);
-const available = () => current?.connection === 'ready' && current?.provider === 'codex';
+const available = () => current?.connection === 'ready' && catalog.isCliAgent(current?.provider);
 function updateActivity() {
-  $('connection').textContent = current?.provider === 'dots' ? '请在气泡设置中切回 Codex' : current?.connection === 'ready' ? 'Codex CLI · 本机工作区' : current?.error || '正在连接 Codex…';
-  $('new-thread').disabled = busy() || !available() || !projectId;
+  const name = catalog.agentName(current?.provider);
+  const connection = current?.connection;
+  $('connection').textContent = current?.provider === 'dots' ? '请选择一个 CLI Agent' : connection === 'ready' ? `${name} · 已连接` : connection === 'authentication' ? `${name} · 需要登录` : connection === 'error' ? `${name} · 连接需要处理` : `正在连接 ${name}…`;
+  $('connection').title = connection === 'ready' ? `${name} · 本机工作区\n${current?.cwd || ''}` : current?.error || $('connection').textContent;
+  $('connection').dataset.state = connection || 'connecting';
+  $('agent-select').value = current?.provider ?? 'codex';
+  $('agent-select').disabled = busy() || current?.connection === 'connecting';
+  $('agent-reconnect').disabled = busy() || current?.connection === 'connecting';
+  $('agent-help').textContent = !available() ? [current?.error, current?.loginHelp].filter(Boolean).join('\n\n') : '';
+  $('agent-details').hidden = !$('agent-help').textContent;
+  $('permission-hint').textContent = current?.permissionHint || '';
+  $('new-thread').disabled = busy() || !available() && !current?.canStartNew || !projectId;
   $('resume').disabled = busy() || !available() || !selected;
-  $('busy-note').hidden = !busy(); $('model').disabled = busy() || !available(); $('effort').disabled = busy() || !available();
+  $('rename').disabled = !available() || !selected;
+  $('busy-note').hidden = !busy(); $('model').disabled = busy() || !available(); $('effort').disabled = busy() || !available() || !(current?.models?.find(m => m.model === current.model)?.efforts?.length);
 }
 function renderProjects() {
-  const host = $('projects'); host.replaceChildren();
+  const host = $('projects'), focusedId = host.contains(document.activeElement) ? document.activeElement.dataset.projectId : undefined;
+  host.replaceChildren();
   for (const p of workspace.projects) {
     const b = node('button', undefined, 'project-row'); b.setAttribute('aria-pressed', String(p.id === projectId && $('settings').hidden)); b.title = p.cwd;
+    b.dataset.projectId = p.id;
     b.append(node('strong', p.name), node('small', p.cwd)); b.addEventListener('click', act(() => selectProject(p.id))); host.append(b);
+    if (p.id === focusedId) b.focus({preventScroll:true});
   }
   if (!workspace.projects.length) host.append(node('p', '添加一个本地文件夹，开始工作。', 'empty-list'));
 }
@@ -39,30 +60,33 @@ async function refreshThreads(append = false) {
   const version = ++listVersion, id = projectId;
   if (!append) { threads = []; $('threads').replaceChildren(node('p', '正在读取本地对话…', 'empty-list')); }
   try {
-    const result = await run(api.listThreads(id, append ? listCursor : null, $('search').value));
+    const result = await run(api.listThreads(id, append ? listCursor : null, $('search').value, current.provider));
     if (version !== listVersion || id !== projectId) return;
     threads = append ? [...threads, ...result.data.filter(v => !threads.some(t => t.id === v.id))] : result.data;
     listCursor = result.nextCursor; renderThreads();
   } catch { if (version === listVersion && !append) $('threads').replaceChildren(node('p', '暂时无法读取。连接恢复后点击「刷新」。', 'empty-list')); }
 }
 function renderThreads() {
-  $('threads').replaceChildren();
+  const host = $('threads'), focusedId = host.contains(document.activeElement) ? document.activeElement.dataset.threadId : undefined;
+  host.replaceChildren();
   for (const t of threads) {
     const b = node('button', undefined, 'thread-row'); b.setAttribute('aria-pressed', String(t.id === selected?.id)); b.title = t.name;
+    b.dataset.threadId = t.id;
     const date = new Date(t.updatedAt * 1000); b.append(node('strong', t.name), node('small', `${t.id === current?.threadId ? '当前 · ' : ''}${Number.isNaN(+date) ? '' : date.toLocaleString('zh-CN',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})}`));
-    b.addEventListener('click', act(() => selectThread(t))); $('threads').append(b);
+    b.addEventListener('click', act(() => selectThread(t))); host.append(b);
+    if (t.id === focusedId) b.focus({preventScroll:true});
   }
   if (!threads.length) $('threads').append(node('p', $('search').value ? '没有匹配的对话。' : '这个项目还没有对话。点击「新对话」开始。', 'empty-list'));
   $('more-threads').hidden = !listCursor;
 }
 async function selectThread(t) {
-  selected = t; renderThreads(); $('detail').hidden = false; $('empty-detail').hidden = true; $('thread-title').value = t.name; $('thread-info').textContent = `本地会话 · ${t.id.slice(-8)}`; updateActivity();
+  selected = t; renderThreads(); $('detail').hidden = false; $('empty-detail').hidden = true; $('thread-title').value = t.name; $('thread-info').textContent = `${catalog.agentName(current?.provider)} · ${t.id.slice(-8)}${current?.renameLocal ? ' · 名称仅在 Rin 保存' : ''}`; updateActivity();
   $('history').replaceChildren(node('p', '正在读取历史…', 'hint')); historyCursor = null; $('more-history').hidden = true; await loadHistory();
 }
 async function loadHistory(older = false) {
   if (!selected) return; const id = selected.id, version = ++historyVersion;
   try {
-    const result = await run(api.history(id, older ? historyCursor : null));
+    const result = await run(api.history(id, older ? historyCursor : null, current.provider));
     if (version !== historyVersion || selected?.id !== id) return;
     if (!older) $('history').replaceChildren();
     const fragment = document.createDocumentFragment();
@@ -70,7 +94,8 @@ async function loadHistory(older = false) {
       if (!['userMessage','agentMessage'].includes(item.type)) continue;
       const text = item.type === 'agentMessage' ? item.text : (item.content ?? []).filter(v => v.type === 'text').map(v => v.text).join('\n');
       if (!text) continue;
-      const article = node('article', undefined, 'history-message'); article.append(node('p', item.type === 'userMessage' ? '你' : item.phase === 'commentary' ? 'Codex · 进度' : 'Codex', 'role'));
+      const name = catalog.agentName(current?.provider);
+      const article = node('article', undefined, 'history-message'); article.append(node('p', item.type === 'userMessage' ? '你' : item.phase === 'commentary' ? `${name} · 进度` : name, 'role'));
       const body = node('div'); renderReply(body, text, href => run(api.openLink(href)).catch(() => {})); article.append(body); fragment.append(article);
     }
     older ? $('history').prepend(fragment) : $('history').append(fragment);
@@ -174,12 +199,15 @@ function updateResourceStatus() {
     let row = [...host.children].find(row => row.dataset.resource === pack.id);
     if (!row) {
       row = node('div', undefined, 'setting-row'); row.dataset.resource = pack.id;
-      row.append(node('span', undefined, 'hint'), node('button'));
+      const description = node('span', undefined, 'resource-description');
+      description.append(node('strong', pack.label), node('span', undefined, 'hint'));
+      row.append(description, node('button'));
       row.lastChild.onclick = act(async () => { acceptWorkspace(await run(row.lastChild.dataset.action === 'unload' ? api.unloadResource(pack.id) : api.downloadResource(pack.id))); updateResourceStatus(); }); host.append(row);
     }
     const installed = pack.installed || (pack.id === 'asr' ? speech.asr : speech.engines?.[pack.id]);
     const loaded = pack.id === 'asr' ? speech.loaded?.includes('asr') : speech.engine === pack.id && speech.loaded?.includes('tts');
-    row.firstChild.textContent = `${pack.label} · ${loaded ? '已载入' : installed ? '已下载 · 未载入' : `模型 ${format(pack.bytes)} · Hugging Face${pack.runtimeBytes ? `；首次另需约 ${format(pack.runtimeBytes)} 运行依赖` : ''}`}`;
+    row.firstChild.firstChild.textContent = pack.label;
+    row.firstChild.lastChild.textContent = loaded ? '已载入' : installed ? '已下载 · 未载入' : `模型 ${format(pack.bytes)} · Hugging Face${pack.runtimeBytes ? `；首次另需约 ${format(pack.runtimeBytes)} 运行依赖` : ''}`;
     row.lastChild.dataset.action = loaded ? 'unload' : 'load';
     row.lastChild.textContent = active && resource.id === pack.id ? (resource.phase === 'loading' ? '正在载入…' : '正在准备…') : loaded ? '释放模型' : installed ? '载入模型' : resource.id === pack.id && ['error','cancelled'].includes(resource.phase) ? '继续下载并载入' : '下载并载入模型';
     row.lastChild.disabled = active;
@@ -214,9 +242,11 @@ async function refreshWorkspace() {
 }
 $('add-project').onclick = act(async () => { const p = await run(api.addProject()); if (p) { await refreshWorkspace(); await selectProject(p.id); } });
 $('remove-project').onclick = act(async () => { await run(api.removeProject(projectId)); projectId = null; await refreshWorkspace(); });
-$('new-thread').onclick = act(async () => { await run(api.newThread(projectId)); await refreshThreads(); });
-$('resume').onclick = act(async () => { if (selected) await run(api.resumeThread(projectId,selected.id)); });
-$('rename').onclick = act(async () => { if (!selected) return; await run(api.renameThread(selected.id,$('thread-title').value)); selected.name = $('thread-title').value.trim(); const t = threads.find(t => t.id === selected.id); if (t) t.name = selected.name; renderThreads(); notice('对话已重命名。'); });
+$('new-thread').onclick = act(async () => { await run(api.newThread(projectId, current.provider)); await refreshThreads(); });
+$('resume').onclick = act(async () => { if (selected) await run(api.resumeThread(projectId,selected.id,current.provider)); });
+$('rename').onclick = act(async () => { if (!selected) return; const target = selected, name = $('thread-title').value.trim(), provider = current.provider; await run(api.renameThread(target.id,name,provider)); if (current.provider !== provider || selected !== target) return; target.name = name; const t = threads.find(t => t.id === target.id); if (t) t.name = name; renderThreads(); notice(current.renameLocal ? '已更新 Rin 中的会话名称。' : '对话已重命名。'); });
+$('agent-select').onchange = act(async () => { try { await run(api.chooseProvider($('agent-select').value)); } finally { updateActivity(); } });
+$('agent-reconnect').onclick = act(() => run(api.reconnect()));
 $('refresh').onclick = act(() => refreshThreads()); $('more-threads').onclick = act(() => refreshThreads(true)); $('more-history').onclick = act(() => loadHistory(true));
 $('search').oninput = () => { clearTimeout(searchTimer); searchTimer = setTimeout(() => refreshThreads(),250); };
 function showSettings() { $('settings').hidden = false; $('conversations').hidden = true; $('settings-tab').setAttribute('aria-pressed','true'); renderProjects(); if (!settingsDirty) fillSettings(); }
@@ -235,7 +265,7 @@ $('retry-tts').onclick = act(() => saveSpeechChoice({ttsResident:true}));
 $('choose-qwen').onclick = act(async () => { acceptWorkspace(await run(api.chooseQwen())); updateSpeechStatus(); });
 $('use-existing-data').onclick = act(() => run(api.useData()));
 $('save-settings').onclick = act(saveSettings); $('preview-voice').onclick = act(async () => { await saveSettings(); await run(api.previewVoice()); }); $('refresh-microphones').onclick = act(refreshDevices);
-$('settings').addEventListener('change',event => { if (event.target.name !== 'wallpaper-character' && !['model','effort','tts-resident','tts-engine','qwen-voice','auto-speak','prepare-speech','completion-sound'].includes(event.target.id)) settingsDirty = true; });
+$('settings').addEventListener('change',event => { if (!event.target.closest('#remote-settings') && event.target.name !== 'wallpaper-character' && !['model','effort','tts-resident','tts-engine','qwen-voice','auto-speak','prepare-speech','completion-sound'].includes(event.target.id)) settingsDirty = true; });
 $('model').onchange = act(async () => { await run(api.chooseModel($('model').value)); }); $('effort').onchange = act(async () => { await run(api.chooseEffort($('effort').value)); });
 $('close').onclick = () => api.windowAction('hide-workbench'); $('back-chat').onclick = () => api.windowAction('show-chat');
 window.addEventListener('blur', () => { if (document.activeElement?.matches('#shortcuts input,#remote-keys input')) document.activeElement.blur(); });
@@ -244,8 +274,19 @@ document.addEventListener('keydown',e => {
   if (e.key === 'Escape') { if (!$('settings').hidden && projectId) selectProject(projectId).catch(() => {}); else api.windowAction('hide-workbench'); }
   if (['ArrowDown','ArrowUp'].includes(e.key) && e.target.matches('.thread-row,.project-row')) { e.preventDefault(); const siblings = [...e.target.parentElement.querySelectorAll('button')]; const i = siblings.indexOf(e.target); siblings[(i+(e.key==='ArrowDown'?1:-1)+siblings.length)%siblings.length]?.focus(); }
 });
-api.onState(state => { const wasReady = available(), changedModel = current?.model !== state.model || current?.effort !== state.effort; current = state; updateActivity(); if (changedModel) fillModels(); if (ready && !wasReady && available()) refreshWorkspace().then(() => refreshThreads()).catch(() => {}); });
+api.onState(state => {
+  const wasReady = available(), changedProvider = current?.provider !== state.provider;
+  const changedModel = changedProvider || current?.model !== state.model || current?.effort !== state.effort || JSON.stringify(current?.models) !== JSON.stringify(state.models);
+  current = state;
+  if (changedProvider || state.connection === 'connecting' && wasReady) {
+    listVersion++; historyVersion++; selected = null; threads = []; listCursor = null; historyCursor = null;
+    $('threads').replaceChildren(); $('history').replaceChildren(); $('detail').hidden = true; $('empty-detail').hidden = false;
+    $('more-threads').hidden = true; $('more-history').hidden = true;
+  }
+  updateActivity(); if (changedModel) fillModels();
+  if (ready && (changedProvider || !wasReady) && available()) refreshWorkspace().then(() => refreshThreads()).catch(() => {});
+});
 api.onWorkspace(value => { const settingsChanged = JSON.stringify(value.settings) !== JSON.stringify(workspace.settings), characterChanged = value.settings.character !== workspace.settings.character; if (!acceptWorkspace(value) || !ready) return; renderProjects(); if (!projectId) refreshWorkspace().catch(() => {}); if (characterChanged) fillVoices(); if (settingsChanged && !settingsDirty) fillSettings(); else updateSpeechStatus(); });
-api.onWorkbenchRefresh(page => { refreshWorkspace().then(() => { if (page === 'speech') { showSettings(); $('voice-downloads').scrollIntoView({block:'start'}); } else if ($('settings').hidden) return refreshThreads(); }).catch(() => {}); });
+api.onWorkbenchRefresh(page => { refreshWorkspace().then(() => { if (page === 'speech' || page === 'remote') { showSettings(); settingsNavigation.show(page==='remote'?'remote-settings':'playback-settings'); } else if ($('settings').hidden) return refreshThreads(); }).catch(() => {}); });
 try { current = await run(api.snapshot()); await refreshWorkspace(); ready = true; } catch { ready = true; }
 import inputActions from '../backend/input-actions.cjs';

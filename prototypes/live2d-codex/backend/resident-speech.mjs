@@ -48,12 +48,13 @@ export class ResidentSpeech extends EventEmitter {
       } catch (error) {
         if (revision !== this.revision) return;
         const worker = this.worker; this.worker = null;
-        if (worker) await worker.close().catch(() => {});
-        this.update('error', error.message);
+        if (worker) await Promise.resolve().then(() => worker.close()).catch(() => {});
+        if (revision === this.revision) this.update('error', error.message);
       }
     })();
     this.loading = task;
-    task.finally(() => { if (this.loading === task) this.loading = null; });
+    const settled = () => { if (this.loading === task) this.loading = null; };
+    task.then(settled, settled);
     return task;
   }
   transcribe(data) { return this.asr.transcribe(data); }

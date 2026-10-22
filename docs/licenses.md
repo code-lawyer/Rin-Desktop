@@ -3,6 +3,7 @@
 Rin-Desktop 自有源代码采用根目录 MIT 许可。安装包是多个独立组件的组合，不应把整个安装包或所有模型称为 MIT。
 
 - Electron、PixiJS、marked、显示封装、Node.js 等按各自许可提供。安装目录保留 Electron/Chromium 的许可文件，以及 `licenses/` 的副本。Codex CLI 由用户自行安装，不包含在本项目安装包中。
+- Claude Agent SDK 0.3.240 按 [Anthropic 商业条款](https://www.anthropic.com/legal/commercial-terms) 提供；它不是 MIT。Agent Client Protocol SDK 1.9.0 采用 Apache-2.0，Koffi 3.3.3 采用 MIT。发布包保留各 SDK/依赖内的 README、LICENSE 和通知，不打包各家 Agent CLI。Claude 产品入口按[官方 SDK 认证与命名要求](https://code.claude.com/docs/en/agent-sdk/overview)显示为 Claude，只允许 API 或官方云平台 API 认证。
 - Live2D Cubism Core 为专有运行时，保持原始文件，不纳入 MIT。安装步骤要求接受其保护条款；本版只提供固定的雨夜场景，不提供任意模型导入，也不再分发 Hiyori 回退人物。请遵守 [官方 Core 条款](https://www.live2d.com/eula/live2d-proprietary-software-license-agreement_en.html) 和 [发行条件](https://www.live2d.com/en/sdk/license/)。企业用途、扩展模型能力或重新发行时应重新判断适用条件。
 - 默认女性 4K 雨夜原画和新增男性雨夜原画均由本项目制作过程中的生成式图像工具生成，绑定和交互代码由本项目制作。本项目允许随本应用展示、修改和再分发这些场景文件；不声称对生成内容享有排他版权，不代表任何既有动漫作品或厂商的官方授权。男性原画的生成说明见 `prototypes/live2d-codex/assets/rainy-window-male/ARTWORK.md`。
 - SenseVoice 和 Kokoro 模型由用户启用时直接从上游 Hugging Face 下载，不包含在安装器或本项目 Release 中，保留各自模型许可证。CPU 语音工作进程及其链接的 Sherpa 原生语音组件按 GPL-3.0-or-later 的组合分发条件提供，保留上游 Apache/MIT/BSD 通知；不能把组合二进制称为仅 Apache/MIT。接收者可修改、重建、重新分发该语音组件，自有源文件仍可按 MIT 单独使用。桌面与 Live2D 组件通过 JSON 文本/PCM 与独立 `node.exe` 语音子进程通信，不链接 Sherpa；安装包将这些独立组件聚合提供。

@@ -1,12 +1,12 @@
 {
-  "version": "0.4.0",
+  "version": "0.5.0",
   "repository": "code-lawyer/Rin-Desktop",
   "files": [
     {
-      "file": "Rin-Desktop-0.4.0-Setup.exe",
-      "bytes": 268352986,
-      "sha256": "dab6a45090cbff65ec83c3b9728e0ad8dbd0f2e0a58edca7d798d042bb7a6fa6",
-      "url": "https://github.com/code-lawyer/Rin-Desktop/releases/download/v0.4.0/Rin-Desktop-0.4.0-Setup.exe"
+      "file": "Rin-Desktop-0.5.0-Setup.exe",
+      "bytes": 282231155,
+      "sha256": "392495df3649b15425d65c5606722d212f5b35f84c0340c0d4e1eea674c7f104",
+      "url": "https://github.com/code-lawyer/Rin-Desktop/releases/download/v0.5.0/Rin-Desktop-0.5.0-Setup.exe"
     }
   ]
 }

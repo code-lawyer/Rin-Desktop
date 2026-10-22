@@ -1,5 +1,10 @@
-param([string]$CodexPath = 'codex')
+param([string]$CodexPath = 'codex', [switch]$Run, [switch]$Help, [string]$OutputDirectory = '')
 $ErrorActionPreference = 'Stop'
+if (-not $Run -or $Help) {
+  Write-Output 'Usage: pwsh -File tools/probes/windows-preflight.ps1 -Run [-OutputDirectory work/qa/new-run]'
+  Write-Output 'Default: help only. -Run reads Windows/device metadata and CLI versions. Each report uses a new work/qa directory.'
+  return
+}
 $taskRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 $computer = Get-CimInstance Win32_ComputerSystem
 $processor = Get-CimInstance Win32_Processor | Select-Object -First 1
@@ -36,8 +41,17 @@ if ($claudeEntry) {
   $claudeVersion = & $claudeEntry.Source --version
   if ($LASTEXITCODE -eq 0) { $report['claudeVersion'] = ($claudeVersion | Out-String).Trim() }
 }
-$outputDirectory = Join-Path $taskRoot 'docs/evidence'
-[IO.Directory]::CreateDirectory($outputDirectory) | Out-Null
+$qaDirectory = [IO.Path]::GetFullPath((Join-Path $taskRoot 'work/qa'))
+if (-not $OutputDirectory) { $OutputDirectory = Join-Path $qaDirectory ('windows-preflight/' + [DateTime]::UtcNow.ToString('yyyyMMdd-HHmmss') + '-' + [Guid]::NewGuid().ToString('N')) }
+$resolvedOutput = [IO.Path]::GetFullPath($OutputDirectory)
+if (-not $resolvedOutput.StartsWith($qaDirectory + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) { throw 'Output must be a new directory inside work/qa' }
+if (Test-Path -LiteralPath $resolvedOutput) { throw 'Output already exists; select a new run directory.' }
+[IO.Directory]::CreateDirectory((Split-Path -Parent $resolvedOutput)) | Out-Null
+New-Item -ItemType Directory -Path $resolvedOutput -ErrorAction Stop | Out-Null
 $json = $report | ConvertTo-Json -Depth 8
-[IO.File]::WriteAllText((Join-Path $outputDirectory '2026-10-01-windows-preflight.json'), $json + "`n", [Text.UTF8Encoding]::new($false))
+$resultFile = Join-Path $resolvedOutput 'result.json'
+$stream = [IO.File]::Open($resultFile, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write)
+try { $bytes = [Text.UTF8Encoding]::new($false).GetBytes($json + "`n"); $stream.Write($bytes, 0, $bytes.Length) }
+finally { $stream.Dispose() }
+Write-Output ('Report: ' + $resultFile)
 $json

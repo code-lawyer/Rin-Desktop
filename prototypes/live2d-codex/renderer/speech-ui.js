@@ -2,12 +2,28 @@ import { currentReply } from './current-reply.mjs';
 import { speechProfile } from '../backend/speech-plan.mjs';
 import { ReplyAudio } from './reply-audio.mjs';
 import { isTaskBusy } from '../backend/task-state.mjs';
+import { remoteVoiceStatus } from './remote-voice-status.mjs';
 export { speechChunks } from '../backend/speech-plan.mjs';
 export function installSpeech({ api, state, insert, error, measure, isBusy = () => isTaskBusy(state()) }) {
   const $ = id => document.getElementById(id);
   let settings = {}, speech = {}, workspaceVersion = -1, stream, context, processor, source, chunks, sampleCount, timer, tick, recording = false, starting = false, recognizing = false, readRequested = false, operation = 0, playGeneration = 0, audioContext, audioSource, finishPlayback, narration, pendingCompletion;
   const seenCompletions = new Set();
+  let remoteBusy = false, playbackGain, volume = 1, volumeOperation = 0, volumePending = 0, volumeEditing = false;
   const label = text => { $('voice-status').textContent = text; $('voice-status').hidden = !text; measure(); };
+  const playbackLabel = text => { $('playback-status').textContent = text; $('playback-status').title = text; $('playback-status').hidden = !text; measure(); };
+  function applyVolume(value) {
+    volume = Math.max(0,Math.min(1,Number.isFinite(value) ? value : 1));
+    if (playbackGain) playbackGain.gain.value = volume;
+    $('playback-volume').value = String(Math.round(volume * 100));
+    $('playback-volume-value').textContent = `${Math.round(volume * 100)}%`;
+  }
+  async function saveVolume(value) {
+    const token = ++volumeOperation; volumePending = token; applyVolume(value);
+    try { const saved = await check(api.setPlaybackVolume(volume)); if (token === volumePending) { volumePending = 0; workspace(saved); } }
+    catch(e) { if (token === volumePending) volumePending = 0; error(e.message); }
+  }
+  $('playback-volume').oninput = () => { volumeEditing = true; applyVolume(Number($('playback-volume').value) / 100); };
+  $('playback-volume').onchange = () => { volumeEditing = false; return saveVolume(volume); };
   const target = () => JSON.stringify([state()?.provider,state()?.cwd,state()?.threadId]);
   const replyKey = (text = currentReply(state()?.messages).text) => {
     const reply = currentReply(state()?.messages);
@@ -17,34 +33,36 @@ export function installSpeech({ api, state, insert, error, measure, isBusy = () 
     progress:value => { if (narration?.key === value.key) { narration.progress = value; showProgress(); } }});
   function showProgress() {
     if (!narration || narration.playing) return;
-    const p = narration.progress, count = p ? ` · ${p.completed} / ${p.total} 段` : '';
-    label(speech.phase === 'loading' ? '正在加载语音模型 · 完整语音准备好后播放' : `正在准备完整语音${count}${narration.playRequested ? ' · 完成后播放' : ' · 按朗读键可在完成后播放'}`);
+    const p = narration.progress, count = p ? ` ${p.completed}/${p.total}` : '';
+    playbackLabel(speech.phase === 'loading' ? '加载中…' : `准备中${count}${narration.playRequested ? ' · 稍后播放' : ''}`);
     updateControls();
   }
   function valid(session) {
     const reply = currentReply(state()?.messages);
-    return settings.ttsResident && speech.phase !== 'error' && !isBusy() && !recording && !starting && !recognizing && session.target === target()
+    return settings.ttsResident && speech.phase !== 'error' && !isBusy() && !recording && !starting && !recognizing && !remoteBusy && session.target === target()
       && session.profile === speechProfile(settings) && (session.preview || (reply.readable && reply.complete && session.key === replyKey()));
   }
   function updateControls() {
     const button = $('replay-reply'), reply = currentReply(state()?.messages);
+    $('replay-label').textContent = '朗读';
+    button.setAttribute('aria-pressed', String(!!narration?.playRequested));
+    $('stop-speech').textContent = narration?.playing ? '停止' : '取消准备';
     if (!settings.ttsResident || speech.phase === 'error') {
-      button.textContent = '语音设置'; button.disabled = false;
+      button.disabled = false;
       button.title = speech.error || '语音未加载 · 在工作台开启常驻后，可逐条朗读';
     } else {
       const ready = ['ready','loading'].includes(speech.phase) || !!narration;
-      button.textContent = narration?.playing ? '正在朗读…' : narration?.playRequested ? '准备好后播放' : narration ? '准备好后朗读' : ({loading:'加载后朗读',unloading:'释放语音中…',stopping:'正在停止…',generating:'合成中…'})[speech.phase] || '朗读此条';
-      button.disabled = !ready || !reply.text || !reply.readable || isBusy() || !!narration?.playRequested || recording || starting || recognizing;
+      button.disabled = !ready || !reply.text || !reply.readable || isBusy() || !!narration?.playRequested || recording || starting || recognizing || remoteBusy;
       button.title = audio.has(replyKey()) ? '完整语音已就绪 · 再次朗读使用缓存' : narration ? '只需按一次，完整语音准备好后开始播放' : ready ? '完整生成当前回复后再连续播放' : '语音模型尚未就绪';
     }
   }
   function refresh() {
     if (narration && !valid(narration)) stopPlayback(false);
     if (narration?.modelReady && speech.phase === 'ready') { narration.modelReady(); narration.modelReady = null; }
-    if (!audio.has(replyKey()) && $('voice-status').textContent === '完整语音已就绪 · 按朗读键播放') label('');
+    if (!audio.has(replyKey()) && $('playback-status').textContent === '已就绪') playbackLabel('');
     if (pendingCompletion) {
       const pending = pendingCompletion, reply = currentReply(state()?.messages);
-      if (pending.target !== target() || (pending.turnId && reply.turnId && pending.turnId !== reply.turnId) || recording || starting || recognizing) pendingCompletion = null;
+      if (pending.target !== target() || (pending.turnId && reply.turnId && pending.turnId !== reply.turnId) || recording || starting || recognizing || remoteBusy) pendingCompletion = null;
       // Codex emits reply-completed just before its final state push. Keep the
       // event until that matching successful turn becomes readable and idle.
       else if (!isBusy() && reply.readable && pending.text === reply.text && speech.phase === 'ready') {
@@ -59,11 +77,11 @@ export function installSpeech({ api, state, insert, error, measure, isBusy = () 
     playGeneration++; pendingCompletion = null; narration?.modelReady?.(); narration = null; readRequested = false;
     audioSource?.stop(); audioSource?.disconnect?.(); audioSource = null; finishPlayback?.(); finishPlayback = null;
     const drained = audio.cancel();
-    $('stop-speech').hidden = true; if (!recording && !recognizing) label(''); updateControls();
+    $('stop-speech').hidden = true; playbackLabel(''); updateControls();
     return wait ? drained : Promise.resolve();
   }
   async function speak(text, {play = true, preview = false} = {}) {
-    if (recording || starting || recognizing) return;
+    if (recording || starting || recognizing || remoteBusy) return;
     if (!settings.ttsResident || speech.phase === 'error') { api.windowAction('speech-settings'); return; }
     const key = preview ? JSON.stringify(['preview',target(),text,speechProfile(settings)]) : replyKey(text);
     if (narration?.key === key) { if (play) { narration.playRequested = true; showProgress(); } return narration.promise; }
@@ -83,13 +101,15 @@ export function installSpeech({ api, state, insert, error, measure, isBusy = () 
         audioContext ??= new AudioContext(); await audioContext.resume();
         if (generation !== playGeneration || !valid(session)) return;
         const buffer = audioContext.createBuffer(1,prepared.samples.length,prepared.sampleRate); buffer.copyToChannel(prepared.samples,0);
-        audioSource = audioContext.createBufferSource(); audioSource.buffer = buffer; audioSource.connect(audioContext.destination);
-        session.playing = true; label('正在播报 · 可随时停止'); updateControls();
+        if (!playbackGain) { playbackGain = audioContext.createGain(); playbackGain.connect(audioContext.destination); }
+        playbackGain.gain.value = volume;
+        audioSource = audioContext.createBufferSource(); audioSource.buffer = buffer; audioSource.connect(playbackGain);
+        session.playing = true; playbackLabel('正在朗读'); updateControls();
         await new Promise(resolve => { finishPlayback = resolve; audioSource.onended = resolve; audioSource.start(); });
         if (generation !== playGeneration) return;
         audioSource?.disconnect?.(); audioSource = null; finishPlayback = null;
       } catch(e) { if (generation === playGeneration && e.name !== 'AbortError') error(e.message); }
-      finally { if (generation === playGeneration) { narration = null; $('stop-speech').hidden = true; label(!session.playRequested && audio.has(key) ? '完整语音已就绪 · 按朗读键播放' : ''); updateControls(); } }
+      finally { if (generation === playGeneration) { narration = null; $('stop-speech').hidden = true; playbackLabel(!session.playRequested && audio.has(key) ? '已就绪' : ''); updateControls(); } }
     })();
     return session.promise;
   }
@@ -102,7 +122,7 @@ export function installSpeech({ api, state, insert, error, measure, isBusy = () 
       // model-ready push. Check the authoritative snapshot for this request.
       workspace(await check(api.workspace()));
       if (generation !== playGeneration) return;
-      if (recording || starting || recognizing) { unavailable('请先完成或取消听写，再朗读回复。'); return; }
+      if (recording || starting || recognizing || remoteBusy) { unavailable('请先完成或取消听写，再朗读回复。'); return; }
       if (!settings.ttsResident || speech.phase === 'error') { api.windowAction('speech-settings'); return; }
       const reply = currentReply(state()?.messages);
       if (isBusy() || !reply.complete) { unavailable('请等这轮回复完整后再朗读。'); return; }
@@ -114,43 +134,64 @@ export function installSpeech({ api, state, insert, error, measure, isBusy = () 
   }
   async function releaseCapture() {
     clearTimeout(timer); clearInterval(tick); stream?.getTracks().forEach(t => t.stop()); stream = null; source?.disconnect(); processor?.disconnect(); processor = null; source = null;
-    const c = context; context = null; if (c && c.state !== 'closed') await c.close();
-    recording = false; starting = false; $('record-button').textContent = '听写'; $('record-button').setAttribute('aria-pressed','false'); $('cancel-recording').hidden = true;
+    const c = context; context = null;
+    recording = false; starting = false; $('record-button').textContent = '电脑听写'; $('record-button').setAttribute('aria-pressed','false'); $('cancel-recording').hidden = true;
+    if (c && c.state !== 'closed') await c.close();
   }
-  async function cancel() { operation++; await releaseCapture(); recognizing = false; chunks = []; await api.capture(null); label('听写已取消'); }
+  async function cancel() {
+    const token = ++operation, released = releaseCapture(); recognizing = false; chunks = [];
+    // Clear the main-process target before waiting for AudioContext.close(), so
+    // this cancellation can never clear a new capture started during that wait.
+    await Promise.all([released, api.capture(null)]);
+    if (token === operation) label('听写已取消');
+  }
   async function toggle() {
-    if (starting || recognizing) return;
+    if (starting || recognizing || remoteBusy) return;
     if (recording) return finish();
-    starting = true; const token = ++operation; const target = {cwd:state().cwd,threadId:state().threadId};
+    starting = true; const token = ++operation; const target = {provider:state().provider,cwd:state().cwd,threadId:state().threadId};
     try {
       // Stop audible playback immediately. Capture cancels backend synthesis
       // without waiting for a CPU model to finish its current native call.
-      await stopPlayback(false); await check(api.capture(target)); if (token !== operation) return;
+      await stopPlayback(false); if (token !== operation) return;
+      await check(api.capture(target)); if (token !== operation) return;
       label('正在打开麦克风…');
       const obtained = await navigator.mediaDevices.getUserMedia({audio:{...(settings.microphone?{deviceId:{exact:settings.microphone}}:{}),channelCount:1,echoCancellation:true,noiseSuppression:true},video:false});
       if (token !== operation) { obtained.getTracks().forEach(t => t.stop()); return; }
-      stream = obtained; context = new AudioContext({sampleRate:16000}); await context.audioWorklet.addModule('app://local/renderer/pcm-worklet.js'); await context.resume();
-      source = context.createMediaStreamSource(stream); processor = new AudioWorkletNode(context,'pcm-capture'); chunks = []; sampleCount = 0;
-      const maxSamples = context.sampleRate * 60;
+      stream = obtained; const ownedContext = context = new AudioContext({sampleRate:16000});
+      await ownedContext.audioWorklet.addModule('app://local/renderer/pcm-worklet.js'); if (token !== operation) return;
+      await ownedContext.resume(); if (token !== operation) return;
+      source = ownedContext.createMediaStreamSource(obtained); processor = new AudioWorkletNode(ownedContext,'pcm-capture'); chunks = []; sampleCount = 0;
+      const maxSamples = ownedContext.sampleRate * 60;
       processor.port.onmessage = e => { if (token === operation && e.data instanceof Float32Array && sampleCount < maxSamples) { const samples = e.data.slice(0,maxSamples - sampleCount); chunks.push(samples); sampleCount += samples.length; } };
-      const silent = context.createGain(); silent.gain.value = 0; source.connect(processor); processor.connect(silent); silent.connect(context.destination);
+      const silent = ownedContext.createGain(); silent.gain.value = 0; source.connect(processor); processor.connect(silent); silent.connect(ownedContext.destination);
       recording = true; starting = false; $('record-button').textContent = '完成听写'; $('record-button').setAttribute('aria-pressed','true'); $('cancel-recording').hidden = false;
       const began = Date.now(); const update = () => label(`正在听写 · ${Math.floor((Date.now()-began)/1000)} 秒 / 60 秒`); update(); tick = setInterval(update,1000); timer = setTimeout(() => finish(),60000);
-    } catch(e) { if (token === operation) { await releaseCapture(); await api.capture(null); label(''); error(e.name === 'NotAllowedError' ? '无法使用麦克风。请检查 Windows 隐私设置中是否允许桌面应用访问麦克风。' : e.name === 'NotFoundError' || e.name === 'OverconstrainedError' ? '所选麦克风不可用，请在工作台选择其他设备。' : e.message); } }
+    } catch(e) { if (token === operation) { await Promise.all([releaseCapture(), api.capture(null)]); if (token !== operation) return; label(''); error(e.name === 'NotAllowedError' ? '无法使用麦克风。请检查 Windows 隐私设置中是否允许桌面应用访问麦克风。' : e.name === 'NotFoundError' || e.name === 'OverconstrainedError' ? '所选麦克风不可用，请在工作台选择其他设备。' : e.message); } }
     finally { if (token === operation) starting = false; }
   }
   async function finish() {
-    if (!recording || recognizing) return; recognizing = true; const token = operation, sampleRate = context.sampleRate, target = {cwd:state().cwd,threadId:state().threadId};
+    if (!recording || recognizing) return; recognizing = true; const token = operation, sampleRate = context.sampleRate, target = {provider:state().provider,cwd:state().cwd,threadId:state().threadId};
     try {
       await new Promise(resolve => { const port = processor.port, old = port.onmessage; const timeout = setTimeout(resolve,300); port.onmessage = event => { if (event.data === 'flushed') { clearTimeout(timeout); resolve(); } else old(event); }; port.postMessage('flush'); });
-      await releaseCapture(); const samples = new Float32Array(sampleCount); let offset = 0; for (const c of chunks) { samples.set(c,offset); offset += c.length; } chunks = [];
+      if (token !== operation) return;
+      await releaseCapture(); if (token !== operation) return;
+      const samples = new Float32Array(sampleCount); let offset = 0; for (const c of chunks) { samples.set(c,offset); offset += c.length; } chunks = [];
       label('正在本地识别…'); const result = await check(api.transcribe({samples,sampleRate}));
-      if (token !== operation || target.cwd !== state().cwd || target.threadId !== state().threadId) return;
-      if (result.text) { insert(result.text); label('已填入输入框 · 确认后发送'); } else label('没有识别到文字，请重试。');
+      if (token !== operation || target.provider !== state().provider || target.cwd !== state().cwd || target.threadId !== state().threadId) return;
+      if (result.text) { insert(result.text); label(''); } else label('没有识别到文字，请重试。');
     } catch(e) { if (token === operation) { error(e.message); label(''); } }
-    finally { recognizing = false; await api.capture(null); }
+    finally { if (token === operation) { recognizing = false; measure(); await api.capture(null); } }
   }
-  $('record-button').onclick = () => toggle().catch(e => error(e.message)); $('cancel-recording').onclick = () => cancel();
+  $('record-button').onclick = () => toggle().catch(e => error(e.message)); $('cancel-recording').onclick = () => remoteBusy ? api.remote('cancel') : cancel();
+  function remoteState(value) {
+    const voice=remoteVoiceStatus(value),wasBusy=remoteBusy;remoteBusy=voice.active;
+    $('record-button').disabled=remoteBusy;
+    if(remoteBusy){$('cancel-recording').hidden=false;label(voice.compact);}
+    else if(wasBusy){$('cancel-recording').hidden=true;label(value.capture?.stage==='complete'?'':value.notice);}
+    refresh();measure();
+  }
+  api.onRemote?.(remoteState);
+  api.remote?.('snapshot').then(result=>{if(result.ok)remoteState(result.value);});
   $('stop-speech').onclick = () => stopPlayback().catch(e => error(e.message));
   $('replay-reply').onclick = () => readReply().catch(e => error(e.message));
   api.onSpeech('cancel',() => cancel()); api.onSpeech('stop',() => stopPlayback(false));
@@ -168,6 +209,7 @@ export function installSpeech({ api, state, insert, error, measure, isBusy = () 
     workspaceVersion = value.version ?? 0;
     const hadVoice = settings.ttsResident, oldProfile = speechProfile(settings), oldAuto = settings.autoSpeak, oldPrepare = settings.prepareSpeech;
     settings = value.settings; speech = value.speech ?? {};
+    if (!volumePending && !volumeEditing) applyVolume(settings.playbackVolume ?? 1);
     if (hadVoice && (!settings.ttsResident || oldProfile !== speechProfile(settings) || speech.phase === 'error')) { stopPlayback(false); audio.clear(); }
     else if ((oldAuto && !settings.autoSpeak) || (oldPrepare && !settings.prepareSpeech && !settings.autoSpeak && !narration?.playRequested)) stopPlayback(false);
     refresh();
@@ -175,6 +217,7 @@ export function installSpeech({ api, state, insert, error, measure, isBusy = () 
   api.onWorkspace(workspace); api.workspace().then(r => { if (r.ok) workspace(r.value); });
   window.addEventListener('beforeunload',() => { stream?.getTracks().forEach(t => t.stop()); api.capture(null); api.stopSpeech(); });
   document.addEventListener('keydown',event => { if (event.key === 'Escape' && (recording || starting)) { event.stopImmediatePropagation(); event.preventDefault(); cancel(); } },true);
-  return { isCapturing: () => recording || starting || recognizing, refresh,
+  return { isCapturing: () => recording || starting || recognizing || remoteBusy, refresh,
+    adjustVolume: delta => saveVolume(Math.round((volume + delta) * 10) / 10),
     readReply: () => readReply().catch(e => error(e.message)), toggleCapture: () => toggle().catch(e => error(e.message)) };
 }

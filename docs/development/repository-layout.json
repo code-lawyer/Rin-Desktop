@@ -1,0 +1,315 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-10-21",
+  "topLevelDirectories": [
+    ".git",
+    ".github",
+    "artwork",
+    "docs",
+    "node_modules",
+    "prototypes",
+    "release",
+    "tests",
+    "tools",
+    "work"
+  ],
+  "protectedDirectoryNames": [
+    "node_modules",
+    ".venv",
+    "models",
+    "runtime",
+    "vendor",
+    "licenses",
+    "__pycache__"
+  ],
+  "rootFiles": "项目元数据、入口、开发指引；保留原 Git 身份",
+  "areas": [
+    {
+      "prefix": "docs/development/",
+      "category": "current-development",
+      "responsibility": "公开开发手册与唯一施工台账",
+      "action": "maintain"
+    },
+    {
+      "prefix": "docs/history/",
+      "category": "historical",
+      "responsibility": "私人历史设计和归档",
+      "action": "archive"
+    },
+    {
+      "prefix": "docs/research/",
+      "category": "research",
+      "responsibility": "私人研究原始资料",
+      "action": "retain"
+    },
+    {
+      "prefix": "docs/evidence/",
+      "category": "evidence",
+      "responsibility": "私人验收原始证据",
+      "action": "retain"
+    },
+    {
+      "prefix": "docs/",
+      "category": "documentation",
+      "responsibility": "构建/隐私/许可/发布及局部设计资料",
+      "action": "maintain"
+    },
+    {
+      "prefix": "prototypes/live2d-halfbody/",
+      "category": "artwork-preview",
+      "responsibility": "独立女生半身动作预览；不替换现有壁纸",
+      "action": "maintain"
+    },
+    {
+      "prefix": "prototypes/live2d-codex/",
+      "category": "desktop",
+      "responsibility": "主应用与其原地保留的依赖资源",
+      "action": "retain-and-maintain"
+    },
+    {
+      "prefix": "prototypes/dots-bridge/",
+      "category": "private-extension",
+      "responsibility": "私人 Dots 桥、状态和依赖",
+      "action": "retain"
+    },
+    {
+      "prefix": "prototypes/qwen-tts-evaluation/",
+      "category": "legacy-runtime",
+      "responsibility": "仍被源码引用的 Qwen 评估环境",
+      "action": "retain"
+    },
+    {
+      "prefix": "tools/project/",
+      "category": "project-tools",
+      "responsibility": "启动、状态、台账生成和检查",
+      "action": "maintain"
+    },
+    {
+      "prefix": "tools/probes/",
+      "category": "protocol-tools",
+      "responsibility": "可复用协议探针",
+      "action": "maintain"
+    },
+    {
+      "prefix": "tools/qa/",
+      "category": "quality-tools",
+      "responsibility": "可复用合成质量验证",
+      "action": "maintain"
+    },
+    {
+      "prefix": "tools/remote-diagnostics/",
+      "category": "device-diagnostics",
+      "responsibility": "独立 RC003 设备诊断",
+      "action": "maintain"
+    },
+    {
+      "prefix": "tools/release/",
+      "category": "release-tools",
+      "responsibility": "原有构建、许可、资源、安装器工具",
+      "action": "maintain"
+    },
+    {
+      "prefix": "tools/psd2live-",
+      "category": "third-party-tool",
+      "responsibility": "本机第三方美术工具及运行时",
+      "action": "retain"
+    },
+    {
+      "prefix": "tests/",
+      "category": "tests",
+      "responsibility": "根协议、设备逻辑与项目工具测试",
+      "action": "maintain"
+    },
+    {
+      "prefix": ".github/",
+      "category": "automation",
+      "responsibility": "原仓库 CI 与发布工作流",
+      "action": "maintain"
+    },
+    {
+      "prefix": "artwork/",
+      "category": "artwork",
+      "responsibility": "原始素材和可编辑工程",
+      "action": "retain"
+    },
+    {
+      "prefix": "release/",
+      "category": "release-artifact",
+      "responsibility": "既有安装包、便携目录和第三方源码产物",
+      "action": "retain"
+    },
+    {
+      "prefix": "node_modules/",
+      "category": "dependencies",
+      "responsibility": "可恢复依赖",
+      "action": "retain"
+    },
+    {
+      "prefix": "work/runtime/",
+      "category": "private-data",
+      "responsibility": "应用数据、模型环境和硬件原始记录",
+      "action": "retain"
+    },
+    {
+      "prefix": "work/qa/",
+      "category": "qa-output",
+      "responsibility": "新的按次验证输出",
+      "action": "append-only-runs"
+    },
+    {
+      "prefix": "work/",
+      "category": "private-work",
+      "responsibility": "历史验收、备份、缓存、schema、研究",
+      "action": "retain"
+    }
+  ],
+  "moves": [
+    {
+      "from": "docs/00-project-charter.md",
+      "to": "docs/history/controller-v0.2/00-project-charter.md",
+      "kind": "archive",
+      "compatibilityEntry": false
+    },
+    {
+      "from": "docs/01-product-requirements.md",
+      "to": "docs/history/controller-v0.2/01-product-requirements.md",
+      "kind": "archive",
+      "compatibilityEntry": false
+    },
+    {
+      "from": "docs/02-interaction-spec.md",
+      "to": "docs/history/controller-v0.2/02-interaction-spec.md",
+      "kind": "archive",
+      "compatibilityEntry": false
+    },
+    {
+      "from": "docs/03-architecture.md",
+      "to": "docs/history/controller-v0.2/03-architecture.md",
+      "kind": "archive",
+      "compatibilityEntry": false
+    },
+    {
+      "from": "docs/04-domain-and-state.md",
+      "to": "docs/history/controller-v0.2/04-domain-and-state.md",
+      "kind": "archive",
+      "compatibilityEntry": false
+    },
+    {
+      "from": "docs/05-interface-contracts.md",
+      "to": "docs/history/controller-v0.2/05-interface-contracts.md",
+      "kind": "archive",
+      "compatibilityEntry": false
+    },
+    {
+      "from": "docs/06-integration-spikes.md",
+      "to": "docs/history/controller-v0.2/06-integration-spikes.md",
+      "kind": "archive",
+      "compatibilityEntry": false
+    },
+    {
+      "from": "docs/07-privacy-and-dependencies.md",
+      "to": "docs/history/controller-v0.2/07-privacy-and-dependencies.md",
+      "kind": "archive",
+      "compatibilityEntry": false
+    },
+    {
+      "from": "docs/08-implementation-backlog.md",
+      "to": "docs/history/controller-v0.2/08-implementation-backlog.md",
+      "kind": "archive",
+      "compatibilityEntry": false
+    },
+    {
+      "from": "docs/09-test-and-acceptance.md",
+      "to": "docs/history/controller-v0.2/09-test-and-acceptance.md",
+      "kind": "archive",
+      "compatibilityEntry": false
+    },
+    {
+      "from": "docs/10-development-and-release.md",
+      "to": "docs/history/controller-v0.2/10-development-and-release.md",
+      "kind": "archive",
+      "compatibilityEntry": false
+    },
+    {
+      "from": "docs/11-decisions-and-risks.md",
+      "to": "docs/history/controller-v0.2/11-decisions-and-risks.md",
+      "kind": "archive",
+      "compatibilityEntry": false
+    },
+    {
+      "from": "docs/12-user-guide-draft.md",
+      "to": "docs/history/controller-v0.2/12-user-guide-draft.md",
+      "kind": "archive",
+      "compatibilityEntry": false
+    },
+    {
+      "from": "docs/examples/operation.schema.json",
+      "to": "docs/history/controller-v0.2/examples/operation.schema.json",
+      "kind": "archive",
+      "compatibilityEntry": false
+    },
+    {
+      "from": "docs/examples/settings.example.json",
+      "to": "docs/history/controller-v0.2/examples/settings.example.json",
+      "kind": "archive",
+      "compatibilityEntry": false
+    },
+    {
+      "from": "docs/examples/submit-operation.example.json",
+      "to": "docs/history/controller-v0.2/examples/submit-operation.example.json",
+      "kind": "archive",
+      "compatibilityEntry": false
+    },
+    {
+      "from": "work/notes/simple-mic-selection-2026-09-30.md",
+      "to": "docs/history/controller-v0.2/notes/simple-mic-selection-2026-09-30.md",
+      "kind": "archive",
+      "compatibilityEntry": false
+    },
+    {
+      "from": "work/cli-agent-validation-2026-10-19/claude-probe.mjs",
+      "to": "tools/probes/cli-agents/claude-probe.mjs",
+      "kind": "maintained-tool",
+      "compatibilityEntry": true
+    },
+    {
+      "from": "work/cli-agent-validation-2026-10-19/acp-probe.mjs",
+      "to": "tools/probes/cli-agents/acp-probe.mjs",
+      "kind": "maintained-tool",
+      "compatibilityEntry": true
+    },
+    {
+      "from": "work/project-audit-2026-10-20/reproduce-findings.mjs",
+      "to": "tools/qa/reproduce-known-issues.mjs",
+      "kind": "maintained-tool",
+      "compatibilityEntry": true
+    }
+  ],
+  "requiredPublicPaths": [
+    "README.md",
+    "AGENTS.md",
+    "CONTRIBUTING.md",
+    "PROJECT_PLAN.md",
+    "docs/development/README.md",
+    "docs/development/backlog.json",
+    "docs/development/legacy-mapping.json",
+    "docs/development/progress.md",
+    "tools/project/start.mjs",
+    "tools/project/check-project.mjs",
+    "tools/qa/reproduce-known-issues.mjs",
+    "tools/qa/run-output.mjs",
+    "tools/qa/gui/run.mjs",
+    "tools/qa/gui/README.md",
+    "docs/development/review-fixes.md",
+    "tools/probes/cli-agents/claude-probe.mjs",
+    "tools/probes/cli-agents/acp-probe.mjs",
+    "prototypes/live2d-codex/main.cjs",
+    "tools/release/resource-manifest.json"
+  ],
+  "retiredGuiEntrypoints": {
+    "archive": "work/archive/project-quality-2026-10-21/retired-entrypoints",
+    "count": 11,
+    "retainedForwarders": 5,
+    "summary": "Removed archive-only explanatory stubs from the maintained application scripts; original acceptance source and run evidence remain preserved."
+  }
+}

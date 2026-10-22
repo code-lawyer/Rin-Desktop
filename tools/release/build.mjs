@@ -1,9 +1,11 @@
-import { readFile, access } from 'node:fs/promises';
+import { access } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { execFileSync } from 'node:child_process';
+import { releaseVersion, requireFreshDirectory } from './release-inputs.mjs';
 const root=resolve(import.meta.dirname,'../..'), app=join(root,'prototypes/live2d-codex');
-const {version}=JSON.parse(await readFile(join(root,'package.json'),'utf8'));
+const version=await releaseVersion(root);
 const stage=join(root,'release',`Rin-Desktop-${version}-win-x64`), output=join(root,'release',`v${version}`);
+await requireFreshDirectory(stage);await requireFreshDirectory(output);
 const resources=process.env.VIBE_RESOURCE_APP||app;
 await access(join(resources,'runtime/node.exe'));await access(join(app,'voice-resources.json'));
 const compiler=process.env.INNO_ISCC||join(root,'work/release-build/tools/inno/ISCC.exe');await access(compiler);

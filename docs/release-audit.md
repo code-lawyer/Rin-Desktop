@@ -1,3 +1,40 @@
+# 0.5.0 发布范围与验证
+
+日期：2026-10-22。基于原 0.4.0 提交整合当前公共源码和开发文档；两轴审查的具体缺陷、修复与回归见[0.5.0 全项目审查](development/release-0.5.0-review.md)。原 GitHub 仓库、已有个人数据、模型与旧安装包保持。
+
+## 分发范围
+
+- Windows x64 单屏壁纸、原两个人物、Codex、本地听写/朗读、项目与会话工作台继续提供。设置分六类，朗读与实际播放音量有固定入口。
+- RC003 连接、按钮配置、遥控麦克风、草稿清空/撤销/发送和媒体音量接线随本版提供；完整硬件矩阵仍属实验范围。用户“效果基本 ok”是有限反馈，未作为物理音量或休眠/IME稳定性通过。
+- Claude、Grok Build、OpenCode V2 在界面和包清单保持实验标识。离线契约通过不代表真实账户验收。Claude 遵循 SDK 官方要求，仅接受用户配置的API/官方云API认证，不提供订阅登录或额度，也不自动切换计费来源。
+- 基础安装器不含模型、Agent CLI、Qwen Python环境、个人会话、凭据或制作母图。模型继续按需从上游下载，已有模型可复用。
+
+## 当前版本验证
+
+- 最终发布范围本机314项离线测试通过，其中公开源码307项、私人Dots 7项；包含最后的认证、缺失项目路径身份及只读启动器修复。前端构建通过。最初候选因远端CI路径问题被归档，最终安装器重新构建。
+- 标准/紧凑 renderer 的11张截图、遥控发送/清空/撤销、项目/会话焦点、六分类导航和未保存字段检查通过，无页面错误或横向溢出；使用合成preload，不连接账户或设备。
+- RC003辅助程序编译、私有管道握手、受控退出、Consumer Control按键边沿、复制依赖与Electron原生输入绑定加载通过；没有注册监听或连接设备。
+- 正式安装器在独立中文/空格路径使用 PORTABLE 模式实际解包，并在另一个隔离目录从0.4.0覆盖升级。两份安装均逐文件校验8242项；71个已打包应用源文件匹配当前源码，40个原场景/CPU语音组件文件匹配0.4.0。未登记文件、模型权重、Agent CLI或凭据混入检查通过。该模式不注册/测试卸载项或快捷方式，不替代完整注册安装与卸载矩阵。
+- 实际安装版完成5组人物恢复场景：模型/纹理失败、重复与键盘重试、快速切换、延迟确认、重启恢复及自定义声线保留均通过，无页面错误。纹理失败注入明确截获两个PNG请求，避免缓存绕过造成假验收。
+- 152个公开JavaScript文件与5个PowerShell脚本语法检查通过；另有5项ATVV离线解码测试通过。
+- npm官方审计根依赖与应用依赖均无已知漏洞。实际暂存内容381文件公开扫描通过；源码修复后的[push CI](https://github.com/code-lawyer/Rin-Desktop/actions/runs/39755220645)和[PR CI](https://github.com/code-lawyer/Rin-Desktop/actions/runs/39755225757)均通过，包含307项公开测试、构建、台账及双重公开扫描。
+
+## 安装器与许可
+
+应用Release只提供 Rin-Desktop-0.5.0-Setup.exe，282231155字节。SHA-256：
+
+`392495df3649b15425d65c5606722d212f5b35f84c0340c0d4e1eea674c7f104`
+
+权威清单为[resource-manifest.json](../tools/release/resource-manifest.json)。CPU语音组件与独立worker保持不变，继续提供[0.3.1第三方对应源码](https://github.com/code-lawyer/Rin-Desktop/releases/tag/third-party-source-v0.3.1)，其现有ZIP SHA-256为 `f5030a33c8f68b74116ee1c62d3a51f6a8bb07dc610731bfcd915ca9152b4be1`。SDK与Koffi许可随依赖/许可证目录保留；Claude SDK按商业条款提供，不声明为MIT。
+
+## 仍未验收
+
+RC003连续录音/按键矩阵、物理音量/固件差异、休眠/键盘/IME共存；新增三家Agent的真实账户与完整任务路径；全新Windows、全部显卡/代理/DPI、完整注册安装/卸载/真实数据回退矩阵。安装器未代码签名。详见[验收清单](development/test-acceptance.md)及REM/AGT/UI/REL任务，不用构建或单元测试替代。
+
+源码已推送原origin的codex/public-release并建立同名upstream，合入入口为[PR #1](https://github.com/code-lawyer/Rin-Desktop/pull/1)。公开版本以[v0.5.0 Release](https://github.com/code-lawyer/Rin-Desktop/releases/tag/v0.5.0)及同名源码标签为准；只发布上述安装器，保留旧Release与第三方源码附件。同目录并行新增、尚未审定的视频调研工具保留本地，未混入此次发布快照。
+
+---
+
 # 0.4.0 发布审查与验证
 
 以 `cb75075e85e5c91945a9e958c2447f8785759bf7` 为代码基线，按 Standards 与 Spec 两个维度独立复审人物选择及其修复。两轴均无待处理发现。修复前的打包快照用于核对声线重复赋值和失败恢复行为。

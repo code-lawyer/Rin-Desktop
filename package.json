@@ -1,17 +1,45 @@
 {
   "name": "vibe-voice",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "private": true,
   "type": "module",
   "description": "Windows 4K wallpaper companion for Codex with local voice",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/code-lawyer/Rin-Desktop.git"
+  },
   "engines": {
     "node": ">=24"
   },
   "scripts": {
+    "start": "node tools/project/start.mjs",
+    "start:avatar": "node tools/project/start.mjs --mode=avatar",
+    "start:dots": "node tools/project/start.mjs --provider=dots",
+    "status": "node tools/project/status.mjs",
+    "remote:diagnose": "pwsh -NoProfile -File tools/remote-diagnostics/run.ps1",
+    "check:public": "node tools/release/audit-public.mjs --worktree",
+    "check:project": "node tools/project/check-project.mjs",
+    "project:docs": "node tools/project/render-progress.mjs",
+    "qa:known-issues": "node tools/qa/reproduce-known-issues.mjs",
+    "qa:live2d-models": "node tools/qa/live2d-model-inspection.mjs",
+    "qa:remote-component": "node tools/qa/remote-component.mjs",
+    "qa:interface": "node tools/qa/interface-check.mjs",
+    "qa:data-agent": "node tools/qa/data-agent.mjs",
+    "data:recover": "node tools/qa/recover-data.mjs",
+    "probe:claude": "node tools/probes/cli-agents/claude-probe.mjs",
+    "probe:grok": "node tools/probes/cli-agents/acp-probe.mjs grok",
+    "probe:opencode": "node tools/probes/cli-agents/acp-probe.mjs opencode",
     "test": "npm --prefix prototypes/live2d-codex test && node --test tests/*.test.mjs",
     "build": "npm --prefix prototypes/live2d-codex run build",
     "resources": "node tools/release/bootstrap-resources.mjs",
-    "package": "node tools/release/build.mjs"
+    "package": "node tools/release/build.mjs",
+    "package:test": "node tools/release/test-build.mjs",
+    "preview:halfbody": "node tools/project/preview-halfbody.mjs",
+    "qa:halfbody": "node tools/qa/live2d-halfbody-preview.mjs",
+    "qa:halfbody:diagnose": "node tools/qa/live2d-halfbody-diagnose.mjs",
+    "build:halfbody": "node tools/project/preview-halfbody.mjs --build",
+    "test:halfbody": "node --test tests/live2d-halfbody.test.mjs",
+    "qa:release-package": "node tools/qa/release-package.mjs"
   },
   "dependencies": {
     "ws": "8.22.0"

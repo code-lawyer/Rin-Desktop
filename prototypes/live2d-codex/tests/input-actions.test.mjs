@@ -42,3 +42,10 @@ test('occupied or invalid native shortcuts are reported without disabling unrela
   const errors = registerInputActions(f.native, { shortcuts:{record:'F8',send:'broken',readReply:'F10'},remoteEnabled:false }, f.handlers);
   assert.equal(errors.length,2); f.callbacks.get('F10')(); assert.deepEqual(f.calls,['readReply']);
 });
+
+test('RC003 reserves conflicting global hotkeys including combinations and retains unrelated shortcuts', () => {
+  const f=fixture(),settings={shortcuts:{send:'Ctrl+Alt+Enter',chat:'Return',record:'Ctrl+Alt+V'},remoteEnabled:true,remoteKeys:{readReply:'F5'}};
+  const errors=registerInputActions(f.native,settings,f.handlers,{reserved:new Set(['enter','f5'])});
+  assert.equal(errors.length,3);assert.deepEqual([...f.callbacks.keys()],['Ctrl+Alt+V']);
+  registerInputActions(f.native,settings,f.handlers);assert.equal(f.callbacks.has('Return'),true);assert.equal(f.callbacks.has('F5'),true);
+});

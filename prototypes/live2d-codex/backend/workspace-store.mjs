@@ -1,72 +1,155 @@
-import { readFile, writeFile, mkdir, rename, stat, realpath } from 'node:fs/promises';
+import { stat, realpath } from 'node:fs/promises';
 import { join, resolve, basename } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import actions from './input-actions.cjs';
 import characters from './character-profiles.cjs';
+import catalog from './agent-catalog.cjs';
+import { remoteSettings } from './remote-config.mjs';
+import { readJson, writeJson } from './durable-json.mjs';
+import { pathKey } from './path-identity.mjs';
+export { pathKey } from './path-identity.mjs';
+const { isCliAgent } = catalog;
 
 export const { DEFAULT_SHORTCUTS, DEFAULT_REMOTE_KEYS } = actions;
 const { DEFAULT_CHARACTER, characterProfile, isCharacter, isQwenVoice, isChineseVoice } = characters;
 const defaults = () => ({ format: 1, projects: [], drafts: {}, settings: { character: DEFAULT_CHARACTER, completionSound: true, ttsResident: false, ttsEngine: 'qwen', qwenVoice: 'Serena', qwenRoot: '', autoSpeak: false, prepareSpeech: false, voice: 3, speed: 1, microphone: '', shortcuts: { ...DEFAULT_SHORTCUTS }, remoteEnabled: false, remoteKeys: { ...DEFAULT_REMOTE_KEYS } } });
-export const pathKey = value => resolve(value).replace(/[\\/]+$/, '').toLocaleLowerCase('en-US');
 export const draftKey = target => {
   if (!target || typeof target.cwd !== 'string') throw new Error('草稿目标无效。');
   const provider = target?.provider ?? 'codex';
-  if (!['codex', 'dots'].includes(provider)) throw new Error('草稿来源无效。');
+  if (!isCliAgent(provider) && provider !== 'dots') throw new Error('草稿来源无效。');
   if (target.threadId != null && (typeof target.threadId !== 'string' || !target.threadId || target.threadId.length > 200)) throw new Error('草稿会话无效。');
   // Keep existing Codex keys unchanged; Dots has no local project directory.
-  return provider === 'dots' ? `dots|${target.threadId ?? 'new'}` : `${pathKey(target.cwd)}|${target.threadId ?? 'new'}`;
+  return provider === 'dots' ? `dots|${target.threadId ?? 'new'}` : `${provider === 'codex' ? '' : provider + '|'}${pathKey(target.cwd)}|${target.threadId ?? 'new'}`;
 };
 
+export function validateWorkspace(saved) {
+  const object = value => value && typeof value === 'object' && !Array.isArray(value);
+  if (!object(saved) || saved.format !== 1 || !Array.isArray(saved.projects) || !object(saved.settings ?? {})) throw new Error('工作台数据格式不支持。');
+  const ids = new Set();
+  for (const p of saved.projects) {
+    if (!object(p) || typeof p.id !== 'string' || !p.id || ids.has(p.id) || typeof p.cwd !== 'string' || !p.cwd.trim()) throw new Error('项目记录无效。');
+    ids.add(p.id);
+  }
+  if (!object(saved.drafts ?? {})) throw new Error('草稿记录无效。');
+  for (const d of Object.values(saved.drafts ?? {})) if (!object(d) || typeof d.text !== 'string' || d.dictationIds !== undefined && (!Array.isArray(d.dictationIds) || d.dictationIds.some(id => typeof id !== 'string'))) throw new Error('草稿记录无效。');
+  if (!object(saved.submissions ?? {})) throw new Error('发送记录无效。');
+  for (const [provider, s] of Object.entries(saved.submissions ?? {})) {
+    if (!isCliAgent(provider) || !object(s) || typeof s.id !== 'string' || typeof s.text !== 'string' || s.target?.provider !== provider || !['pending','unknown','confirmed','released','not-sent'].includes(s.status)) throw new Error('发送记录无效。');
+    draftKey(s.target);
+  }
+  return saved;
+}
+
+function canonicalDrafts(drafts = {}) {
+  const result = {};
+  for (const [oldKey, draft] of Object.entries(drafts)) {
+    const parts = oldKey.split('|');
+    const provider = isCliAgent(parts[0]) ? parts.shift() : 'codex';
+    const key = parts[0] === 'dots' || parts.length < 2 ? oldKey : `${provider === 'codex' ? '' : provider + '|'}${pathKey(parts.shift())}|${parts.join('|')}`;
+    const existing = result[key];
+    // Aliases may contain independently edited drafts. Show all distinct text
+    // instead of choosing a winner and silently discarding the other version.
+    result[key] = !existing ? draft : { ...existing, text: existing.text === draft.text ? draft.text : [existing.text, draft.text].filter(Boolean).join('\n\n'), dictationIds: [...new Set([...(existing.dictationIds ?? []), ...(draft.dictationIds ?? [])])] };
+  }
+  return result;
+}
+
 export class WorkspaceStore {
-  constructor(directory) { this.file = join(directory, 'workspaces.json'); this.data = defaults(); this.queue = Promise.resolve(); }
+  constructor(directory, { io } = {}) { this.file = join(directory, 'workspaces.json'); this.io = io; this.data = defaults(); this.queue = Promise.resolve(); }
   async load() {
     try {
-      const saved = JSON.parse(await readFile(this.file, 'utf8'));
-      if (saved.format !== 1 || !Array.isArray(saved.projects)) throw new Error('工作台数据格式不支持。');
+      const saved = await readJson(this.file, validateWorkspace, this.io);
+      if (!saved) return this.snapshot();
       this.data = { ...defaults(), ...saved, settings: { ...defaults().settings, ...saved.settings, shortcuts: { ...DEFAULT_SHORTCUTS, ...saved.settings?.shortcuts }, remoteKeys: { ...DEFAULT_REMOTE_KEYS, ...saved.settings?.remoteKeys } } };
+      this.data.drafts = canonicalDrafts(saved.drafts);
+      this.data.submissions ??= {};
+      for (const submission of Object.values(this.data.submissions)) if (submission.status === 'pending') submission.status = 'unknown';
       const profile = characterProfile(saved.settings?.character);
       this.data.settings.character = profile.id;
+      this.data.settings.rc003 = remoteSettings(saved.settings?.rc003);
       if (!isQwenVoice(saved.settings?.qwenVoice)) this.data.settings.qwenVoice = profile.qwenVoice;
       if (!isChineseVoice(saved.settings?.voice)) this.data.settings.voice = profile.voice;
     } catch (error) { if (error.code !== 'ENOENT') throw new Error(`工作台记录未能读取，原文件已保留：${error.message}`); }
     return this.snapshot();
   }
   snapshot() { return structuredClone({ projects: this.data.projects, settings: this.data.settings }); }
-  async save() {
-    const content = JSON.stringify(this.data, null, 2) + '\n';
-    this.queue = this.queue.catch(() => {}).then(async () => { await mkdir(resolve(this.file, '..'), { recursive: true }); await writeFile(this.file + '.tmp', content); await rename(this.file + '.tmp', this.file); });
+  transaction(change) {
+    this.queue = this.queue.catch(() => {}).then(async () => {
+      const next = structuredClone(this.data);
+      const result = await change(next);
+      await writeJson(this.file, next, this.io);
+      this.data = next;
+      return structuredClone(result);
+    });
     return this.queue;
   }
   async add(cwd) {
     if (typeof cwd !== 'string' || !cwd.trim()) throw new Error('请选择项目文件夹。');
     const canonical = await realpath(resolve(cwd));
     if (!(await stat(canonical)).isDirectory()) throw new Error('项目路径必须是文件夹。');
-    let project = this.data.projects.find(p => pathKey(p.cwd) === pathKey(canonical));
-    if (!project) { project = { id: randomUUID(), cwd: canonical, name: basename(canonical) || canonical, lastThreadId: null, updatedAt: Date.now() }; this.data.projects.push(project); await this.save(); }
-    return structuredClone(project);
+    const existing = this.data.projects.find(p => pathKey(p.cwd) === pathKey(canonical));
+    if (existing) return structuredClone(existing);
+    return this.transaction(data => {
+      let project = data.projects.find(p => pathKey(p.cwd) === pathKey(canonical));
+      if (!project) { project = { id: randomUUID(), cwd: canonical, name: basename(canonical) || canonical, lastThreadId: null, updatedAt: Date.now() }; data.projects.push(project); }
+      return project;
+    });
   }
   project(id) { const p = this.data.projects.find(p => p.id === id); if (!p) throw new Error('项目不在工作台列表中，请重新选择。'); return structuredClone(p); }
   async remember(state) {
     let p = this.data.projects.find(p => pathKey(p.cwd) === pathKey(state.cwd));
     if (!p) { try { p = await this.add(state.cwd); } catch { return; } p = this.data.projects.find(v => v.id === p.id); }
-    if (p.lastThreadId !== state.threadId) { p.lastThreadId = state.threadId; p.updatedAt = Date.now(); await this.save(); }
+    const provider = state.provider ?? 'codex';
+    if (!isCliAgent(provider)) return;
+    if (p.lastThreads?.[provider] !== state.threadId || provider === 'codex' && p.lastThreadId !== state.threadId) return this.transaction(data => {
+      p = data.projects.find(v => v.id === p.id);
+      if (!p) return;
+      p.lastThreads ??= {};
+      p.lastThreads[provider] = state.threadId;
+      if (provider === 'codex') p.lastThreadId = state.threadId;
+      p.updatedAt = Date.now();
+    });
   }
   async remove(id, activeCwd) {
     const p = this.project(id);
     if (pathKey(p.cwd) === pathKey(activeCwd)) throw new Error('请先切换到其他项目，再移除此入口。');
-    this.data.projects = this.data.projects.filter(p => p.id !== id); await this.save();
+    await this.transaction(data => {
+      // The receipt can belong to another provider or to a newly assigned
+      // thread. Keep both project identities reachable until it is resolved.
+      const pending = Object.values(data.submissions ?? {}).some(record =>
+        ['pending', 'unknown'].includes(record.status) &&
+        [record.target, record.originalTarget].some(target => typeof target?.cwd === 'string' && pathKey(target.cwd) === pathKey(p.cwd)));
+      if (pending) throw new Error('此项目还有发送结果未确定，请先核查并处理原稿，再移除此入口。');
+      data.projects = data.projects.filter(p => p.id !== id);
+    });
   }
   draft(target) { return this.data.drafts[draftKey(target)]?.text ?? ''; }
-  async saveDraft(target, text) {
-    const key = draftKey(target);
-    if (target.provider !== 'dots' && (typeof target.cwd !== 'string' || !this.data.projects.some(p => pathKey(p.cwd) === pathKey(target.cwd)))) throw new Error('草稿的项目不存在。');
-    if (typeof text !== 'string' || text.length > 64000 || (target.threadId !== null && target.threadId !== undefined && (typeof target.threadId !== 'string' || target.threadId.length > 200))) throw new Error('草稿内容无效。');
-    if (text) this.data.drafts[key] = { text, updatedAt: Date.now() }; else delete this.data.drafts[key];
-    const entries = Object.entries(this.data.drafts).sort((a, b) => b[1].updatedAt - a[1].updatedAt);
-    this.data.drafts = Object.fromEntries(entries.slice(0, 100)); await this.save();
+  draftSnapshot(target) {
+    const draft=this.data.drafts[draftKey(target)];
+    return {text:draft?.text ?? '',dictationIds:[...(draft?.dictationIds ?? [])]};
   }
+  async appendDictation(target, text, id) {
+    return this.transaction(data => {
+      const draft=data.drafts[draftKey(target)];
+      if(draft?.dictationIds?.includes(id))return;
+      const current=draft?.text ?? '';
+      this.setDraft(data,target,current+(current && !/\s$/.test(current)?' ':'')+text,id);
+    });
+  }
+  setDraft(data, target, text, dictationId) {
+    const key = draftKey(target);
+    if (target.provider !== 'dots' && (typeof target.cwd !== 'string' || !data.projects.some(p => pathKey(p.cwd) === pathKey(target.cwd)))) throw new Error('草稿的项目不存在。');
+    if (typeof text !== 'string' || text.length > 64000 || (target.threadId !== null && target.threadId !== undefined && (typeof target.threadId !== 'string' || target.threadId.length > 200))) throw new Error('草稿内容无效。');
+    const dictationIds=[...(data.drafts[key]?.dictationIds ?? []),...(dictationId?[dictationId]:[])].slice(-32);
+    if (text) data.drafts[key] = { text, updatedAt: Date.now(), ...(dictationIds.length?{dictationIds}:{}) }; else delete data.drafts[key];
+    // Unsent input is user data, not a bounded/reconstructible history cache.
+    // Only an explicit empty save removes the selected draft.
+  }
+  saveDraft(target, text, dictationId) { return this.transaction(data => this.setDraft(data, target, text, dictationId)); }
   async updateSettings(patch) {
-    const next = structuredClone(this.data.settings);
+    await this.transaction(data => {
+    const next = data.settings;
+    if ('rc003' in patch) next.rc003 = remoteSettings(patch.rc003);
     if ('character' in patch) {
       if (!isCharacter(patch.character)) throw new Error('请选择已支持的壁纸人物。');
       if (patch.character !== next.character) {
@@ -75,6 +158,7 @@ export class WorkspaceStore {
       }
     }
     if ('completionSound' in patch) { if (typeof patch.completionSound !== 'boolean') throw new Error('提示音开关无效。'); next.completionSound = patch.completionSound; }
+    if ('playbackVolume' in patch) { if (!Number.isFinite(patch.playbackVolume) || patch.playbackVolume < 0 || patch.playbackVolume > 1) throw new Error('播报音量应在 0–100% 之间。'); next.playbackVolume = patch.playbackVolume; }
     if ('ttsResident' in patch) { if (typeof patch.ttsResident !== 'boolean') throw new Error('常驻开关无效。'); next.ttsResident = patch.ttsResident; }
     if ('ttsEngine' in patch) { if (!['qwen','kokoro'].includes(patch.ttsEngine)) throw new Error('请选择已支持的语音引擎。'); next.ttsEngine = patch.ttsEngine; }
     if ('qwenVoice' in patch) { if (!isQwenVoice(patch.qwenVoice)) throw new Error('请选择已支持的 Qwen 声线。'); next.qwenVoice = patch.qwenVoice; }
@@ -90,6 +174,7 @@ export class WorkspaceStore {
         const v = patch[group][key]; if (typeof v !== 'string' || v.length > 80 || /[\r\n]/.test(v)) throw new Error('按键映射无效。'); next[group][key] = v;
       }
     }
-    this.data.settings = next; await this.save(); return this.snapshot();
+    });
+    return this.snapshot();
   }
 }

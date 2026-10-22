@@ -7,6 +7,10 @@ Original application source is MIT. This distribution includes separately licens
 | Electron | 44.7.2; MIT and Chromium notices at installation root |
 | Node.js | 24.16.0; `licenses/node-LICENSE` |
 | OpenAI Codex CLI | User-installed external prerequisite; not bundled or updated by Rin Desktop |
+| Claude Code, Grok Build, OpenCode V2 CLI | User-installed external programs; not bundled or updated by Rin Desktop; their own service terms apply |
+| Claude Agent SDK | `@anthropic-ai/claude-agent-sdk` 0.3.240; governed by [Anthropic Commercial Terms](https://www.anthropic.com/legal/commercial-terms), with the upstream README retained in the packaged dependency; native CLI optional packages are excluded |
+| Agent Client Protocol SDK | `@agentclientprotocol/sdk` 1.9.0; Apache-2.0; license retained in the packaged dependency |
+| Koffi | 3.3.3; MIT; Windows x64 prebuilt FFI for application-local input handling; `licenses/koffi-LICENSE.txt` and the source package's notices retained in this distribution |
 | PixiJS, marked, pixi-live2d-display | MIT; copies in `licenses/` |
 | Live2D Cubism Core | Proprietary; unmodified runtime, `vendor/LICENSE-CubismCore.md` and `licenses/live2d-proprietary-agreement.html` |
 | Rainy-window scene | Project-generated artwork and custom rig; permitted for display, modification and redistribution with this application; no claim of exclusive rights over generated imagery |
@@ -22,7 +26,7 @@ Original application source is MIT. This distribution includes separately licens
 
 Hiyori and earlier scene revisions are not included in the public installer. No account credentials, personal sessions or voice recordings are bundled. Voice models and the Qwen Python runtime are separate optional downloads. Qwen remains unloaded until enabled.
 
-Rin Desktop 0.4.0 retains the CPU speech components and independent worker from 0.3.1 unchanged. Their corresponding-source materials remain available from the separate [0.3.1 developer source page](https://github.com/code-lawyer/Rin-Desktop/releases/tag/third-party-source-v0.3.1). Download `Third-Party-Corresponding-Source-0.3.1.zip` for the exact Sherpa tag, eSpeak/piper pins, native build files, dependencies and worker source. These native components retain their licenses and modification rights; this project's MIT license does not replace them. Application users do not need this archive to install or run Rin Desktop.
+Rin Desktop 0.5.0 retains the CPU speech components and independent worker from 0.3.1 unchanged. Their corresponding-source materials remain available from the separate [0.3.1 developer source page](https://github.com/code-lawyer/Rin-Desktop/releases/tag/third-party-source-v0.3.1). Download `Third-Party-Corresponding-Source-0.3.1.zip` for the exact Sherpa tag, eSpeak/piper pins, native build files, dependencies and worker source. These native components retain their licenses and modification rights; this project's MIT license does not replace them. Application users do not need this archive to install or run Rin Desktop.
 
 The CPU speech worker and linked Sherpa/eSpeak native components are conveyed as a GPL-3.0-or-later combination, with upstream Apache/MIT/BSD notices preserved. Recipients may modify, rebuild and redistribute that component under the GPL; the original MIT source files may also be used separately under MIT. The desktop/Live2D component is a separate program, communicating with the Node speech worker through JSON text and PCM. GPL and LGPL components are provided without warranty; see their full license texts. The corresponding-source archive includes the same-version worker source and build material.
 

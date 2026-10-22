@@ -1,5 +1,5 @@
 import { readFile, writeFile, mkdir, readdir, cp } from 'node:fs/promises';
-import { join, resolve, relative } from 'node:path';
+import { join, resolve } from 'node:path';
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 const root=resolve(import.meta.dirname,'../..'), target=join(root,'prototypes/live2d-codex/licenses');
@@ -14,6 +14,11 @@ const sources=[
  ['gradio-client-LICENSE.txt','https://raw.githubusercontent.com/gradio-app/gradio/gradio%406.17.3/LICENSE']
 ];
 const index=[];
+const koffiRoot=join(root,'prototypes/live2d-codex/node_modules/koffi');
+const koffiManifest=JSON.parse(await readFile(join(koffiRoot,'package.json'),'utf8'));
+const koffiLicense=await readFile(join(koffiRoot,'LICENSE.txt'));
+await writeFile(join(target,'koffi-LICENSE.txt'),koffiLicense);
+index.push({file:'koffi-LICENSE.txt',source:`npm:koffi@${koffiManifest.version}/LICENSE.txt`,sha256:createHash('sha256').update(koffiLicense).digest('hex')});
 for(const [name,url] of sources){execFileSync('curl.exe',['-fsSL','--retry','2','--max-time','90','-o',join(target,name),url],{windowsHide:true});const bytes=await readFile(join(target,name));if(!/license/i.test(bytes.toString()))throw new Error(`Invalid license response: ${name}`);index.push({file:name,source:url,sha256:createHash('sha256').update(bytes).digest('hex')});}
 const python=join(root,'work/release-build/qwen/python');
 await cp(join(python,'LICENSE.txt'),join(target,'python-LICENSE.txt'));

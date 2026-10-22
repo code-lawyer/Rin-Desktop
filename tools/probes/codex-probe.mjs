@@ -1,19 +1,22 @@
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import os from 'node:os';
 import { parseArgs } from 'node:util';
 import { startStdio, initialize } from './stdio-transport.mjs';
 import { TurnObserver } from './turn-observer.mjs';
+import { createRunDirectory, writeRunReport, requireLiveRun } from '../qa/run-output.mjs';
 
-const root = resolve(import.meta.dirname, '../..');
-const cwd = resolve(root, 'work/sandbox-project');
 const { values: args } = parseArgs({ options: {
+  run: { type: 'boolean', default: false }, help: { type: 'boolean', default: false }, output: { type: 'string' },
   codex: { type: 'string', default: process.env.VIBE_CODEX_PATH ?? 'codex' },
   'expected-version': { type: 'string' },
   'create-thread': { type: 'boolean', default: false },
   'live-turn': { type: 'boolean', default: false }
 } });
+requireLiveRun('node tools/probes/codex-probe.mjs --run [--live-turn] [--output=work/qa/new-run]', 'the local CLI and account checks; --live-turn also sends test prompts', args.run, args.help);
+const runDirectory = await createRunDirectory('codex-stdio', args.output);
+const cwd = resolve(runDirectory, 'project');
 const createThread = args['create-thread'] || args['live-turn'];
 const version = execFileSync(args.codex, ['--version'], { encoding: 'utf8', windowsHide: true }).trim();
 if (args['expected-version'] && version !== `codex-cli ${args['expected-version']}`) {
@@ -21,7 +24,7 @@ if (args['expected-version'] && version !== `codex-cli ${args['expected-version'
 }
 await mkdir(cwd, { recursive: true });
 const evidence = {
-  date: new Date().toISOString(), stage: 'M0/S-01', cliVersion: version,
+  date: new Date().toISOString(), probe: 'codex-stdio', cliVersion: version,
   environment: { node: process.version, platform: process.platform, cpu: os.cpus()[0]?.model, memoryGB: Math.round(os.totalmem() / 1024 ** 3) },
   tests: [], inferenceStarted: false, accountDetailsPersisted: false
 };
@@ -100,9 +103,8 @@ try {
   evidence.diagnostics = transport.diagnostics();
   observer?.close();
   await transport.close();
-  const out = resolve(root, `docs/evidence/2026-10-01-codex-${args['live-turn'] ? 'live' : 'stdio'}.json`);
-  await mkdir(resolve(root, 'docs/evidence'), { recursive: true });
-  await writeFile(out, JSON.stringify(evidence, null, 2) + '\n');
+  await writeRunReport(runDirectory, evidence);
+  console.log(`Report: ${resolve(runDirectory, 'result.json')}`);
   console.log(JSON.stringify(evidence, null, 2));
   if (evidence.tests.some(test => test.status === 'failed')) process.exitCode = 1;
 }

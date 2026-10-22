@@ -1,4 +1,5 @@
-const { app, BrowserWindow, ipcMain, protocol, screen, Tray, Menu, nativeImage, dialog, globalShortcut, shell, net, session } = require('electron');
+const { app, BrowserWindow, ipcMain, protocol, screen, Tray, Menu, nativeImage, dialog, globalShortcut, shell, net, session, powerMonitor } = require('electron');
+const { isCliAgent, agentName } = require('./backend/agent-catalog.cjs');
 const { join, resolve, relative, extname, sep } = require('node:path');
 const { readFile, writeFile, mkdir, rename } = require('node:fs/promises');
 const { pathToFileURL } = require('node:url');
@@ -6,7 +7,9 @@ const { bubbleLayout } = require('./backend/bubble-layout.cjs');
 const { avatarScale: normalizeAvatarScale, avatarBounds } = require('./backend/avatar-window.cjs');
 const { WallpaperHost } = require('./backend/wallpaper-host.cjs');
 const { registerInputActions } = require('./backend/input-actions.cjs');
+const { RemoteInput, RESERVED_KEYS } = require('./backend/remote-input.cjs');
 const { characterProfile, isCharacter } = require('./backend/character-profiles.cjs');
+const { dataHome, storageLocation } = require('./backend/storage-location.cjs');
 
 const root = __dirname;
 const packaged = require('node:fs').existsSync(join(root, 'portable.json'));
@@ -14,12 +17,15 @@ const legacyDotsAvailable = !packaged && require('node:fs').existsSync(join(root
 const projectRoot = packaged ? app.getPath('documents') : resolve(root, '../..');
 const argument = key => process.argv.find(arg => arg.startsWith(`--${key}=`))?.slice(key.length + 3);
 const wallpaperMode = packaged || (argument('mode') ?? 'wallpaper') === 'wallpaper';
-const defaultStorage = join(process.env.LOCALAPPDATA || app.getPath('userData'), 'VibeVoice');
-let importedStorage;
-if (packaged) {
-  try { const data = JSON.parse(require('node:fs').readFileSync(join(defaultStorage,'data-location.json'),'utf8')); if (typeof data.directory === 'string' && require('node:path').isAbsolute(data.directory) && require('node:fs').existsSync(data.directory)) importedStorage = data.directory; } catch {}
+let portable, startupStorageError, defaultStorage, storageDir;
+try {
+  if (packaged) portable = JSON.parse(require('node:fs').readFileSync(join(root, 'portable.json'), 'utf8'));
+  defaultStorage = dataHome(process.env.LOCALAPPDATA || app.getPath('userData'), portable);
+  storageDir = storageLocation({ defaultStorage, sourceStorage: join(projectRoot, 'work/runtime/avatar'), packaged, override: argument('storage') });
+} catch (error) {
+  startupStorageError = error;
+  storageDir = join(app.getPath('temp'), 'rin-startup-error');
 }
-const storageDir = resolve(argument('storage') ?? (packaged ? importedStorage || defaultStorage : join(projectRoot, 'work/runtime/avatar')));
 app.setPath('userData', join(storageDir, 'profile'));
 const debugPort = argument('debug-port');
 if (debugPort && /^\d{4,5}$/.test(debugPort)) {
@@ -28,14 +34,15 @@ if (debugPort && /^\d{4,5}$/.test(debugPort)) {
 }
 protocol.registerSchemesAsPrivileged([{ scheme: 'app', privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true, stream: true } }]);
 
-let avatar, chat, workbench, backend, tray, store, speech, voiceResources, captureTarget, captureTimer, closing = false;
+let avatar, chat, workbench, backend, tray, store, submissions, speech, voiceResources, remote, captureTarget, captureTimer, closing = false;
 let shortcutErrors = [], rememberedTarget = '', keyLearning = false, shortcutResumeAt = 0, workspaceVersion = 0;
-let provider = 'codex', changingProvider = false, changingData = false;
+let provider = 'codex', changingProvider = false, providerChange = null, changingData = false;
 let desiredBubble = { width: 440, height: 220 }, previousState, readingMode = false, avatarAnchor = null;
 let characterScale = 1, characterBox, dragOrigin, appearanceTimer, appearanceQueue = Promise.resolve();
 let bubblePosition = null, chatDragOrigin, currentChatLayout;
 let wallpaperHost, manualPause = false, pendingMode = null, lastPresentation = '';
 let wallpaperStatus = { phase: 'loading', requestId: 0 }, appliedWallpaperRequest = -1;
+const remoteInput = new RemoteInput({onError:error=>remote?.disconnect().then(()=>remote.update({notice:error.message})).catch(()=>{})});
 const isLocal = url => { try { const u = new URL(url); return u.protocol === 'app:' && u.hostname === 'local' && ['/renderer/index.html', '/renderer/workbench.html'].includes(u.pathname); } catch { return false; } };
 const trusted = event => [avatar, chat, workbench].some(win => win && !win.isDestroyed() && win.webContents === event.sender) && isLocal(event.senderFrame?.url ?? '');
 const appearance = () => ({ scale: characterScale, mode: wallpaperMode ? 'wallpaper' : 'avatar' });
@@ -97,7 +104,7 @@ function hideChat() { if (readingMode) { readingMode = false; chat.setFullScreen
 function toggleChat() { chat?.isVisible() ? hideChat() : showChat(); }
 function recallChat() { chat?.isVisible() && chat.isFocused() ? hideChat() : showChat(); }
 function showWorkbench(page) { hideChat(); workbench?.show(); workbench?.focus(); workbench?.webContents.send('workbench:refresh', typeof page === 'string' ? page : null); }
-function workspaceSnapshot() { return { ...store.snapshot(), version: workspaceVersion, speech: speech.status(), wallpaper: wallpaperStatus, resources: voiceResources?.snapshot(), shortcutErrors, legacyDotsAvailable }; }
+function workspaceSnapshot() { return { ...store.snapshot(), version: workspaceVersion, speech: speech.status(), remote: remote?.snapshot(), wallpaper: wallpaperStatus, resources: voiceResources?.snapshot(), shortcutErrors, legacyDotsAvailable }; }
 function notifyWorkspace() { workspaceVersion++; for (const win of [chat, workbench]) if (win && !win.isDestroyed()) win.webContents.send('workbench:state', workspaceSnapshot()); }
 function stopSpeech() { chat?.webContents.send('speech:stop'); return speech?.stop().catch(error => console.error('[speech:stop]', error.message)); }
 async function confirmWallpaper(info) {
@@ -124,11 +131,11 @@ async function confirmWallpaper(info) {
     notifyWorkspace();
   }
 }
-function switchAllowed() { if (captureTarget) throw new Error('请先完成或取消听写，再切换对话。'); if (provider !== 'codex') throw new Error('项目工作台需要切换到 Codex。'); stopSpeech(); }
+function switchAllowed() { if (captureTarget) throw new Error('请先完成或取消听写，再切换对话。'); if (!isCliAgent(provider)) throw new Error('请先选择 CLI Agent。'); stopSpeech(); }
 function sendInputAction(action) {
   if (changingData) return;
   if (action === 'record') showChat();
-  if (['record', 'send', 'readReply'].includes(action)) chat?.webContents.send('companion:input-action', action);
+  if (['record', 'send', 'readReply', 'clearDraft', 'undoDraft', 'volumeUp', 'volumeDown'].includes(action)) chat?.webContents.send('companion:input-action', action);
 }
 function finishKeyLearning() {
   if (!keyLearning) return;
@@ -140,7 +147,7 @@ function registerShortcuts() {
   shortcutErrors = registerInputActions(globalShortcut, store.data.settings, {
     chat: recallChat, workbench: () => showWorkbench(), record: () => sendInputAction('record'),
     send: () => sendInputAction('send'), readReply: () => sendInputAction('readReply'), stopSpeech
-  }, { suspended: argument('shortcut') === 'off' || keyLearning || changingData, resumeAt: shortcutResumeAt });
+  }, { suspended: argument('shortcut') === 'off' || keyLearning || changingData, resumeAt: shortcutResumeAt, reserved:remoteInput.enabled?RESERVED_KEYS:new Set() });
 }
 async function makeBackend(kind) {
   if (kind === 'dots') {
@@ -148,17 +155,26 @@ async function makeBackend(kind) {
     const { DotsCompanion } = await import(pathToFileURL(join(root, 'backend/dots.mjs')).href);
     return new DotsCompanion({ storageDir });
   }
+  if (kind === 'claude') {
+    const { ClaudeCompanion } = await import(pathToFileURL(join(root, 'backend/claude-agent.mjs')).href);
+    return new ClaudeCompanion({ projectRoot: argument('project') ?? projectRoot, storageDir });
+  }
+  if (kind === 'grok' || kind === 'opencode') {
+    const { AcpCompanion } = await import(pathToFileURL(join(root, 'backend/acp-agent.mjs')).href);
+    return new AcpCompanion({ provider: kind, projectRoot: argument('project') ?? projectRoot, storageDir });
+  }
   const { CodexCompanion } = await import(pathToFileURL(join(root, 'backend/codex.mjs')).href);
   return new CodexCompanion({ projectRoot: argument('project') ?? projectRoot, storageDir });
 }
 function bindBackend() {
+  submissions?.bind(backend, provider);
   backend.on('state', state => {
     if (state.connection !== previousState?.connection || state.status !== previousState?.status) {
       console.info('[companion:connection]', JSON.stringify({ provider, connection: state.connection, status: state.status }));
     }
-    for (const win of [avatar, chat, workbench]) if (win && !win.isDestroyed()) win.webContents.send('companion:state', { ...state, provider });
-    const target = `${state.cwd}|${state.threadId}`;
-    if (store && provider === 'codex' && state.connection === 'ready' && state.status !== 'configuring' && target !== rememberedTarget) { rememberedTarget = target; store.remember(state).then(notifyWorkspace).catch(error => console.error(error.message)); }
+    for (const win of [avatar, chat, workbench]) if (win && !win.isDestroyed()) win.webContents.send('companion:state', { ...state, provider, submission: submissions?.snapshot(provider) });
+    const target = `${provider}|${state.cwd}|${state.threadId}`;
+    if (store && isCliAgent(provider) && state.connection === 'ready' && state.status !== 'configuring' && target !== rememberedTarget) { rememberedTarget = target; store.remember({ ...state, provider }).then(notifyWorkspace).catch(error => console.error(error.message)); }
     if (previousState && ['starting', 'working', 'waiting', 'stopping'].includes(previousState.status) && state.status === 'idle') showChat({ focus: false });
     previousState = state;
     if (pendingMode && !backend.busy) { const next = pendingMode; pendingMode = null; switchMode(next); }
@@ -172,23 +188,40 @@ function bindBackend() {
     if (settings?.ttsResident && (settings.autoSpeak || settings.prepareSpeech) && !captureTarget) chat?.webContents.send('speech:reply', reply);
   });
 }
-async function changeProvider(next) {
+async function changeProvider(next, { reconnect = false } = {}) {
+  if (closing) throw new Error('应用正在退出。');
+  if (!backend || !store) throw new Error('应用正在启动，请稍候。');
   if (captureTarget) throw new Error('请先完成或取消听写。');
   stopSpeech();
-  if (!['codex', 'dots'].includes(next)) throw new Error('请选择 Codex 或 Dots。');
+  if (!isCliAgent(next) && next !== 'dots') throw new Error('请选择支持的 Agent。');
   if (changingProvider) throw new Error('正在切换对话来源。');
-  if (next === provider) return;
-  if (provider === 'codex' && backend.busy) throw new Error('请先等待或停止当前 Codex 任务。');
+  if (next === provider && !reconnect) return;
+  if (backend.busy) throw new Error('请先等待或停止当前任务。');
   changingProvider = true;
-  try {
-    const replacement = await makeBackend(next);
-    backend.removeAllListeners(); await backend.close();
-    backend = replacement; provider = next; previousState = null; bindBackend();
-    await mkdir(storageDir, { recursive: true });
-    await writeFile(join(storageDir, 'provider.json'), JSON.stringify({ provider }));
-    tray?.setToolTip(`Vibe Voice · ${provider === 'dots' ? '凛（Dots）' : 'Codex'} 桌面伙伴`);
-    await backend.connect();
-  } finally { changingProvider = false; }
+  const switching = (async () => {
+    let replacement;
+    try {
+      replacement = await makeBackend(next);
+      if (closing) return;
+      backend.removeAllListeners(); await backend.close();
+      if (closing) return;
+      backend = replacement; provider = next; previousState = null; rememberedTarget = null; bindBackend();
+      for (const win of [avatar, chat, workbench]) if (win && !win.isDestroyed()) win.webContents.send('companion:state', { ...backend.snapshot(), provider });
+      await mkdir(storageDir, { recursive: true });
+      if (closing) return;
+      await writeFile(join(storageDir, 'provider.json'), JSON.stringify({ provider }));
+      if (closing) return;
+      tray?.setToolTip(`Vibe Voice · ${agentName(provider)} 桌面伙伴`);
+      await replacement.connect();
+    } finally {
+      // Quit owns the published backend. A replacement still being constructed
+      // belongs to this operation, and must be released before quit completes.
+      if (replacement && replacement !== backend) await replacement.close();
+    }
+  })();
+  providerChange = switching;
+  try { await switching; }
+  finally { changingProvider = false; if (providerChange === switching) providerChange = null; }
 }
 function positionChat() {
   if (!avatar || !chat || chat.isDestroyed()) return;
@@ -226,11 +259,12 @@ else {
   app.on('second-instance', (_event, argv) => {
     const mode = argv.find(arg => arg.startsWith('--mode='))?.slice(7);
     const requestedProvider = argv.find(arg => arg.startsWith('--provider='))?.slice(11);
-    const ready = ['codex', 'dots'].includes(requestedProvider) ? changeProvider(requestedProvider) : Promise.resolve();
+    const ready = isCliAgent(requestedProvider) || requestedProvider === 'dots' ? changeProvider(requestedProvider) : Promise.resolve();
     ready.then(() => { if (['avatar', 'wallpaper'].includes(mode)) switchMode(mode); else showChat(); })
       .catch(error => { showChat(); dialog.showErrorBox('对话来源尚未切换', error.message); });
   });
   app.whenReady().then(async () => {
+    if (startupStorageError) throw startupStorageError;
     console.info('[companion:startup]', 'ready');
     protocol.handle('app', async request => {
       try {
@@ -245,35 +279,29 @@ else {
         return new Response(request.method === 'HEAD' ? null : await readFile(file), { headers: { 'Content-Type': types[extname(file)] ?? 'application/octet-stream', 'X-Content-Type-Options': 'nosniff' } });
       } catch { return new Response('', { status: 404 }); }
     });
-    provider = argument('provider') ?? 'codex';
-    if (!['dots', 'codex'].includes(provider) || (provider === 'dots' && !legacyDotsAvailable)) provider = 'codex';
+    let savedProvider;
+    try { savedProvider = JSON.parse(await readFile(join(storageDir, 'provider.json'), 'utf8')).provider; } catch {}
+    provider = argument('provider') ?? savedProvider ?? 'codex';
+    if ((!isCliAgent(provider) && provider !== 'dots') || (provider === 'dots' && !legacyDotsAvailable)) provider = 'codex';
     backend = await makeBackend(provider);
     console.info('[companion:startup]', 'backend');
     const { WorkspaceStore } = await import(pathToFileURL(join(root, 'backend/workspace-store.mjs')).href);
     const { ResidentSpeech } = await import(pathToFileURL(join(root, 'backend/resident-speech.mjs')).href);
     store = new WorkspaceStore(storageDir); await store.load();
+    const { SubmissionGuard } = await import(pathToFileURL(join(root, 'backend/submission-guard.mjs')).href);
+    submissions = new SubmissionGuard(store);
+    submissions.on('state', value => { if (value.provider === provider && !closing) backend?.changed(); });
     wallpaperStatus.character = store.data.settings.character;
     const { VoiceResources, MODEL_FOLDERS } = await import(pathToFileURL(join(root, 'backend/voice-resources.mjs')).href);
     const { upstreamProxyEnvironment } = await import(pathToFileURL(join(root, 'backend/voice-runtime.mjs')).href);
+    const { activateVoiceResource } = await import(pathToFileURL(join(root, 'backend/voice-activation.mjs')).href);
     voiceResources = new VoiceResources(join(storageDir, 'voice-resources'), JSON.parse(await readFile(join(root, 'voice-resources.json'), 'utf8')), {
       fetch: (url, options) => net.fetch(url, options),
       runtimeEnvironment: () => upstreamProxyEnvironment(url => session.defaultSession.resolveProxy(url)),
-      activate: async (id, signal) => {
-        signal.throwIfAborted();
-        if (closing) throw new Error('应用正在退出。');
-        if (id === 'asr') await speech.loadAsr();
-        else {
-          stopSpeech();
-          const patch = { ttsEngine: id, ttsResident: true };
-          if (id === 'qwen' && !speech.status().engines.qwen) patch.qwenRoot = voiceResources.directory('qwen');
-          await store.updateSettings(patch);
-          signal.throwIfAborted();
-          if (closing) throw new Error('应用正在退出。');
-          await speech.configure(store.data.settings);
-          if (speech.phase === 'error') throw new Error(speech.error);
-        }
-        notifyWorkspace();
-      }
+      activate: (id, signal) => activateVoiceResource(id, signal, {
+        speech, store, stopSpeech, isClosing: () => closing,
+        qwenDirectory: () => voiceResources.directory('qwen'), notifyWorkspace
+      })
     });
     voiceResources.on('state', notifyWorkspace);
     const bundledQwen = join(root, 'runtime/qwen'), localQwen = resolve(root, '../qwen-tts-evaluation');
@@ -317,27 +345,77 @@ else {
     chat.on('enter-full-screen', () => { readingMode = true; positionChat(); });
     chat.on('leave-full-screen', () => { readingMode = false; positionChat(); });
     bindBackend();
+    const { RemoteController } = await import(pathToFileURL(join(root,'backend/remote-controller.mjs')).href);
+    const { NativeRemote } = await import(pathToFileURL(join(root,'backend/remote-native.mjs')).href);
+    remote = new RemoteController({
+      settings:store.data.settings.rc003,
+      prepareKeys:()=>remoteInput.start(),
+      createTransport:() => new NativeRemote({root,storageDir,packaged}),
+      save:async rc003 => { await store.updateSettings({rc003}); notifyWorkspace(); },
+      begin:id => {
+        if(closing || changingData || changingProvider || backend.state.status === 'starting') throw new Error('应用正在切换或启动，请稍后再按住语音键。');
+        if(captureTarget)throw new Error('已有听写正在进行，请先结束或取消。');
+        if(voiceResources.active)throw new Error('语音模型正在准备，请完成或取消准备后再按住语音键。');
+        if(!speech.status().asr) { showWorkbench('speech'); throw new Error('首次使用请在语音模型中下载听写资源，然后按住遥控器语音键。'); }
+        const target={provider,cwd:backend.state.cwd,threadId:backend.state.threadId};
+        captureTarget={...target,origin:'rc003',id}; stopSpeech(); showChat(); return target;
+      },
+      transcribe:data => speech.transcribe(data),
+      deliver:async (target,text,id) => {
+        await store.appendDictation(target,text,id);
+        if(!chat.isDestroyed()) chat.webContents.send('remote:text',{target,text,id});
+      },
+      end:id => { if(captureTarget?.origin==='rc003' && captureTarget.id===id) captureTarget=null; },
+      action:async action => {
+        if(changingData || changingProvider || closing || keyLearning) return;
+        if(action==='chat')return recallChat();
+        if(action==='workbench')return showWorkbench();
+        if(action==='remoteSettings')return showWorkbench('remote');
+        if(action==='back'){workbench.hide();return showChat();}
+        if(action==='stopSpeech')return stopSpeech();
+        if(action==='interrupt'){if(backend.busy)await backend.interrupt();return;}
+        if(['send','readReply','clearDraft','undoDraft'].includes(action)){showChat({focus:false});return sendInputAction(action);}
+        if(['volumeUp','volumeDown'].includes(action))return sendInputAction(action);
+        const destination=workbench.isFocused()?workbench:chat;
+        if(destination===chat && !chat.isFocused()){showChat();return;}
+        destination.webContents.send('remote:action',action);
+      }
+    });
+    remoteInput.attach(chat);
+    remote.on('devices',devices=>remoteInput.setDevices(devices));
+    remote.on('diagnostic',value=>console.info('[companion:remote]',JSON.stringify(value)));
+    let remoteShortcuts=false,remoteDiagnostic='';
+    remote.on('state',value=>{
+      const diagnostic=JSON.stringify({phase:value.phase,keysAvailable:value.keysAvailable,notice:value.notice});
+      if(diagnostic!==remoteDiagnostic){remoteDiagnostic=diagnostic;console.info('[companion:remote]',diagnostic);}
+      if(['disconnected','disconnecting','error'].includes(value.phase))remoteInput.stop();
+      if(remoteShortcuts!==remoteInput.enabled){remoteShortcuts=remoteInput.enabled;registerShortcuts();notifyWorkspace();}
+      for(const win of [chat,workbench])if(!win.isDestroyed())win.webContents.send('remote:state',value);
+    });
+    powerMonitor.on('suspend',()=>remote.suspend()); powerMonitor.on('resume',()=>remote.resume());
     console.info('[companion:startup]', 'windows');
     const handler = (channel, fn) => ipcMain.handle(channel, async (event, ...args) => {
       if (!trusted(event)) return { ok: false, error: '不受信任的窗口。' };
+      if (closing) return { ok: false, error: '应用正在退出。' };
+      if (submissions.active.has(provider) && /^(companion:(send|new|provider|reconnect|model)|workbench:(new|resume|effort|use-data))$/.test(channel)) return { ok: false, error: '正在保存发送记录，请稍候。' };
+      if (changingProvider && /^(companion:(send|new|provider|reconnect|login|model|respond|submission)|workbench:(list|history|resume|new|rename|effort))$/.test(channel)) return { ok: false, error: '正在连接 Agent，请稍候。' };
       if (changingData && /^(companion:(send|new|provider|model)|speech:capture|workbench:(new|resume|remove|add|use-data))$/.test(channel)) return {ok:false,error:'正在选择数据目录，请稍候。'};
       try { return { ok: true, value: await fn(event, ...args) }; } catch (error) { return { ok: false, error: error.message }; }
     });
-    handler('companion:snapshot', () => ({ ...backend.snapshot(), provider }));
+    handler('companion:snapshot', () => ({ ...backend.snapshot(), provider, submission: submissions.snapshot(provider) }));
     handler('workbench:use-data', async () => {
       if (backend.busy || captureTarget || voiceResources.active) throw new Error('请先完成当前任务、听写和资源下载，再切换数据目录。');
       changingData = true; registerShortcuts();
       try {
-      const chosen = await dialog.showOpenDialog(workbench, { title:'选择已有 Vibe Voice 数据目录', properties:['openDirectory'] });
+      const chosen = await dialog.showOpenDialog(workbench, { title: portable?.testBuild ? '选择测试用数据副本（请先备份原目录）' : '选择已有 Vibe Voice 数据目录', properties:['openDirectory'] });
       if (chosen.canceled) return;
-      const directory = chosen.filePaths[0];
-      const state = JSON.parse(await readFile(join(directory,'workspaces.json'),'utf8'));
-      if (state.format !== 1 || !Array.isArray(state.projects) || !state.settings) throw new Error('该目录不是有效的 Vibe Voice 数据目录。');
+      const { validateDataDirectory, selectDataDirectory } = await import(pathToFileURL(join(root,'backend/data-directory.mjs')).href);
+      const directory = await validateDataDirectory(chosen.filePaths[0]);
       if (resolve(directory) === storageDir) return;
       if (backend.busy || captureTarget || closing || changingProvider) throw new Error('应用状态已改变，数据目录未切换。');
-      await mkdir(defaultStorage,{recursive:true});
       const pointer = join(defaultStorage,'data-location.json');
-      await writeFile(pointer+'.tmp',JSON.stringify({format:1,directory})); await rename(pointer+'.tmp',pointer);
+      await store.queue;
+      await selectDataDirectory(directory, pointer);
       app.relaunch({ args:[...process.argv.slice(1).filter(value=>!value.startsWith('--storage=')),`--storage=${directory}`] }); app.quit();
       } finally { changingData = false; if (!closing) registerShortcuts(); }
     });
@@ -348,7 +426,7 @@ else {
     });
     handler('companion:cancel-login', () => backend.cancelLogin());
     handler('companion:provider', (_event, kind) => changeProvider(kind));
-    handler('companion:reconnect', () => { if (provider !== 'dots') throw new Error('请重启以恢复 Codex 连接。'); return backend.connect(); });
+    handler('companion:reconnect', () => changeProvider(provider, { reconnect: true }));
     handler('companion:open-dot', () => shell.openExternal('https://chatgpt.com/dots/home'));
     handler('companion:appearance', appearance);
     handler('companion:presentation', presentation);
@@ -359,13 +437,30 @@ else {
       if (!['https:', 'http:'].includes(url.protocol)) throw new Error('只能打开网页链接。');
       await shell.openExternal(url.href);
     });
-    handler('companion:send', (_event, text) => { if (captureTarget) throw new Error('请先完成听写。'); stopSpeech(); return backend.send(text); });
+    handler('companion:send', (_event, text, expected) => { if (captureTarget) throw new Error('请先完成听写。'); stopSpeech(); return isCliAgent(provider) ? submissions.send(backend, provider, text, expected) : backend.send(text); });
+    handler('companion:submission', (_event, action, id) => {
+      if (!isCliAgent(provider)) throw new Error('请先选择 CLI Agent。');
+      if (action === 'check') return submissions.reconcile(backend, provider, id);
+      if (action === 'release') return submissions.release(backend, provider, id);
+      throw new Error('发送核查操作无效。');
+    });
     handler('companion:interrupt', () => backend.interrupt());
     handler('companion:new', () => { switchAllowed(); return backend.newConversation(); });
     handler('companion:model', (_event, model) => backend.chooseModel(model));
     handler('companion:respond', (_event, data) => backend.respond(data?.id, data?.answer));
     handler('companion:project', showWorkbench);
     handler('workbench:snapshot', workspaceSnapshot);
+    handler('remote:command', (event, command, value) => {
+      if(command==='snapshot')return remote.snapshot();
+      if(command==='cancel')return remote.cancel('本次遥控器听写已取消。');
+      if(event.sender!==workbench.webContents || changingData || closing)throw new Error('请在工作台的遥控器页面操作。');
+      if(command==='scan')return remote.scan();
+      if(command==='connect')return remote.connect(value);
+      if(command==='disconnect')return remote.disconnect();
+      if(command==='forget')return remote.disconnect({forget:true});
+      if(command==='settings' && value && typeof value==='object')return remote.configure(value);
+      throw new Error('遥控器操作无效。');
+    });
     handler('resources:download', (_event, id) => {
       if (changingData || closing) throw new Error('应用正在切换数据或退出，请稍后重试。');
       if (captureTarget) throw new Error('请先结束当前听写。');
@@ -386,13 +481,14 @@ else {
     handler('resources:cancel', () => { voiceResources.cancel(); return workspaceSnapshot(); });
     handler('workbench:add', async () => { const picked = await dialog.showOpenDialog(workbench, { title: '添加本地项目', defaultPath: backend.state.cwd, properties: ['openDirectory'] }); if (picked.canceled) return null; const result = await store.add(picked.filePaths[0]); notifyWorkspace(); return result; });
     handler('workbench:remove', async (_event, id) => { await store.remove(id, backend.state.cwd); notifyWorkspace(); });
-    handler('workbench:list', (_event, id, cursor, search) => backend.listThreads(store.project(id).cwd, cursor, search));
-    handler('workbench:history', (_event, id, cursor) => backend.history(id, cursor));
-    handler('workbench:resume', async (_event, id, threadId) => { switchAllowed(); await backend.resumeConversation(threadId, store.project(id).cwd); showChat(); });
-    handler('workbench:new', async (_event, id) => { switchAllowed(); await backend.newConversation(store.project(id).cwd); showChat(); });
-    handler('workbench:rename', (_event, id, name) => backend.renameConversation(id, name));
+    const requireProvider = expected => { if (expected !== undefined && expected !== provider) throw new Error('Agent 已切换，请刷新列表。'); };
+    handler('workbench:list', (_event, id, cursor, search, expected) => { requireProvider(expected); return backend.listThreads(store.project(id).cwd, cursor, search); });
+    handler('workbench:history', (_event, id, cursor, expected) => { requireProvider(expected); return backend.history(id, cursor); });
+    handler('workbench:resume', async (_event, id, threadId, expected) => { requireProvider(expected); switchAllowed(); await backend.resumeConversation(threadId, store.project(id).cwd); showChat(); });
+    handler('workbench:new', async (_event, id, expected) => { requireProvider(expected); switchAllowed(); await backend.newConversation(store.project(id).cwd); showChat(); });
+    handler('workbench:rename', (_event, id, name, expected) => { requireProvider(expected); return backend.renameConversation(id, name); });
     handler('workbench:effort', (_event, effort) => backend.chooseEffort(effort));
-    handler('workbench:draft', (_event, target, text) => text === undefined ? store.draft(target) : store.saveDraft(target, text));
+    handler('workbench:draft', (_event, target, text) => text === undefined ? store.draftSnapshot(target) : store.saveDraft(target, text));
     handler('workbench:settings', async (_event, patch) => {
       if (!patch || typeof patch !== 'object') throw new Error('设置无效。');
       const character = wallpaperMode && 'character' in patch ? patch.character : undefined;
@@ -432,10 +528,19 @@ else {
     handler('speech:capture', (event, target) => {
       if (event.sender !== chat.webContents) throw new Error('请从对话气泡开始听写。');
       if (target && !speech.status().asr) { showWorkbench('speech'); throw new Error('请先在工作台下载听写资源，完成后即可使用。'); }
-      if (target) { if (captureTarget) throw new Error('听写正在进行。'); if (target.threadId !== backend.state.threadId || target.cwd !== backend.state.cwd) throw new Error('当前对话已切换，请重试。'); stopSpeech(); captureTarget = target; clearTimeout(captureTimer); captureTimer = setTimeout(() => { captureTarget = null; chat.webContents.send('speech:cancel'); }, 180000); }
-      else { captureTarget = null; clearTimeout(captureTimer); }
+      if (target) { if (captureTarget) throw new Error('听写正在进行。'); if (changingProvider || target.provider && target.provider !== provider || target.threadId !== backend.state.threadId || target.cwd !== backend.state.cwd) throw new Error('当前对话已切换，请重试。'); stopSpeech(); captureTarget = target; clearTimeout(captureTimer); captureTimer = setTimeout(() => { captureTarget = null; chat.webContents.send('speech:cancel'); }, 180000); }
+      else if(captureTarget?.origin!=='rc003') { captureTarget = null; clearTimeout(captureTimer); }
     });
-    handler('speech:transcribe', async (event, data) => { if (event.sender !== chat.webContents || !captureTarget) throw new Error('没有进行中的听写。'); try { return await speech.transcribe(data); } finally { captureTarget = null; clearTimeout(captureTimer); } });
+    handler('speech:transcribe', async (event, data) => {
+      if (event.sender !== chat.webContents || !captureTarget || captureTarget.origin === 'rc003') throw new Error('没有进行中的电脑听写。');
+      const owned = captureTarget;
+      try { return await speech.transcribe(data); }
+      finally {
+        // A cancelled request may finish after another recording has started.
+        // Its cleanup owns neither the newer target nor the newer watchdog.
+        if (captureTarget === owned) { captureTarget = null; clearTimeout(captureTimer); captureTimer = null; }
+      }
+    });
     const { speechProfile } = await import(pathToFileURL(join(root,'backend/speech-plan.mjs')).href);
     handler('speech:synthesize', (_event, text, profile) => {
       const settings = {...store.data.settings};
@@ -449,6 +554,7 @@ else {
       if (notify !== false || event.sender !== chat.webContents) chat.webContents.send('speech:stop');
       await speech.stop();
     });
+    handler('speech:volume', async (_event, value) => { await store.updateSettings({playbackVolume:value}); notifyWorkspace(); return workspaceSnapshot(); });
     handler('speech:preview', () => { if (speech.status().phase !== 'ready') throw new Error('请先开启常驻加载，等待语音模型就绪后试听。'); showChat(); chat.webContents.send('speech:reply', { text: '雨还在下。慢慢来，我们把眼前的事情一件一件做好。', preview: true }); });
     handler('notification:preview', () => { chat.webContents.send('notification:sound', { action: 'play' }); });
     handler('companion:window', (_event, action) => {
@@ -457,6 +563,7 @@ else {
       else if (action === 'show-chat') showChat();
       else if (action === 'workbench') showWorkbench();
       else if (action === 'speech-settings') showWorkbench('speech');
+      else if (action === 'remote-settings') showWorkbench('remote');
       else if (action === 'hide-workbench') workbench.hide();
       else if (action === 'hide-chat') hideChat();
       else if (action === 'toggle-reading') { readingMode = !readingMode; chat.setFullScreen(readingMode); positionChat(); }
@@ -521,15 +628,16 @@ else {
       console.info('[companion:desktop]', JSON.stringify(presentation()));
       screen.on('display-metrics-changed', () => { wallpaperHost.command('ensure'); positionChat(); });
     } else if (argument('visual') !== 'hidden') avatar.showInactive(); // Isolated UI verification can omit the legacy character window.
-    tray = new Tray(icon()); tray.setToolTip(`Vibe Voice · ${provider === 'dots' ? '凛（Dots）' : 'Codex'} 桌面伙伴`);
+    tray = new Tray(icon()); tray.setToolTip(`${portable?.testBuild ? 'Rin Desktop 测试版' : 'Vibe Voice'} · ${agentName(provider)} 桌面伙伴`);
     tray.setContextMenu(Menu.buildFromTemplate([{ label: '打开对话  Ctrl+Alt+空格', click: showChat },
-      { label: '项目与对话工作台', click: showWorkbench }, { label: '听写 / 完成听写', click: () => sendInputAction('record') },
+      { label: '项目与对话工作台', click: showWorkbench }, { label:'连接与设置遥控器', click:()=>showWorkbench('remote') }, { label: '听写 / 完成听写', click: () => sendInputAction('record') },
       { label: '发送当前草稿', click: () => sendInputAction('send') }, { label: '朗读此条', click: () => sendInputAction('readReply') }, { label: '停止播报', click: stopSpeech },
       ...(wallpaperMode ? [{ label: '暂停壁纸动画', type: 'checkbox', checked: manualPause, click: item => { manualPause = item.checked; notifyPresentation(); } }, ...(!packaged ? [{ label: '切换为悬浮角色', click: () => switchMode('avatar') }] : [])]
         : [{ label: '显示 / 隐藏角色', click: () => avatar.isVisible() ? avatar.hide() : avatar.showInactive() }, { label: '恢复默认位置与大小', click: resetAvatar }, { label: '切换为雨夜壁纸', click: () => switchMode('wallpaper') }]),
       { type: 'separator' }, { label: '退出桌面伙伴', click: () => app.quit() }]));
     tray.on('click', toggleChat);
     registerShortcuts(); speech.configure(store.data.settings); notifyWorkspace();
+    remote.start();
     await backend.connect();
     if (argument('show') === 'workbench') showWorkbench();
   }).catch(error => {
@@ -541,7 +649,7 @@ else {
   app.on('before-quit', event => {
     if (closing) return; event.preventDefault(); closing = true;
     globalShortcut.unregisterAll(); tray?.destroy(); clearTimeout(captureTimer);
-    Promise.allSettled([voiceResources?.close(), speech?.close(), wallpaperHost?.close(), backend?.close(), store?.queue, characterBox ? saveAppearance() : Promise.resolve()])
+    Promise.allSettled([remote?.close(), voiceResources?.close(), speech?.close(), wallpaperHost?.close(), backend?.close(), providerChange, store?.queue, characterBox ? saveAppearance() : Promise.resolve()])
       .then(() => speech?.close()).finally(() => app.exit(0));
   });
   app.on('window-all-closed', () => { if (closing) app.quit(); });

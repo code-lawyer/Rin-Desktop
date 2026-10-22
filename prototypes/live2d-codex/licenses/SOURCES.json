@@ -377,5 +377,10 @@
   {
     "file": "python-packages/uvicorn-0.54.0.dist-info/licenses",
     "source": "Python installed distribution: uvicorn-0.54.0.dist-info"
+  },
+  {
+    "file": "koffi-LICENSE.txt",
+    "source": "npm:koffi@3.3.3/LICENSE.txt",
+    "sha256": "22bcbbbacd739b026a8dc484f62a31484ce4c4e31f3408b60b29b4e41d62b290"
   }
 ]

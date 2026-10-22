@@ -1,12 +1,17 @@
 import { EventEmitter } from 'node:events';
 import { spawn, execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { mkdir, readFile, writeFile, rename, stat } from 'node:fs/promises';
+import { mkdir, stat } from 'node:fs/promises';
 import { join, resolve, delimiter, basename } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { AvatarRpc } from './rpc.mjs';
 import { approvalView, approvalResult } from './approvals.mjs';
 import { isTaskBusy } from './task-state.mjs';
+import { AgentLifecycle } from './agent-lifecycle.mjs';
+import { currentReply } from './reply-state.mjs';
+import packageInfo from '../package.json' with { type: 'json' };
+import { readJson, writeJson } from './durable-json.mjs';
+import { pathKey } from './path-identity.mjs';
 
 const MAX_TEXT = 256_000;
 const clip = text => String(text ?? '').slice(0, MAX_TEXT);
@@ -47,14 +52,16 @@ export class CodexCompanion extends EventEmitter {
     this.metadataPath = join(this.storageDir, 'session.json'); this.binary = binary;
     this.spawnServer = spawnServer; this.rpc = null; this.requests = new Map(); this.completedTurns = new Set(); this.toolItems = new Map();
     this.persistQueue = Promise.resolve(); this.closed = false; this.pendingUser = null; this.loginRevision = 0;
+    this.lifecycle = new AgentLifecycle();
     this.pendingSend = null; this.stopRequested = false; this.interrupting = null;
     this.state = { connection: 'connecting', status: 'connecting', activity: '正在读取 Codex 登录', error: null,
       login: null, version: null, cwd: this.projectRoot, projectName: basename(this.projectRoot), threadId: null, turnId: null,
       model: null, models: [], messages: [], approvals: [], restored: false, threadName: '', effort: null };
   }
-  get busy() { return !!this.pendingSend || isTaskBusy(this.state); }
+  get busy() { return !!this.pendingSend || !!this.lifecycle.active || isTaskBusy(this.state); }
   snapshot() { return structuredClone(this.state); }
   changed(immediate = true) {
+    if (this.closed) return;
     if (immediate) { clearTimeout(this.updateTimer); this.updateTimer = null; this.emit('state', this.snapshot()); }
     else if (!this.updateTimer) this.updateTimer = setTimeout(() => this.changed(), 65);
   }
@@ -62,20 +69,23 @@ export class CodexCompanion extends EventEmitter {
     const metadata = { format: 1, cwd: this.state.cwd, threadId: this.state.threadId, model: this.state.model, ...(this.state.effort ? { effort: this.state.effort } : {}) };
     this.persistQueue = this.persistQueue.catch(() => {}).then(async () => {
       await mkdir(this.storageDir, { recursive: true });
-      await writeFile(this.metadataPath + '.tmp', JSON.stringify(metadata, null, 2) + '\n');
-      await rename(this.metadataPath + '.tmp', this.metadataPath);
+      await writeJson(this.metadataPath, metadata);
     });
     return this.persistQueue;
   }
   async connect() {
+    if (this.closed) return;
+    const operation = this.lifecycle.begin();
     try {
       await mkdir(this.storageDir, { recursive: true });
+      operation.check();
       let saved, projectError;
       try {
-        saved = JSON.parse(await readFile(this.metadataPath, 'utf8'));
+        saved = await readJson(this.metadataPath);
       } catch (error) {
         if (error.code !== 'ENOENT') throw new Error('无法读取上次会话信息，原文件已保留。请检查文件后重启。', { cause: error });
       }
+      operation.check();
       if (saved !== undefined) {
         if (saved?.format !== 1 || typeof saved.cwd !== 'string' || !saved.cwd.trim()) throw new Error('上次会话信息格式无效，原文件已保留。');
         this.state.cwd = resolve(saved.cwd); this.state.projectName = basename(saved.cwd);
@@ -88,6 +98,7 @@ export class CodexCompanion extends EventEmitter {
           projectError = '上次项目目录无法访问，原会话已保留。请恢复目录后重启，或通过「项目」明确选择其他目录开始新对话。';
         }
       }
+      operation.check();
       this.binary ??= findCodex();
       this.state.version = execFileSync(this.binary, ['--version'], { encoding: 'utf8', windowsHide: true, timeout: 10_000, stdio: ['ignore', 'pipe', 'ignore'] }).trim();
       const child = this.spawnServer ? this.spawnServer() : spawn(this.binary, ['app-server', '--listen', 'stdio://', '-c', 'forced_login_method="chatgpt"'],
@@ -96,22 +107,29 @@ export class CodexCompanion extends EventEmitter {
       this.rpc.on('notification', message => this.onNotification(message));
       this.rpc.on('request', request => this.onRequest(request));
       this.rpc.on('closed', error => { if (!this.closed) { this.state.connection = 'error'; this.state.status = 'error'; this.state.error = error.message; this.requests.clear(); this.state.approvals = []; this.changed(); } });
-      await this.rpc.request('initialize', { clientInfo: { name: 'vibe_voice_avatar', title: 'Rin Desktop', version: '0.3.0' }, capabilities: { experimentalApi: true } });
+      await this.rpc.request('initialize', { clientInfo: { name: 'vibe_voice_avatar', title: 'Rin Desktop', version: packageInfo.version }, capabilities: { experimentalApi: true } });
+      operation.check();
       this.rpc.notify('initialized');
       this.projectError = projectError;
       const account = await this.rpc.request('account/read', { refreshToken: false });
+      operation.check();
       if (account.account?.type !== 'chatgpt') {
         this.state.connection = 'authentication'; this.state.status = 'idle';
         this.state.activity = '请登录你的 ChatGPT 账户'; this.changed(); this.emit('attention'); return;
       }
       await this.finishConnection();
-    } catch (error) { this.state.connection = 'error'; this.state.status = 'error'; this.state.error = error.message; this.changed(); }
+    } catch (error) {
+      await this.rpc?.close();
+      if (!this.closed) { this.state.connection = 'error'; this.state.status = 'error'; this.state.error = error.message; this.changed(); }
+    } finally { operation.release(); }
   }
   async finishConnection() {
+      this.lifecycle.assertOpen();
       const projectError = this.projectError;
       this.state.login = 'chatgpt'; // Account identifiers and credentials never cross into the renderer.
       this.state.loginPending = false; this.state.error = null;
       const result = await this.rpc.request('model/list', { includeHidden: false });
+      this.lifecycle.assertOpen();
       this.state.models = (result.data ?? []).map(m => ({ id: m.id, model: m.model, name: m.displayName ?? m.model, isDefault: !!m.isDefault, efforts: m.supportedReasoningEfforts ?? [], defaultEffort: m.defaultReasoningEffort }));
       if (!this.state.models.some(m => m.model === this.state.model)) this.state.model = (this.state.models.find(m => m.isDefault) ?? this.state.models[0])?.model ?? null;
       if (projectError) {
@@ -123,8 +141,10 @@ export class CodexCompanion extends EventEmitter {
         this.state.activity = '正在恢复上次对话'; this.changed();
         try {
           const restored = await this.rpc.request('thread/resume', { threadId: this.state.threadId, ...this.threadOptions() });
+          this.lifecycle.assertOpen();
           this.loadThread(restored.thread); this.state.restored = true;
         } catch (error) {
+          if (this.closed) return;
           // Keep the saved ID available for manual recovery; do not silently create another thread.
           this.state.connection = 'ready'; this.state.status = 'error';
           this.state.error = `上次对话未能恢复：${error.message}。可重启重试，或点击「新对话」。`; this.changed(); return;
@@ -209,12 +229,15 @@ export class CodexCompanion extends EventEmitter {
     if (this.state.messages.length > 200) this.state.messages.splice(0, this.state.messages.length - 200);
   }
   onNotification({ method, params: p = {} }) {
+    if (this.closed) return;
     if (method === 'account/login/completed') { this.completeLogin(p); return; }
     if (p.threadId && p.threadId !== this.state.threadId) return;
+    if (p.turnId && this.completedTurns.has(p.turnId)) return;
     if (p.turnId && this.state.turnId && p.turnId !== this.state.turnId) return;
     if (method === 'turn/started') {
-      if (this.completedTurns.has(p.turn.id)) return;
+      if (this.completedTurns.has(p.turn.id) || this.state.turnId && p.turn.id !== this.state.turnId) return;
       this.state.turnId = p.turn.id; this.state.status = 'working'; this.state.activity = 'Codex 正在思考';
+      this.receivedSubmission();
       if (this.stopRequested) this.interruptTurn().catch(() => {});
     } else if (method === 'turn/completed') {
       if (this.completedTurns.has(p.turn.id) || (this.state.turnId && p.turn.id !== this.state.turnId)) return;
@@ -226,9 +249,8 @@ export class CodexCompanion extends EventEmitter {
       this.state.activity = p.turn.status === 'interrupted' ? '已停止，可以继续对话' : p.turn.status === 'failed' ? '本次任务未完成' : '回复已完成';
       if (p.turn.error) this.state.error = clip(p.turn.error.message);
       if (p.turn.status === 'completed') {
-        const replies = this.state.messages.filter(m => m.turnId === p.turn.id && m.role === 'assistant');
-        const final = replies.findLast(m => m.phase === 'final_answer') ?? replies.findLast(m => !m.phase);
-        if (final?.text) this.emit('reply-completed', { threadId: this.state.threadId, turnId: p.turn.id, text: final.text });
+        const reply = currentReply(this.state.messages.filter(m => m.turnId === p.turn.id));
+        if (reply.readable && reply.text) this.emit('reply-completed', { threadId: this.state.threadId, turnId: p.turn.id, text: reply.text });
       }
     } else if (method === 'item/started' || method === 'item/completed') this.receiveItem(p.item, p.turnId, method === 'item/completed');
     else if (method === 'item/agentMessage/delta') {
@@ -245,6 +267,7 @@ export class CodexCompanion extends EventEmitter {
     this.changed();
   }
   onRequest(request) {
+    if (this.closed) return;
     if (request.params?.threadId && request.params.threadId !== this.state.threadId) { this.rpc.reject(request.id, 'Request does not belong to the avatar thread.'); return; }
     if (request.params?.turnId && (this.completedTurns.has(request.params.turnId) || (this.state.turnId && request.params.turnId !== this.state.turnId))) {
       this.rpc.reject(request.id, 'Request does not belong to the active turn.'); return;
@@ -269,18 +292,32 @@ export class CodexCompanion extends EventEmitter {
     }
     return view;
   }
-  assertReady() { if (this.state.connection !== 'ready' || !this.rpc || this.rpc.closed) throw new Error('Codex 尚未连接。'); }
-  async send(text) {
+  assertReady() { if (this.closed || this.state.connection !== 'ready' || !this.rpc || this.rpc.closed) throw new Error('Codex 尚未连接。'); }
+  receivedSubmission() {
+    const operation = this.pendingSend;
+    if (!operation?.dispatched || operation.received) return;
+    operation.received = true;
+    this.emit('submission', { id: operation.id, status: 'confirmed', target: { cwd: this.state.cwd, threadId: this.state.threadId } });
+  }
+  async readSubmissionHistory({ cwd, threadId }) {
+    this.assertReady();
+    if (!threadId) return [];
+    const { thread } = await this.rpc.request('thread/read', { threadId, includeTurns: true });
+    if (!Array.isArray(thread?.turns) || thread.cwd && pathKey(thread.cwd) !== pathKey(cwd)) throw new Error('无法核查该项目的会话。');
+    return thread.turns.flatMap(turn => (turn.items ?? []).filter(item => item.type === 'userMessage').map(item => ({ id: item.id, text: inputText(item.content) })));
+  }
+  async send(text, submission = {}) {
     this.assertReady(); if (this.busy) throw new Error('请等待当前回复，或先停止当前任务。');
     if (this.state.status === 'error') throw new Error('请先恢复连接或开始新对话。');
     if (typeof text !== 'string' || !text.trim() || text.length > 64_000) throw new Error('请输入 1 至 64000 个字符的任务。');
-    const operation = { cancelled: false }; this.pendingSend = operation; this.stopRequested = false; this.interrupting = null;
+    const operation = { cancelled: false, id: submission.id }; this.pendingSend = operation; this.stopRequested = false; this.interrupting = null;
     this.state.status = 'starting'; this.state.activity = '正在发送'; this.state.error = null; this.changed();
     try {
       if (!this.state.threadId) {
         const result = await this.rpc.request('thread/start', { ...this.threadOptions(), ephemeral: false });
         this.state.threadId = result.thread.id; await this.persist();
       }
+      if (submission.beforeDispatch) await submission.beforeDispatch({ cwd: this.state.cwd, threadId: this.state.threadId });
       if (operation.cancelled || this.closed) {
         this.state.status = 'idle'; this.state.activity = '已取消发送，可以继续对话'; this.stopRequested = false;
         this.changed(); return { accepted: false, cancelled: true };
@@ -288,7 +325,10 @@ export class CodexCompanion extends EventEmitter {
       const id = `local-${randomUUID()}`; this.pendingUser = id;
       this.upsertMessage({ id, role: 'user', text: text.trim(), complete: true, turnId: null }); this.changed();
       if (!this.state.threadName) this.state.threadName = text.trim().slice(0, 48);
+      operation.dispatched = true;
       const result = await this.rpc.request('turn/start', { threadId: this.state.threadId, model: this.state.model, ...(this.state.effort ? { effort: this.state.effort } : {}), input: [{ type: 'text', text: text.trim() }] }, 60_000);
+      if (!result?.turn?.id) throw new Error('Codex 未返回发送确认，请核查会话。');
+      this.receivedSubmission();
       const draft = this.state.messages.find(m => m.id === id); if (draft) draft.turnId = result.turn.id;
       // Completion notifications may arrive before the start acknowledgment.
       if (!this.completedTurns.has(result.turn.id)) {
@@ -298,8 +338,8 @@ export class CodexCompanion extends EventEmitter {
       }
       this.changed(); return { accepted: true };
     } catch (error) {
-      this.state.error = error.code === 'TIMEOUT' ? `${error.message} 发送结果尚未确定；请先停止或重启恢复会话，不要重复发送。` : error.message;
-      if (error.code !== 'TIMEOUT' && !this.state.turnId) this.state.status = 'idle';
+      this.state.error = operation.received ? '请求已送达，但连接回执未能完成。请等待回复或重新连接。' : error.code === 'TIMEOUT' ? `${error.message} 发送结果尚未确定；请先停止或重启恢复会话，不要重复发送。` : error.message;
+      if (!this.state.turnId) this.state.status = 'error';
       this.changed(); throw error;
     } finally { if (this.pendingSend === operation) this.pendingSend = null; }
   }
@@ -347,19 +387,21 @@ export class CodexCompanion extends EventEmitter {
   }
   async newConversation(cwd = this.state.cwd) {
     this.assertReady(); if (this.busy) throw new Error('请先停止当前任务。');
-    const previousState = this.snapshot();
+    const operation = this.lifecycle.begin(), previousState = this.snapshot();
     this.state.status = 'configuring'; this.state.activity = '正在切换对话'; this.changed();
     try {
     if (!(await stat(cwd)).isDirectory()) throw new Error('请选择有效的项目目录。');
+    operation.check();
     const previous = this.state.threadId;
     this.state.cwd = resolve(cwd); this.state.projectName = basename(cwd); this.state.threadId = null; this.state.turnId = null;
     this.state.threadName = '';
     this.state.messages = []; this.state.error = null; this.state.restored = false;
     this.pendingUser = null; this.stopRequested = false; this.interrupting = null;
-    this.requests.clear(); this.toolItems.clear(); this.state.approvals = []; await this.persist();
+    this.requests.clear(); this.toolItems.clear(); this.state.approvals = []; await this.persist(); operation.check();
     this.state.status = 'idle'; this.state.activity = '准备就绪'; this.changed();
     if (previous) this.rpc.request('thread/unsubscribe', { threadId: previous }).catch(() => {});
-    } catch (error) { this.state = previousState; this.state.error = error.message; this.changed(); throw error; }
+    } catch (error) { if (!this.closed) { this.state = previousState; this.state.error = error.message; this.changed(); } throw error; }
+    finally { operation.release(); }
   }
   async chooseModel(model) {
     this.assertReady(); if (this.busy) throw new Error('请等待当前任务结束。');
@@ -401,26 +443,31 @@ export class CodexCompanion extends EventEmitter {
   async resumeConversation(threadId, expectedCwd) {
     this.assertReady(); if (this.busy) throw new Error('当前任务仍在执行，可以先查看历史；结束或停止后再继续另一对话。');
     if (typeof threadId !== 'string' || !threadId || threadId.length > 200) throw new Error('对话编号无效。');
-    const previous = this.snapshot(); this.state.status = 'configuring'; this.state.activity = '正在恢复对话'; this.changed();
+    const operation = this.lifecycle.begin(), previous = this.snapshot(); this.state.status = 'configuring'; this.state.activity = '正在恢复对话'; this.changed();
     try {
       const metadata = await this.rpc.request('thread/read', { threadId, includeTurns: false });
+      operation.check();
       if (metadata.thread.status?.type === 'active' && threadId !== previous.threadId) throw new Error('该对话正在另一个客户端执行，请等待结束后再继续。');
       const cwd = resolve(metadata.thread.cwd);
-      if (cwd.toLowerCase() !== resolve(expectedCwd).toLowerCase()) throw new Error('对话目录与选中的项目不一致，未切换。');
+      if (pathKey(cwd) !== pathKey(expectedCwd)) throw new Error('对话目录与选中的项目不一致，未切换。');
       if (!(await stat(cwd)).isDirectory()) throw new Error('该项目目录不可访问。');
+      operation.check();
       const restored = await this.rpc.request('thread/resume', { threadId, cwd, sandbox: 'workspace-write', approvalPolicy: 'on-request', approvalsReviewer: 'user' });
+      operation.check();
       if (!restored.thread.turns?.length) {
         try { restored.thread.turns = (await this.history(threadId)).turns; } catch { /* A new or temporarily unreadable history may still resume. */ }
       }
+      operation.check();
       this.loadThread(restored.thread);
       this.state.cwd = cwd; this.state.projectName = basename(cwd); this.state.model = restored.model ?? restored.thread.model ?? previous.model;
       this.state.effort = restored.reasoningEffort ?? restored.thread.reasoningEffort ?? null;
       this.state.activity = this.state.turnId ? '原对话仍在执行' : '已恢复，可以继续对话';
       this.state.error = null; this.state.restored = true; this.pendingUser = null; this.stopRequested = false; this.interrupting = null;
       this.requests.clear(); this.toolItems.clear(); this.state.approvals = [];
-      await this.persist(); this.changed();
+      await this.persist(); operation.check(); this.changed();
       if (previous.threadId && previous.threadId !== threadId) this.rpc.request('thread/unsubscribe', { threadId: previous.threadId }).catch(() => {});
-    } catch (error) { this.state = previous; this.changed(); throw error; }
+    } catch (error) { if (!this.closed) { this.state = previous; this.changed(); } throw error; }
+    finally { operation.release(); }
   }
   async renameConversation(threadId, name) {
     this.assertReady(); if (typeof name !== 'string' || !name.trim() || name.length > 100) throw new Error('请输入 1–100 字的对话名称。');
@@ -428,7 +475,7 @@ export class CodexCompanion extends EventEmitter {
     if (threadId === this.state.threadId) { this.state.threadName = name.trim(); this.changed(); }
   }
   async close() {
-    this.closed = true; clearTimeout(this.updateTimer);
+    this.closed = true; this.lifecycle.close(); clearTimeout(this.updateTimer);
     this.stopRequested = true; if (this.pendingSend) this.pendingSend.cancelled = true;
     try { if (this.state.turnId && !this.rpc?.closed) await this.rpc.request('turn/interrupt', { threadId: this.state.threadId, turnId: this.state.turnId }, 3000); } catch {}
     await this.rpc?.close(); await this.persistQueue.catch(() => {});

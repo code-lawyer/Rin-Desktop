@@ -1,5 +1,5 @@
 // Resolve upstream metadata, never package or upload model weights.
-import { readFile, writeFile, mkdir } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { join, resolve } from 'node:path';
 const root = resolve(import.meta.dirname, '../..'), app = join(root, 'prototypes/live2d-codex');

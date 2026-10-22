@@ -1,6 +1,6 @@
 import { spawn, execFileSync } from 'node:child_process';
 import { randomBytes, createHash } from 'node:crypto';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { createServer } from 'node:net';
 import { setTimeout as delay } from 'node:timers/promises';
@@ -8,14 +8,17 @@ import { parseArgs } from 'node:util';
 import { connectWebSocket } from './websocket-transport.mjs';
 import { accountOnlyEnvironment, initialize } from './stdio-transport.mjs';
 import { TurnObserver } from './turn-observer.mjs';
+import { createRunDirectory, writeRunReport, requireLiveRun } from '../qa/run-output.mjs';
 
 const { values: args } = parseArgs({ options: {
+  run: { type: 'boolean', default: false }, help: { type: 'boolean', default: false }, output: { type: 'string' },
   codex: { type: 'string', default: process.env.VIBE_CODEX_PATH ?? 'codex' },
   'expected-version': { type: 'string' },
   'with-tui': { type: 'boolean', default: false }
 } });
-const root = resolve(import.meta.dirname, '../..');
-const cwd = resolve(root, 'work/sandbox-project');
+requireLiveRun('node tools/probes/codex-tui-probe.mjs --run [--with-tui] [--output=work/qa/new-run]', 'two real test prompts and native CLI session history', args.run, args.help);
+const runDirectory = await createRunDirectory('codex-shared', args.output);
+const cwd = resolve(runDirectory, 'project');
 await mkdir(cwd, { recursive: true });
 const version = execFileSync(args.codex, ['--version'], { encoding: 'utf8', windowsHide: true }).trim();
 if (args['expected-version'] && version !== `codex-cli ${args['expected-version']}`) throw new Error('CLI version mismatch');
@@ -33,7 +36,7 @@ const backend = spawn(args.codex, ['app-server', '--listen', endpoint, '--ws-aut
 let stderrBytes = 0; let backendError;
 backend.stderr.on('data', bytes => { stderrBytes += bytes.length; });
 backend.on('error', error => { backendError = error; });
-const evidence = { date: new Date().toISOString(), stage: 'M0/S-01', cliVersion: version, transport: 'authenticated-loopback-websocket', experimental: true, tests: [], accountDetailsPersisted: false };
+const evidence = { date: new Date().toISOString(), probe: 'codex-shared', cliVersion: version, transport: 'authenticated-loopback-websocket', experimental: true, tests: [], accountDetailsPersisted: false };
 let controller, viewer, observer, tui;
 let phase = 'server-start';
 async function stopChild(child) {
@@ -108,8 +111,8 @@ try {
   await viewer?.close(); await controller?.close();
   await stopChild(backend);
   evidence.diagnostics = { stderrBytes };
-  await mkdir(resolve(root, 'docs/evidence'), { recursive: true });
-  await writeFile(resolve(root, `docs/evidence/2026-10-01-codex-${args['with-tui'] ? 'tui' : 'shared'}.json`), JSON.stringify(evidence, null, 2) + '\n');
+  await writeRunReport(runDirectory, evidence);
+  console.log(`Report: ${resolve(runDirectory, 'result.json')}`);
   console.log(JSON.stringify(evidence, null, 2));
   if (evidence.tests.some(test => test.status === 'failed')) process.exitCode = 1;
 }

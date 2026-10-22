@@ -1,0 +1,1779 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-10-22",
+  "releaseBaseline": "0.5.0",
+  "statusMeaning": {
+    "verified": "限定范围有证据，不代表关联模块没有独立缺陷",
+    "implemented": "已有实现，完整验收未完成",
+    "in_progress": "本轮正在实施，交付前更新结果",
+    "planned": "尚待施工",
+    "deferred": "明确后置，不进入当前交付"
+  },
+  "phases": [
+    "organization",
+    "baseline",
+    "stability",
+    "remote",
+    "agents",
+    "release",
+    "decisions",
+    "future"
+  ],
+  "tasks": [
+    {
+      "id": "ORG-01",
+      "title": "全目录盘点与保护基线",
+      "phase": "organization",
+      "priority": "P1",
+      "status": "verified",
+      "owner": "项目维护",
+      "dependsOn": [],
+      "paths": [
+        "docs/development/repository-map.md"
+      ],
+      "acceptance": [
+        "全目录文件登记；活动数据、模型、第三方依赖与源码可区分；迁移前源文件有备份。"
+      ],
+      "nextAction": "新增顶层目录时同步目录规则。",
+      "evidence": [
+        {
+          "ref": "docs/development/repository-map.md",
+          "summary": "本轮枚举 66,846 个文件；368 个项目文本文件备份，私人完整清单留在本机。",
+          "kind": "local-audit-summary"
+        }
+      ]
+    },
+    {
+      "id": "ORG-02",
+      "title": "统一源码启动与状态命令",
+      "phase": "organization",
+      "priority": "P1",
+      "status": "verified",
+      "owner": "开发工具",
+      "dependsOn": [],
+      "paths": [
+        "tools/project/start.mjs",
+        "tools/project/launch.ps1",
+        "tests/project-launcher.test.mjs"
+      ],
+      "acceptance": [
+        "所有兼容入口选择当前源码；保留原数据；错误可见；Windows 路径与编码回归通过。"
+      ],
+      "nextAction": "修改启动参数时维护启动回归。",
+      "evidence": [
+        {
+          "ref": "tests/project-launcher.test.mjs",
+          "summary": "12 项启动回归覆盖旧包回退、失败交接、参数与编码。",
+          "kind": "source-or-test"
+        }
+      ]
+    },
+    {
+      "id": "ORG-03",
+      "title": "旧方案归档与验证脚本迁移",
+      "phase": "organization",
+      "priority": "P1",
+      "status": "verified",
+      "owner": "项目维护",
+      "dependsOn": [
+        "ORG-01"
+      ],
+      "paths": [
+        "tools/qa/reproduce-known-issues.mjs",
+        "tools/probes/cli-agents/README.md",
+        "docs/development/repository-map.md"
+      ],
+      "acceptance": [
+        "20 个文件迁移有去向与校验记录；旧工具保留兼容入口；旧证据与用户数据保持；新工具脱离个人路径。"
+      ],
+      "nextAction": "新增验证工具放入 tools，运行输出放入 work/qa；继续保留旧证据和兼容入口。",
+      "evidence": [
+        {
+          "ref": "docs/development/verification.md",
+          "summary": "20 个文件完成迁移；旧入口、锁定 SDK、全文件保护与公开检查通过，原 Git 配置保持。",
+          "kind": "organization-verification"
+        }
+      ]
+    },
+    {
+      "id": "ORG-04",
+      "title": "独立开发文档与统一施工台账",
+      "phase": "organization",
+      "priority": "P1",
+      "status": "verified",
+      "owner": "项目维护",
+      "dependsOn": [
+        "ORG-01"
+      ],
+      "paths": [
+        "docs/development/README.md",
+        "docs/development/backlog.json",
+        "tools/project/check-project.mjs"
+      ],
+      "acceptance": [
+        "项目目标、真实技术路线、数据/接口、计划、进度与验收齐备；旧编号全部归并；生成页与台账一致；公共文档无私人依赖。"
+      ],
+      "nextAction": "继续以JSON台账维护进度；后续重点为硬件稳定性、真实新增Agent与完整安装/显示矩阵。",
+      "evidence": [
+        {
+          "ref": "docs/development/verification.md",
+          "summary": "完整开发手册、40 项任务与 127 条旧事项归并通过自动检查；独立公开源码副本和两轴复核通过。",
+          "kind": "handoff-verification"
+        }
+      ]
+    },
+    {
+      "id": "BASE-01",
+      "title": "动态壁纸、气泡、工作台和人物设置",
+      "phase": "baseline",
+      "priority": "P1",
+      "status": "verified",
+      "owner": "桌面界面",
+      "dependsOn": [],
+      "paths": [
+        "prototypes/live2d-codex/main.cjs",
+        "prototypes/live2d-codex/renderer/app.js",
+        "prototypes/live2d-codex/renderer/workbench.js"
+      ],
+      "acceptance": [
+        "已发布 0.4.0 的单屏壁纸、对话气泡、工作台与两人物选择保留。"
+      ],
+      "nextAction": "涉及 UI 变更时运行人物恢复与布局验收。",
+      "evidence": [
+        {
+          "ref": "docs/release-audit.md",
+          "summary": "0.4.0 源码及安装包人物失败恢复、切换、重启验收；不代表全部机器兼容。",
+          "kind": "release"
+        }
+      ]
+    },
+    {
+      "id": "BASE-02",
+      "title": "Codex 会话、流式回复、审批与模型设置",
+      "phase": "baseline",
+      "priority": "P1",
+      "status": "verified",
+      "owner": "Agent 适配",
+      "dependsOn": [],
+      "paths": [
+        "prototypes/live2d-codex/backend/codex.mjs",
+        "prototypes/live2d-codex/backend/rpc.mjs",
+        "prototypes/live2d-codex/tests/companion.test.mjs"
+      ],
+      "acceptance": [
+        "保留已发布 Codex 工作流；已知关闭竞态独立归入 FIX-02。"
+      ],
+      "nextAction": "协议升级时重跑契约与真实任务验收。",
+      "evidence": [
+        {
+          "ref": "docs/release-audit.md",
+          "summary": "原生 CLI 登录、任务、追问、重启恢复已有发布证据，生命周期缺陷不被此结论掩盖。",
+          "kind": "release"
+        }
+      ]
+    },
+    {
+      "id": "BASE-03",
+      "title": "电脑麦克风听写与会话草稿",
+      "phase": "baseline",
+      "priority": "P1",
+      "status": "verified",
+      "owner": "本地语音",
+      "dependsOn": [],
+      "paths": [
+        "prototypes/live2d-codex/renderer/app.js",
+        "prototypes/live2d-codex/renderer/draft-session.mjs",
+        "prototypes/live2d-codex/tests/draft-session.test.mjs"
+      ],
+      "acceptance": [
+        "本地听写先回填当前捕获目标的草稿，由用户确认发送。"
+      ],
+      "nextAction": "RC003 接入复用此边界，重新验证目标切换。",
+      "evidence": [
+        {
+          "ref": "docs/project-status.md",
+          "summary": "现有电脑麦克风流程与草稿回归；不包含 RC003 专用音频。",
+          "kind": "recorded-baseline"
+        }
+      ]
+    },
+    {
+      "id": "BASE-04",
+      "title": "本地模型下载、按需载入与回复朗读",
+      "phase": "baseline",
+      "priority": "P1",
+      "status": "verified",
+      "owner": "本地语音",
+      "dependsOn": [],
+      "paths": [
+        "prototypes/live2d-codex/backend/voice-resources.mjs",
+        "prototypes/live2d-codex/backend/voice-runtime.mjs",
+        "prototypes/live2d-codex/backend/resident-speech.mjs",
+        "prototypes/live2d-codex/voice-resources.json"
+      ],
+      "acceptance": [
+        "保留固定清单、哈希校验、独立 worker、手动/自动朗读；异常问题另跟踪 FIX-01/03。"
+      ],
+      "nextAction": "改动清单或运行时后做全新目录下载与退出验收。",
+      "evidence": [
+        {
+          "ref": "docs/release-audit.md",
+          "summary": "SenseVoice/Kokoro/Qwen 下载、真实载入、合成和生命周期的已发布范围。",
+          "kind": "release"
+        }
+      ]
+    },
+    {
+      "id": "BASE-05",
+      "title": "既有安装器、发布资源与源码 CI",
+      "phase": "baseline",
+      "priority": "P1",
+      "status": "verified",
+      "owner": "构建发布",
+      "dependsOn": [],
+      "paths": [
+        "tools/release/build.mjs",
+        "tools/release/installer.iss",
+        ".github/workflows/check.yml"
+      ],
+      "acceptance": [
+        "0.4.0 发布链与资源来源保持，不把当前工作区称为新发布包。"
+      ],
+      "nextAction": "当前未发布功能进入 REL-01/03 的新验收。",
+      "evidence": [
+        {
+          "ref": "docs/release-audit.md",
+          "summary": "0.4.0 安装包文件哈希及既有卸载保留数据记录。",
+          "kind": "release"
+        }
+      ]
+    },
+    {
+      "id": "BASE-06",
+      "title": "通用快捷键与遥控按键映射",
+      "phase": "baseline",
+      "priority": "P2",
+      "status": "verified",
+      "owner": "输入交互",
+      "dependsOn": [],
+      "paths": [
+        "prototypes/live2d-codex/backend/input-actions.cjs",
+        "prototypes/live2d-codex/tests/input-actions.test.mjs"
+      ],
+      "acceptance": [
+        "现有全局快捷键映射与冲突提示保持；不宣称能辨认 RC003 来源或接收蓝牙音频。"
+      ],
+      "nextAction": "原生设备接入时防止和全局快捷键重复触发。",
+      "evidence": [
+        {
+          "ref": "prototypes/live2d-codex/tests/input-actions.test.mjs",
+          "summary": "通用输入注册/去重/挂起边界的自动测试。",
+          "kind": "source-or-test"
+        }
+      ]
+    },
+    {
+      "id": "FIX-01",
+      "title": "修复 Kokoro 加载失败后的清理和状态",
+      "phase": "stability",
+      "priority": "P1",
+      "status": "verified",
+      "owner": "本地语音",
+      "dependsOn": [
+        "ORG-04"
+      ],
+      "paths": [
+        "prototypes/live2d-codex/backend/resident-speech.mjs",
+        "prototypes/live2d-codex/tests/resident-speech.test.mjs",
+        "tools/qa/reproduce-known-issues.mjs",
+        "prototypes/live2d-codex/tests/agent-contract.test.mjs"
+      ],
+      "acceptance": [
+        "同步或异步 close 都能清理；模型加载错误仍可见；不残留 loading 或未处理 rejection；复现通过。"
+      ],
+      "nextAction": "维护失败路径回归；真实账户、声音和安装验收仍按 AGT/REL 任务执行。",
+      "evidence": [
+        {
+          "ref": "prototypes/live2d-codex/tests/agent-contract.test.mjs",
+          "summary": "同步/异步及抛错 close、重试、旧清理晚到和资源退出均有回归；最小复现通过。",
+          "kind": "offline-regression"
+        }
+      ]
+    },
+    {
+      "id": "FIX-02",
+      "title": "修复 Codex 连接中关闭的竞态",
+      "phase": "stability",
+      "priority": "P1",
+      "status": "verified",
+      "owner": "Agent 适配",
+      "dependsOn": [
+        "ORG-04"
+      ],
+      "paths": [
+        "prototypes/live2d-codex/backend/codex.mjs",
+        "prototypes/live2d-codex/tests/companion.test.mjs",
+        "tools/qa/reproduce-known-issues.mjs",
+        "prototypes/live2d-codex/tests/agent-contract.test.mjs"
+      ],
+      "acceptance": [
+        "close 后不再启动后端；连接返回晚到时不恢复状态；所拥有进程与 RPC 完成释放。"
+      ],
+      "nextAction": "维护失败路径回归；真实账户、声音和安装验收仍按 AGT/REL 任务执行。",
+      "evidence": [
+        {
+          "ref": "prototypes/live2d-codex/tests/agent-contract.test.mjs",
+          "summary": "文件探测及协议初始化中关闭后不再启动/复活；共享操作生命周期；最小复现通过。",
+          "kind": "offline-regression"
+        }
+      ]
+    },
+    {
+      "id": "FIX-03",
+      "title": "统一新 Agent 完成回复与自动朗读的文本",
+      "phase": "stability",
+      "priority": "P1",
+      "status": "verified",
+      "owner": "Agent/语音",
+      "dependsOn": [
+        "ORG-04"
+      ],
+      "paths": [
+        "prototypes/live2d-codex/backend/native-agent.mjs",
+        "prototypes/live2d-codex/renderer/current-reply.mjs",
+        "prototypes/live2d-codex/renderer/reply-audio.mjs",
+        "prototypes/live2d-codex/tests/agent-contract.test.mjs"
+      ],
+      "acceptance": [
+        "多段回复后完成事件、可见最终回复和朗读触发条件一致；工具消息不误播；中断不自动朗读。"
+      ],
+      "nextAction": "维护失败路径回归；真实账户、声音和安装验收仍按 AGT/REL 任务执行。",
+      "evidence": [
+        {
+          "ref": "prototypes/live2d-codex/tests/agent-contract.test.mjs",
+          "summary": "后端事件和renderer共用最终回复选择；多段回复/工具与中断资格回归，最小复现通过。",
+          "kind": "offline-regression"
+        }
+      ]
+    },
+    {
+      "id": "DATA-01",
+      "title": "提交回执不明时保留草稿与核查",
+      "phase": "stability",
+      "priority": "P1",
+      "status": "verified",
+      "owner": "会话数据",
+      "dependsOn": [
+        "FIX-02"
+      ],
+      "paths": [
+        "prototypes/live2d-codex/backend/submission-guard.mjs",
+        "prototypes/live2d-codex/renderer/draft-session.mjs",
+        "prototypes/live2d-codex/tests/submission-safety.test.mjs"
+      ],
+      "acceptance": [
+        "离线模拟服务端接收但回执丢失、重启、确认写盘失败及首次建会话；发送前持久化原稿，显示未知状态，只读原生历史核查，不自动重发；真实主应用验收留在 REL-01 和各后端任务。"
+      ],
+      "nextAction": "按测试包 D1–D5 场景进行用户实测；保持离线回归。",
+      "evidence": [
+        {
+          "ref": "prototypes/live2d-codex/tests/submission-safety.test.mjs",
+          "summary": "11 项发送保护回归通过，包含三个新增 provider 的本地排队与原生确认区别。",
+          "kind": "offline-regression"
+        },
+        {
+          "ref": "docs/development/data-agent-validation.md",
+          "summary": "状态机、核查条件、失败保留、隐私与剩余实机边界。",
+          "kind": "offline-regression"
+        }
+      ]
+    },
+    {
+      "id": "DATA-02",
+      "title": "存储迁移、路径别名和崩溃恢复验收",
+      "phase": "stability",
+      "priority": "P1",
+      "status": "verified",
+      "owner": "会话数据",
+      "dependsOn": [
+        "ORG-04"
+      ],
+      "paths": [
+        "prototypes/live2d-codex/backend/workspace-store.mjs",
+        "prototypes/live2d-codex/backend/durable-json.mjs",
+        "prototypes/live2d-codex/backend/data-directory.mjs",
+        "prototypes/live2d-codex/backend/data-recovery.mjs",
+        "prototypes/live2d-codex/tests/data-safety.test.mjs"
+      ],
+      "acceptance": [
+        "旧格式/数据目录采用、丢失项目、大小写/目录联接、并发草稿、打开/同步/替换故障、损坏记录、只写新目录恢复有离线证据；不覆盖原数据；真实安装/升级/回滚归 REL-01。"
+      ],
+      "nextAction": "用用户的数据副本执行 D6–D10 与 REL-01；备份不替代独立数据备份和实际断电验证。",
+      "evidence": [
+        {
+          "ref": "prototypes/live2d-codex/tests/data-safety.test.mjs",
+          "summary": "13 项数据回归通过，含真实临时 Windows junction、恢复副本、测试数据隔离及目录指针失效。",
+          "kind": "offline-regression"
+        },
+        {
+          "ref": "docs/development/data-agent-validation.md",
+          "summary": "迁移兼容、写入失败和恢复工具的可复现说明。",
+          "kind": "offline-regression"
+        }
+      ]
+    },
+    {
+      "id": "UI-01",
+      "title": "遥控器全菜单导航与独立审批操作",
+      "phase": "remote",
+      "priority": "P1",
+      "status": "implemented",
+      "owner": "桌面交互",
+      "dependsOn": [
+        "BASE-01"
+      ],
+      "paths": [
+        "prototypes/live2d-codex/renderer/remote-ui.mjs",
+        "prototypes/live2d-codex/renderer/workbench.html",
+        "prototypes/live2d-codex/renderer/app.js"
+      ],
+      "acceptance": [
+        "项目、会话、模型和取消可用方向键/确认/返回完成；普通确认不代替权限审批；焦点可见。"
+      ],
+      "nextAction": "按新测试候选实测草稿确认发送、清空重录/撤销、右键朗读、菜单和审批导航；补 REM-05 真实设备证据。",
+      "evidence": [
+        {
+          "ref": "docs/development/remote-integration.md",
+          "kind": "source-and-offline",
+          "summary": "2026-10-21：主应用内连接、按钮设置、原生来源判断、麦克风到原目标草稿、休眠/退出及打包已接线；离线回归、组件编译/管道和复制依赖的 Electron 加载通过。真实硬件、输入法、多设备及安装验收待完成。"
+        },
+        {
+          "ref": "prototypes/live2d-codex/tests/remote-integration.test.mjs",
+          "kind": "offline-tests",
+          "summary": "模拟连接、按键去重、音频解码、目标草稿、断线/取消旧结果及输入共存。"
+        },
+        {
+          "ref": "prototypes/live2d-codex/tests/remote-ui.test.mjs",
+          "kind": "offline-tests",
+          "summary": "手动连接取消、迟到结果与审批二次确认的界面回归。"
+        },
+        {
+          "ref": "docs/development/remote-controls-ui.md",
+          "kind": "source-offline-and-renderer",
+          "summary": "2026-10-22：遥控草稿确认发送、清空/撤销、固定朗读入口及分类设置已接入；离线功能和真实 renderer 布局检查通过。音量 Consumer Control 编译/自检及播放增益回归通过，物理键待验收。"
+        },
+        {
+          "ref": "docs/development/release-0.5.0-review.md",
+          "kind": "source-offline-review",
+          "summary": "修复六分类确认及项目/会话列表刷新导致的遥控焦点丢失，真实 renderer 的导航/字段保留检查通过。"
+        }
+      ]
+    },
+    {
+      "id": "UI-02",
+      "title": "缩放、桌面重建和显示环境验收",
+      "phase": "release",
+      "priority": "P2",
+      "status": "planned",
+      "owner": "桌面界面",
+      "dependsOn": [
+        "BASE-01"
+      ],
+      "paths": [
+        "prototypes/live2d-codex/backend/wallpaper-host.cjs",
+        "prototypes/live2d-codex/scripts/verify-character-switch.mjs"
+      ],
+      "acceptance": [
+        "125%/150% 缩放、锁屏/唤醒、Explorer 重启、分辨率变化有记录；多屏未经实现不作兼容承诺。"
+      ],
+      "nextAction": "建立单屏实机矩阵和稳定恢复步骤。",
+      "evidence": []
+    },
+    {
+      "id": "REM-01",
+      "title": "RC003 Raw Input 与 ATVV 可行性诊断",
+      "phase": "remote",
+      "priority": "P1",
+      "status": "verified",
+      "owner": "设备输入",
+      "dependsOn": [],
+      "paths": [
+        "tools/remote-diagnostics/session.mjs",
+        "tools/remote-diagnostics/atvv.py",
+        "tests/remote-buttons.test.mjs"
+      ],
+      "acceptance": [
+        "一次真实按键/音频/本地识别成功可追溯；明确它不是主应用集成验收。"
+      ],
+      "nextAction": "作为下一步适配器输入，不据单次成功宣布稳定。",
+      "evidence": [
+        {
+          "ref": "docs/project-status.md",
+          "summary": "2026-10-20：389 帧、5.835 秒、识别约 2.984 秒及短语匹配；完整私人记录本地保留。",
+          "kind": "hardware-summary"
+        }
+      ]
+    },
+    {
+      "id": "REM-02",
+      "title": "主应用 RC003 设备连接与按键生命周期",
+      "phase": "remote",
+      "priority": "P1",
+      "status": "implemented",
+      "owner": "设备输入",
+      "dependsOn": [
+        "REM-01",
+        "FIX-02"
+      ],
+      "paths": [
+        "prototypes/live2d-codex/backend/remote-controller.mjs",
+        "prototypes/live2d-codex/backend/remote-native.mjs",
+        "prototypes/live2d-codex/native/rc003-helper.cs",
+        "prototypes/live2d-codex/backend/remote-input.cjs"
+      ],
+      "acceptance": [
+        "主应用只有一个设备连接拥有者；来源过滤、长按去重、断线代际和退出清理；普通键盘原始消息保留，输入法/多设备实际时序另行验收。",
+        "应用内搜索、配对/连接、断开、清除记录和自动连接；设备状态不依赖独立诊断窗口。"
+      ],
+      "nextAction": "修正版已观察到用户操作产生的一次完整收音到草稿日志；继续按 REM-05 实测稳定性、识别准确率、键盘/输入法共存与重连。",
+      "evidence": [
+        {
+          "ref": "docs/development/remote-integration.md",
+          "kind": "source-and-offline",
+          "summary": "2026-10-21：主应用内连接、按钮设置、原生来源判断、麦克风到原目标草稿、休眠/退出及打包已接线；离线回归、组件编译/管道和复制依赖的 Electron 加载通过。真实硬件、输入法、多设备及安装验收待完成。"
+        },
+        {
+          "ref": "prototypes/live2d-codex/tests/remote-integration.test.mjs",
+          "kind": "offline-tests",
+          "summary": "模拟连接、按键去重、音频解码、目标草稿、断线/取消旧结果及输入共存。"
+        },
+        {
+          "ref": "docs/development/remote-integration.md",
+          "kind": "regression-and-open-hardware-feedback",
+          "summary": "2026-10-21：复现并修正物理语音键不启动、无音频时状态提前推进及停止播报清掉录音提示；全量288项离线测试通过。用户实机失败原因尚需新阶段记录确认，不将回归结果记为硬件通过。"
+        },
+        {
+          "ref": "docs/development/remote-controls-ui.md",
+          "kind": "user-run-log-summary",
+          "summary": "2026-10-22：只读检查用户测试日志，观察到主应用物理语音键触发、113帧/1695ms音频、本地识别与写入草稿完成。单次链路有运行证据；未读取识别文本，不代替稳定性、识别准确率或音量验收。"
+        }
+      ]
+    },
+    {
+      "id": "REM-03",
+      "title": "RC003 音频接入捕获目标和草稿",
+      "phase": "remote",
+      "priority": "P1",
+      "status": "implemented",
+      "owner": "设备/语音",
+      "dependsOn": [
+        "REM-02",
+        "BASE-03",
+        "FIX-01"
+      ],
+      "paths": [
+        "prototypes/live2d-codex/backend/remote-audio.mjs",
+        "prototypes/live2d-codex/main.cjs",
+        "prototypes/live2d-codex/renderer/draft-session.mjs",
+        "prototypes/live2d-codex/renderer/remote-voice-status.mjs"
+      ],
+      "acceptance": [
+        "按下/松开形成有上限的音频段；接 SenseVoice；切换会话不误投草稿；静音/丢尾/断线可解释；不默认录音落盘。",
+        "电脑麦克风与遥控器麦克风来源明确；连接、已收到声音与本地识别按实际阶段反馈，物理语音键和协议请求共用采集互斥。"
+      ],
+      "nextAction": "修正版已观察到用户操作产生的一次完整收音到草稿日志；继续按 REM-05 实测稳定性、识别准确率、键盘/输入法共存与重连。",
+      "evidence": [
+        {
+          "ref": "docs/development/remote-integration.md",
+          "kind": "source-and-offline",
+          "summary": "2026-10-21：主应用内连接、按钮设置、原生来源判断、麦克风到原目标草稿、休眠/退出及打包已接线；离线回归、组件编译/管道和复制依赖的 Electron 加载通过。真实硬件、输入法、多设备及安装验收待完成。"
+        },
+        {
+          "ref": "prototypes/live2d-codex/tests/remote-integration.test.mjs",
+          "kind": "offline-tests",
+          "summary": "模拟连接、按键去重、音频解码、目标草稿、断线/取消旧结果及输入共存。"
+        },
+        {
+          "ref": "prototypes/live2d-codex/tests/workbench.test.mjs",
+          "kind": "offline-tests",
+          "summary": "设备设置与听写 ID 持久化、重载幂等及同文追加回归。"
+        },
+        {
+          "ref": "docs/development/remote-integration.md",
+          "kind": "regression-and-open-hardware-feedback",
+          "summary": "2026-10-21：复现并修正物理语音键不启动、无音频时状态提前推进及停止播报清掉录音提示；全量288项离线测试通过。用户实机失败原因尚需新阶段记录确认，不将回归结果记为硬件通过。"
+        },
+        {
+          "ref": "docs/development/remote-controls-ui.md",
+          "kind": "user-run-log-summary",
+          "summary": "2026-10-22：只读检查用户测试日志，观察到主应用物理语音键触发、113帧/1695ms音频、本地识别与写入草稿完成。单次链路有运行证据；未读取识别文本，不代替稳定性、识别准确率或音量验收。"
+        }
+      ]
+    },
+    {
+      "id": "REM-04",
+      "title": "遥控确认发送、中断、朗读及审批",
+      "phase": "remote",
+      "priority": "P1",
+      "status": "implemented",
+      "owner": "输入交互",
+      "dependsOn": [
+        "REM-02",
+        "UI-01",
+        "DATA-01"
+      ],
+      "paths": [
+        "prototypes/live2d-codex/backend/remote-config.mjs",
+        "prototypes/live2d-codex/renderer/remote-ui.mjs",
+        "prototypes/live2d-codex/main.cjs"
+      ],
+      "acceptance": [
+        "确认只发送当前已确认草稿；按键连发不重复提交；审批使用明确动作；中断定位会话与轮次。",
+        "用户按按钮名称选择功能并立即保存；语音键按住说话，不要求录入键码。"
+      ],
+      "nextAction": "按新测试候选实测草稿确认发送、清空重录/撤销、右键朗读、菜单和审批导航；补 REM-05 真实设备证据。",
+      "evidence": [
+        {
+          "ref": "docs/development/remote-integration.md",
+          "kind": "source-and-offline",
+          "summary": "2026-10-21：主应用内连接、按钮设置、原生来源判断、麦克风到原目标草稿、休眠/退出及打包已接线；离线回归、组件编译/管道和复制依赖的 Electron 加载通过。真实硬件、输入法、多设备及安装验收待完成。"
+        },
+        {
+          "ref": "prototypes/live2d-codex/tests/remote-integration.test.mjs",
+          "kind": "offline-tests",
+          "summary": "模拟连接、按键去重、音频解码、目标草稿、断线/取消旧结果及输入共存。"
+        },
+        {
+          "ref": "prototypes/live2d-codex/tests/remote-ui.test.mjs",
+          "kind": "offline-tests",
+          "summary": "手动连接取消、迟到结果与审批二次确认的界面回归。"
+        },
+        {
+          "ref": "docs/development/remote-controls-ui.md",
+          "kind": "source-offline-and-renderer",
+          "summary": "2026-10-22：遥控草稿确认发送、清空/撤销、固定朗读入口及分类设置已接入；离线功能和真实 renderer 布局检查通过。音量 Consumer Control 编译/自检及播放增益回归通过，物理键待验收。"
+        }
+      ]
+    },
+    {
+      "id": "REM-05",
+      "title": "RC003 连续操作与休眠重连验收",
+      "phase": "remote",
+      "priority": "P1",
+      "status": "in_progress",
+      "owner": "硬件验收",
+      "dependsOn": [
+        "REM-03",
+        "REM-04"
+      ],
+      "paths": [
+        "tools/remote-diagnostics/README.md",
+        "docs/development/testing.md"
+      ],
+      "acceptance": [
+        "记录 100 次采集、50 条语料及 200 次目标操作；有效音频/延迟/语义按目标统计；拔插、休眠、断线不重放旧事件。"
+      ],
+      "nextAction": "复测语音输入、确认一次发送、清空/重录/撤销、朗读和物理音量键；保留没有事件或没有听感变化的失败记录，再继续既定稳定性矩阵。",
+      "evidence": [
+        {
+          "ref": "docs/development/remote-integration.md",
+          "kind": "user-reported-failure",
+          "summary": "2026-10-21：用户反馈遥控器连接后不能语音听写，录音设备显示电脑麦克风。已开始主应用实测但尚未通过；已确认源码缺陷与现场唯一根因分开记录。"
+        },
+        {
+          "ref": "docs/development/remote-controls-ui.md",
+          "kind": "open-user-feedback",
+          "summary": "用户复测反馈界面拥挤、草稿无清空方式、确认发送和朗读难以发现、物理音量无系统提示或可听变化。相关代码和界面已修正，仍需新候选实机复测。"
+        },
+        {
+          "ref": "docs/development/remote-controls-ui.md",
+          "kind": "user-run-log-summary",
+          "summary": "2026-10-22：只读检查用户测试日志，观察到主应用物理语音键触发、113帧/1695ms音频、本地识别与写入草稿完成。单次链路有运行证据；未读取识别文本，不代替稳定性、识别准确率或音量验收。"
+        },
+        {
+          "ref": "docs/development/release-0.5.0-review.md",
+          "kind": "limited-user-feedback",
+          "summary": "用户于2026-10-22反馈上一修正版“效果基本 ok”；仅记录有限反馈，物理音量、连续操作、睡眠重连与IME矩阵未据此勾选。"
+        }
+      ]
+    },
+    {
+      "id": "REM-06",
+      "title": "遥控组件安装与退出验收",
+      "phase": "remote",
+      "priority": "P1",
+      "status": "implemented",
+      "owner": "构建发布",
+      "dependsOn": [
+        "REM-05",
+        "REL-01"
+      ],
+      "paths": [
+        "prototypes/live2d-codex/scripts/package-portable.mjs",
+        "prototypes/live2d-codex/backend/remote-native.mjs",
+        "tools/qa/remote-component.mjs",
+        "tools/release/installer.iss",
+        "prototypes/live2d-codex/scripts/copy-agent-dependencies.mjs"
+      ],
+      "acceptance": [
+        "独立目录安装后能定位组件和依赖；与其他桥接器冲突可诊断；退出/卸载保留数据且只停止自有连接。"
+      ],
+      "nextAction": "使用0.5.0完成物理遥控器连接、桥接冲突、休眠、退出和卸载组合验收；保留现有数据与模型。",
+      "evidence": [
+        {
+          "ref": "docs/development/remote-integration.md",
+          "kind": "source-and-offline",
+          "summary": "2026-10-21：主应用内连接、按钮设置、原生来源判断、麦克风到原目标草稿、休眠/退出及打包已接线；离线回归、组件编译/管道和复制依赖的 Electron 加载通过。真实硬件、输入法、多设备及安装验收待完成。"
+        },
+        {
+          "ref": "docs/release-audit.md",
+          "kind": "isolated-installer-and-gui",
+          "summary": "2026-10-22：0.5.0安装/升级逐文件验证包含遥控组件；原生辅助程序、管道、受控退出与依赖加载通过。物理设备连接、冲突、休眠、退出及卸载组合仍待验收。"
+        }
+      ]
+    },
+    {
+      "id": "AGT-01",
+      "title": "Claude/Grok/OpenCode 源码适配器",
+      "phase": "agents",
+      "priority": "P1",
+      "status": "verified",
+      "owner": "Agent 适配",
+      "dependsOn": [],
+      "paths": [
+        "prototypes/live2d-codex/backend/claude-agent.mjs",
+        "prototypes/live2d-codex/backend/acp-agent.mjs",
+        "prototypes/live2d-codex/backend/native-agent.mjs",
+        "prototypes/live2d-codex/CLI-AGENTS.md"
+      ],
+      "acceptance": [
+        "三个适配器及界面选择存在；未完成的真实功能不能计入已发布支持。"
+      ],
+      "nextAction": "源码与离线协议范围已验证；各家真实账户/主应用验收仍由 AGT-03/04/05 承担，继续保留实验标识。",
+      "evidence": [
+        {
+          "ref": "prototypes/live2d-codex/tests/agent-protocol.test.mjs",
+          "summary": "实际 Claude/ACP 适配器在 SDK 边界与 ACP stdio 合成对端中覆盖，不计为真实 CLI 验收。",
+          "kind": "offline-regression"
+        }
+      ]
+    },
+    {
+      "id": "AGT-02",
+      "title": "新 Agent 的统一契约和失败路径测试",
+      "phase": "agents",
+      "priority": "P1",
+      "status": "verified",
+      "owner": "Agent 适配",
+      "dependsOn": [
+        "AGT-01",
+        "FIX-03"
+      ],
+      "paths": [
+        "prototypes/live2d-codex/backend/native-agent.mjs",
+        "prototypes/live2d-codex/backend/agent-questions.mjs",
+        "prototypes/live2d-codex/backend/agent-process.mjs",
+        "prototypes/live2d-codex/tests/agent-contract.test.mjs",
+        "prototypes/live2d-codex/tests/agent-protocol.test.mjs",
+        "tools/qa/data-agent.mjs"
+      ],
+      "acceptance": [
+        "每家覆盖创建/恢复/发送/流式/审批/提问/中断/退出、晚到事件和权限差异；测试不调用真实账户。"
+      ],
+      "nextAction": "保持 106 项专项回归；按 AGT-03/04/05 与验收清单做真实 CLI/账户验证。",
+      "evidence": [
+        {
+          "ref": "prototypes/live2d-codex/tests/agent-contract.test.mjs",
+          "summary": "原有并发、关闭、最终文本和历史结果语义回归保持通过。",
+          "kind": "offline-regression"
+        },
+        {
+          "ref": "prototypes/live2d-codex/tests/agent-protocol.test.mjs",
+          "summary": "23 项实际适配器/锁定 ACP SDK 的离线矩阵：创建恢复、流式、审批、问题、工具中断、退出、旧/外来事件及权限差异。",
+          "kind": "offline-regression"
+        },
+        {
+          "ref": "docs/development/data-agent-validation.md",
+          "summary": "各家矩阵和无真实账户边界；不宣称已发布支持。",
+          "kind": "offline-regression"
+        }
+      ]
+    },
+    {
+      "id": "AGT-03",
+      "title": "Claude 主应用真实验收",
+      "phase": "agents",
+      "priority": "P1",
+      "status": "planned",
+      "owner": "Agent 验收",
+      "dependsOn": [
+        "AGT-02",
+        "DEC-01",
+        "FIX-01",
+        "FIX-02"
+      ],
+      "paths": [
+        "prototypes/live2d-codex/backend/claude-agent.mjs",
+        "tools/probes/cli-agents/claude-probe.mjs"
+      ],
+      "acceptance": [
+        "原有 CLI 登录、两轮任务、审批/拒绝、提问、运行工具取消、重启恢复、模型、草稿和朗读分别记录。"
+      ],
+      "nextAction": "先用独立探针验证当前 CLI，再验证主应用完整路径。",
+      "evidence": []
+    },
+    {
+      "id": "AGT-04",
+      "title": "Grok 主应用真实验收",
+      "phase": "agents",
+      "priority": "P1",
+      "status": "planned",
+      "owner": "Agent 验收",
+      "dependsOn": [
+        "AGT-02",
+        "DEC-01",
+        "FIX-03"
+      ],
+      "paths": [
+        "prototypes/live2d-codex/backend/acp-agent.mjs",
+        "tools/probes/cli-agents/acp-probe.mjs"
+      ],
+      "acceptance": [
+        "同一主应用最小契约逐项通过；账户、权限和取消行为有实测；缺能力不以空操作通过。"
+      ],
+      "nextAction": "复核原生登录与协议能力，再进入独立数据目录的桌面验收。",
+      "evidence": []
+    },
+    {
+      "id": "AGT-05",
+      "title": "OpenCode 主应用真实验收",
+      "phase": "agents",
+      "priority": "P1",
+      "status": "planned",
+      "owner": "Agent 验收",
+      "dependsOn": [
+        "AGT-02",
+        "DEC-01",
+        "FIX-03"
+      ],
+      "paths": [
+        "prototypes/live2d-codex/backend/acp-agent.mjs",
+        "tools/probes/cli-agents/acp-probe.mjs"
+      ],
+      "acceptance": [
+        "验证真实登录提供商及权限规则；会话恢复、取消、草稿与朗读通过；握手成功不代替任务完成。"
+      ],
+      "nextAction": "先消除历史账户/模型请求证据缺口，再测主应用。",
+      "evidence": []
+    },
+    {
+      "id": "AGT-06",
+      "title": "跨 provider 会话与草稿隔离",
+      "phase": "agents",
+      "priority": "P1",
+      "status": "implemented",
+      "owner": "会话数据",
+      "dependsOn": [
+        "AGT-01",
+        "DATA-02"
+      ],
+      "paths": [
+        "prototypes/live2d-codex/backend/workspace-store.mjs",
+        "prototypes/live2d-codex/renderer/draft-session.mjs",
+        "prototypes/live2d-codex/renderer/workbench.js"
+      ],
+      "acceptance": [
+        "相同目录/同名会话/相同 ID 在不同 provider 下不混淆；忙碌与录音时切换有明确行为。"
+      ],
+      "nextAction": "草稿容量与基础 provider 隔离已有回归；继续验证相同 ID、录音中切换及逐家真实验收。",
+      "evidence": [
+        {
+          "ref": "prototypes/live2d-codex/tests/agent-contract.test.mjs",
+          "summary": "106 条草稿跨三个新增 provider、Codex 和两个项目，磁盘重载仍保留；忙碌/录音切换尚待完整验收。",
+          "kind": "offline-regression"
+        }
+      ]
+    },
+    {
+      "id": "REL-01",
+      "title": "当前源码安装候选与数据恢复验收",
+      "phase": "release",
+      "priority": "P1",
+      "status": "implemented",
+      "owner": "构建发布",
+      "dependsOn": [
+        "FIX-01",
+        "FIX-02",
+        "FIX-03",
+        "DATA-02",
+        "AGT-02"
+      ],
+      "paths": [
+        "tools/release/build.mjs",
+        "prototypes/live2d-codex/scripts/package-portable.mjs",
+        "docs/build.md",
+        "tools/release/test-build.mjs",
+        "docs/development/test-acceptance.md"
+      ],
+      "acceptance": [
+        "新版本独立目录安装、升级/回滚、卸载、中文路径、缺 CLI/模型/无 GPU 均有证据；不复用旧 0.4 报告充当新结果。"
+      ],
+      "nextAction": "0.5.0已完成隔离中文路径安装解包、0.4.0覆盖升级和人物恢复；补注册安装/卸载、真实数据回滚、缺CLI/模型/无GPU与全新系统矩阵。",
+      "evidence": [
+        {
+          "ref": "docs/development/data-agent-validation.md",
+          "summary": "内部候选 20261022-data-agent-02 的 ZIP 与独立 Test 安装器已构建；包内 106 项离线回归通过、8255 个文件校验通过；真实安装/升级/回滚仍未测。",
+          "kind": "test-candidate"
+        },
+        {
+          "ref": "docs/development/test-acceptance.md",
+          "summary": "人工场景初始均为未测，包含数据、四家 Agent、RC003 及安装回滚；待用户执行。",
+          "kind": "acceptance-plan"
+        },
+        {
+          "ref": "docs/development/remote-integration.md",
+          "kind": "test-candidate",
+          "summary": "2026-10-21：生成20261022-remote-voice-01候选（ZIP与独立Test安装器）；包内37项遥控器离线回归通过，8260个文件哈希和应用源码指纹核对通过。本机已启动并观察到协议连接及按键接口就绪；尚无本次录音成功证据，安装器仍未实装验收。"
+        },
+        {
+          "ref": "docs/development/remote-controls-ui.md",
+          "kind": "built-test-candidate",
+          "summary": "2026-10-22：生成 20261022-remote-controls-02 ZIP/Setup。8263 个包文件哈希、68 个已打包应用源文件与源码快照匹配，ZIP 9261 项 CRC 通过；随包45项遥控/语音专项通过。新便携程序实际启动、Agent ready、RC003 connected；继续原测试数据，项目/草稿/发送记录及已有设置逐项一致，只新增音量按钮默认配置。未验证安装器或物理音量效果。"
+        },
+        {
+          "ref": "docs/release-audit.md",
+          "kind": "isolated-installer-and-gui",
+          "summary": "2026-10-22：0.5.0正式安装器在隔离中文/空格路径PORTABLE解包及0.4.0覆盖升级通过；两份安装各8242文件校验一致，实际安装版5组人物故障/恢复/重启检查通过。未覆盖注册安装、卸载、真实数据回滚或物理设备。"
+        }
+      ]
+    },
+    {
+      "id": "REL-02",
+      "title": "本批源码提交同步与 upstream",
+      "phase": "release",
+      "priority": "P2",
+      "status": "verified",
+      "owner": "仓库维护",
+      "dependsOn": [
+        "ORG-03",
+        "ORG-04"
+      ],
+      "paths": [
+        ".gitignore",
+        ".github/workflows/check.yml",
+        "docs/development/data-and-release.md"
+      ],
+      "acceptance": [
+        "本批改动经过公开扫描和 diff 审查后提交到原仓库开发分支；对应 upstream 明确；工作区不被误当已同步。"
+      ],
+      "nextAction": "保持原origin和同名开发分支upstream；后续变更继续公开扫描、PR与CI，不把本地新文件自动当作已发布。",
+      "evidence": [
+        {
+          "ref": "docs/development/data-and-release.md",
+          "kind": "git-push-upstream-and-ci",
+          "summary": "2026-10-22：公开381文件index扫描通过；提交推送原code-lawyer/Rin-Desktop的codex/public-release，建立同名upstream。PR #1及f1e22a6的两路GitHub CI通过，保留原main历史。"
+        }
+      ]
+    },
+    {
+      "id": "REL-03",
+      "title": "下一应用版本发布验收",
+      "phase": "release",
+      "priority": "P1",
+      "status": "implemented",
+      "owner": "构建发布",
+      "dependsOn": [
+        "REL-01",
+        "SEC-01",
+        "UI-02"
+      ],
+      "paths": [
+        "tools/release/resource-manifest.json",
+        "docs/release-audit.md"
+      ],
+      "acceptance": [
+        "稳定支持仅声明已验收范围；实验能力明确标识、默认由用户选择，不放宽审批/数据/凭据约束；版本、哈希、许可、指南与已知限制一致；完整矩阵另按依赖任务验收。"
+      ],
+      "nextAction": "0.5.0发布范围、安装器校验和验证已整理；继续完成REL-01、SEC-01、UI-02及RC003/新增Agent的完整矩阵，完成前不将实验能力标为全面支持。",
+      "evidence": [
+        {
+          "ref": "docs/development/release-0.5.0-review.md",
+          "kind": "source-offline-review",
+          "summary": "0.5.0 发布前完成 Standards/Spec 两轴审查与修复；用户反馈上一候选基本可用，尚不能替代完整设备/账户矩阵。"
+        },
+        {
+          "ref": "docs/release-audit.md",
+          "kind": "release-candidate-and-ci",
+          "summary": "0.5.0最终安装器重新构建；隔离中文路径安装和0.4.0覆盖升级逐文件校验通过，公开307项GitHub CI及构建/扫描通过。版本发布入口与SHA-256记录完整，硬件/真实账户/完整注册安装矩阵仍待验收。"
+        }
+      ]
+    },
+    {
+      "id": "DEC-01",
+      "title": "确认新增后端的账户和计费边界",
+      "phase": "decisions",
+      "priority": "P1",
+      "status": "implemented",
+      "owner": "产品/Agent",
+      "dependsOn": [
+        "AGT-01"
+      ],
+      "paths": [
+        "prototypes/live2d-codex/CLI-AGENTS.md",
+        "docs/development/decisions.md"
+      ],
+      "acceptance": [
+        "旧 R-36 的沿用 CLI 账户约束与当前可选 API Key 能力有明确产品决策；不自动更换计费来源。"
+      ],
+      "nextAction": "Claude 发布入口已限定 API/官方云 API 并说明独立费用；其余逐家真实认证与扩大正式支持继续验收，不自动更改用户计费。",
+      "evidence": [
+        {
+          "ref": "docs/development/release-0.5.0-review.md",
+          "kind": "source-offline-review",
+          "summary": "依官方 SDK 要求修正 Claude 产品认证/命名，实际来源白名单拒绝 OAuth 与未知来源，有协议回归。"
+        }
+      ]
+    },
+    {
+      "id": "DEC-02",
+      "title": "明确原 TUI 共存与并发任务的后续定位",
+      "phase": "decisions",
+      "priority": "P2",
+      "status": "planned",
+      "owner": "产品/架构",
+      "dependsOn": [],
+      "paths": [
+        "docs/development/decisions.md",
+        "tools/probes/codex-tui-probe.mjs"
+      ],
+      "acceptance": [
+        "旧原 TUI 同任务控制和多活动任务要求有明确保留/后置决定；当前壁纸工作台不假称实现。"
+      ],
+      "nextAction": "基于当前桌面主流程说明收益、限制与成本，再决定是否进入后续里程碑。",
+      "evidence": []
+    },
+    {
+      "id": "SEC-01",
+      "title": "新增后端的日志、凭据和依赖审计",
+      "phase": "release",
+      "priority": "P1",
+      "status": "implemented",
+      "owner": "隐私/发布",
+      "dependsOn": [
+        "AGT-02",
+        "DEC-01"
+      ],
+      "paths": [
+        "docs/privacy.md",
+        "tools/release/audit-public.mjs",
+        "prototypes/live2d-codex/THIRD-PARTY-NOTICES.md"
+      ],
+      "acceptance": [
+        "新增 SDK 的许可和对应源码要求核对；消息缓存保留政策准确；正文/凭据不进入公共日志；原生权限差异说明完整。"
+      ],
+      "nextAction": "公开文件、锁定依赖及源码数据流已审查；真实新增后端账户的数据流仍按 AGT-03/04/05 验证。",
+      "evidence": [
+        {
+          "ref": "docs/development/release-0.5.0-review.md",
+          "kind": "source-offline-review",
+          "summary": "npm 官方审计无已知漏洞；保留各SDK许可，纠正本地诊断隐私说明，并检查不分发CLI、模型或凭据。"
+        }
+      ]
+    },
+    {
+      "id": "PRIVATE-01",
+      "title": "私人 Dots 通道保留与隔离",
+      "phase": "baseline",
+      "priority": "P2",
+      "status": "verified",
+      "owner": "私人扩展",
+      "dependsOn": [],
+      "paths": [
+        "docs/development/repository-map.md",
+        ".gitignore"
+      ],
+      "acceptance": [
+        "本机桥接与配置保留；公开仓库/安装包不纳入私人服务。"
+      ],
+      "nextAction": "仅在本机需要时用单独测试验证，不阻塞公共源码开发。",
+      "evidence": [
+        {
+          "ref": "docs/project-status.md",
+          "summary": "原通道留在原路径；公开忽略范围保持。",
+          "kind": "local-audit-summary"
+        },
+        {
+          "ref": "docs/development/quality-audit.md",
+          "summary": "STD-03/04：本地私人适配器关闭中连接及并发发送两项缺陷先复现后修复，合成I/O回归通过，未调用私人服务；公开CI不依赖私人文件。",
+          "kind": "offline-regression"
+        }
+      ]
+    },
+    {
+      "id": "FUT-01",
+      "title": "有限语音操作意图",
+      "phase": "future",
+      "priority": "P3",
+      "status": "deferred",
+      "owner": "交互设计",
+      "dependsOn": [
+        "REM-05"
+      ],
+      "paths": [
+        "docs/development/product.md"
+      ],
+      "acceptance": [
+        "显式进入操作模式；否定/歧义需确认；听写正文不会执行控制。"
+      ],
+      "nextAction": "遥控主流程稳定后再立项。",
+      "evidence": []
+    },
+    {
+      "id": "ART-01",
+      "title": "精细 Live2D 可行性调研与现有绑定核查",
+      "phase": "future",
+      "priority": "P2",
+      "status": "verified",
+      "owner": "美术/渲染",
+      "dependsOn": [
+        "BASE-01"
+      ],
+      "paths": [
+        "docs/development/live2d-feasibility.md",
+        "tools/qa/live2d-model-inspection.mjs"
+      ],
+      "acceptance": [
+        "以现有代码和 MOC3 参数采样区分运行时、姿态图切换与实际网格变形。",
+        "通过一手资料区分拆件、自动绑定、模型导出和播放工具，记录本机接口检查与未验证边界。",
+        "形成保留现有渲染链的样例路线，不把调研或参数采样称为新人物画质、GPU性能或安装验收。"
+      ],
+      "nextAction": "调研路线已在ART-02进入单角色样例；后续以实际预览验收决定FUT-02范围。",
+      "evidence": [
+        {
+          "ref": "docs/development/live2d-feasibility.md",
+          "kind": "source-research-and-offline-inspection",
+          "summary": "2026-10-21：男女模型各2个网格、24个参数；采样仅4项影响网格或透明度，抬头为透明度切换。已有PSD2Live 3.4.5的help/targets返回0；公开制作/AI工具、调用边界和SDK许可已调研。未生成或验收精细新模型。"
+        }
+      ]
+    },
+    {
+      "id": "ART-02",
+      "title": "女生 Live2D 半身样例与独立预览",
+      "phase": "future",
+      "priority": "P2",
+      "status": "in_progress",
+      "owner": "美术/渲染",
+      "dependsOn": [
+        "BASE-01",
+        "ART-01"
+      ],
+      "paths": [
+        "prototypes/live2d-halfbody",
+        "tools/project/preview-halfbody.mjs",
+        "tools/qa/live2d-halfbody-preview.mjs",
+        "tools/qa/live2d-halfbody-diagnose.mjs",
+        "tests/live2d-halfbody.test.mjs",
+        "docs/development/live2d-halfbody-preview.md"
+      ],
+      "acceptance": [
+        "保留现有男女壁纸与设置，提供女生半身的独立可编辑模型和预览。",
+        "连续转头、眨眼、实际声音驱动口型与发丝摆动；停止播放及加载失败可恢复。",
+        "中立姿态保留母版的头身、脸型、五官和颈肩比例；同画布分层复合可还原母版，未审定的非等比拉伸不得用于凑位置。",
+        "左右、俯仰、四个组合角及眨眼/口型中间形均经实图检查；零翻折和可播放不代表美术通过，需用户认可画风、人物身份与动作。"
+      ],
+      "nextAction": "按原画保真小样计划，从原女生 attention 图的头颈开始：同画布拆件/静态复合对照通过后，逐关键形制作头部并交付10–15秒试片，再扩展半身和发丝。See-through尚未部署或实测；自动拆件一轮实验及最多两轮定向修正仍不能保真时，停止扩展并建议专业美术接手。原壁纸继续保留。",
+      "evidence": [
+        {
+          "ref": "docs/development/live2d-halfbody-preview.md",
+          "kind": "offline-model-and-browser-preview",
+          "summary": "2026-10-21：14个素材部件导出16个网格、20个参数；修正闭眼翻折及重复唇线；243组组合采样无非有限坐标或可见翻折，真实语音口型、停止竞态、坏音频恢复和模型重试通过。这些仅为技术证据；后续人工美术验收失败。"
+        },
+        {
+          "ref": "docs/development/live2d-halfbody-preview.md",
+          "kind": "visual-rejection-and-source-diagnosis",
+          "summary": "2026-10-22：用户否决人体比例和脸型。复查母图、图集、实际PNG尺寸、MOC3及浏览器姿态，确认3个发层非等比拉伸、独立重绘拼装和颈部合并问题；关闭风并缩小转头不能修复中立比例。本机MCP查询确认可逐关键形精修；未产生或验收新角色，任务退回返工。"
+        },
+        {
+          "ref": "docs/development/live2d-halfbody-preview.md",
+          "kind": "rework-plan",
+          "summary": "2026-10-22：制定原画分层保真、头颈关键形、短动态试片、半身/头发四阶段计划及两轮定向修正止损条件；优先保留原画脸型和姿态，每阶段有可见交付和效果门槛。这是方案更新，不是新模型实现或验收证据。"
+        }
+      ]
+    },
+    {
+      "id": "ART-03",
+      "title": "已下载动态壁纸的源码检查与接入调研",
+      "phase": "future",
+      "priority": "P2",
+      "status": "verified",
+      "owner": "美术/渲染",
+      "dependsOn": [
+        "BASE-01",
+        "ART-01"
+      ],
+      "paths": [
+        "docs/development/external-wallpaper-feasibility.md"
+      ],
+      "acceptance": [
+        "定位当前 Wallpaper Engine 壁纸及可读资源，区分视频、Web、Scene 与实时 Live2D。",
+        "检查动态媒体和入场、循环、过渡、暂停机制，记录独立预览中的失败与未验证范围。",
+        "基于主应用实际窗口与启动代码形成接入路线；不把调查称为已交付兼容模式、实时口型或美术验收。"
+      ],
+      "nextAction": "优先评估 Wallpaper Engine 保留渲染、本应用独立提供对话和语音的兼容模式；随后按需实现本地视频导入。正式实施需移除隐藏模式的原角色加载、处理气泡与声线映射，并实测桌面共存和循环；ART-02 的美术返工尚未通过。",
+      "evidence": [
+        {
+          "ref": "docs/development/external-wallpaper-feasibility.md",
+          "kind": "local-source-media-and-browser-inspection",
+          "summary": "2026-10-22：从运行进程和当前壁纸配置定位 Web 项目，确认 HTML/JS 和三档 WebM；探测媒体编码并播放 1440p 动态素材，发现独立预览循环衔接超时。检查双视频预加载、帧回调及宿主接口，确认主应用 hidden 入口仍加载原角色。仅完成调研，未修改第三方壁纸或交付正式接入。"
+        }
+      ]
+    },
+    {
+      "id": "FUT-02",
+      "title": "更精细人物绑定与扩展素材",
+      "phase": "future",
+      "priority": "P3",
+      "status": "deferred",
+      "owner": "美术/渲染",
+      "dependsOn": [
+        "BASE-01",
+        "ART-01",
+        "ART-02"
+      ],
+      "paths": [
+        "docs/development/product.md",
+        "docs/development/live2d-feasibility.md"
+      ],
+      "acceptance": [
+        "新的绑定、动作与素材许可独立验收；保留现有两人物。",
+        "单角色样例先验证连续转头、眨眼、口型、发丝与组合参数；再验收目标运行时、人物声线一致性、失败重试和实机资源占用。"
+      ],
+      "nextAction": "ART-02已提供女生独立半身样例；先人工确认画风和动作，再决定正式壁纸接入及双人物全面精修。",
+      "evidence": [
+        {
+          "ref": "docs/development/live2d-feasibility.md",
+          "kind": "research-only",
+          "summary": "ART-01提供已有绑定实测和制作路线，不代表FUT-02的新模型、美术或性能验收完成。"
+        }
+      ]
+    },
+    {
+      "id": "FUT-03",
+      "title": "多屏、多硬件和跨平台",
+      "phase": "future",
+      "priority": "P3",
+      "status": "deferred",
+      "owner": "平台架构",
+      "dependsOn": [
+        "REM-05"
+      ],
+      "paths": [
+        "docs/development/product.md"
+      ],
+      "acceptance": [
+        "每个新增平台/硬件单独定义兼容矩阵和资源预算。"
+      ],
+      "nextAction": "Windows 单屏 RC003 主线稳定后按需求排序。",
+      "evidence": []
+    },
+    {
+      "id": "FUT-04",
+      "title": "多个后台任务与同目录并发控制",
+      "phase": "future",
+      "priority": "P3",
+      "status": "deferred",
+      "owner": "会话架构",
+      "dependsOn": [
+        "DEC-02",
+        "DATA-01"
+      ],
+      "paths": [
+        "prototypes/live2d-codex/backend/native-agent.mjs",
+        "prototypes/live2d-codex/backend/codex.mjs"
+      ],
+      "acceptance": [
+        "并发目标隔离和同目录互斥真实可验证；不改变当前单活动后端的语义。"
+      ],
+      "nextAction": "先明确产品是否保留旧三活动任务目标。",
+      "evidence": []
+    },
+    {
+      "id": "FIX-04",
+      "title": "统一会话切换锁与旧连接释放所有权",
+      "phase": "stability",
+      "priority": "P1",
+      "owner": "Agent 适配",
+      "paths": [
+        "prototypes/live2d-codex/backend/agent-lifecycle.mjs",
+        "prototypes/live2d-codex/backend/native-agent.mjs",
+        "prototypes/live2d-codex/backend/claude-agent.mjs",
+        "prototypes/live2d-codex/backend/acp-agent.mjs",
+        "prototypes/live2d-codex/tests/agent-contract.test.mjs"
+      ],
+      "acceptance": [
+        "第一 await 前锁定切换；并发新建/恢复/发送被拒绝；关闭阻止新连接，重复关闭等待正在释放的旧连接。"
+      ],
+      "nextAction": "协议适配新增资源时继续遵守共享锁与可等待的释放约定。",
+      "status": "verified",
+      "dependsOn": [
+        "ORG-04"
+      ],
+      "evidence": [
+        {
+          "ref": "docs/development/review-fixes.md",
+          "summary": "对应审查 S-01；三后端并发/关闭及真实适配器的假child释放回归通过。",
+          "kind": "offline-regression"
+        }
+      ]
+    },
+    {
+      "id": "FIX-05",
+      "title": "恢复原生历史时保留轮次结果和朗读资格",
+      "phase": "stability",
+      "priority": "P1",
+      "owner": "Agent/语音",
+      "paths": [
+        "prototypes/live2d-codex/backend/reply-state.mjs",
+        "prototypes/live2d-codex/backend/claude-agent.mjs",
+        "prototypes/live2d-codex/backend/acp-agent.mjs",
+        "prototypes/live2d-codex/tests/agent-contract.test.mjs"
+      ],
+      "acceptance": [
+        "已知完成/失败/中断/进行中及commentary状态恢复一致；歧义或外部改变的历史可展示但不能冒充成功完成。"
+      ],
+      "nextAction": "真实 CLI 验收时检查原生历史分段变化；未知结果保守不可朗读。",
+      "status": "verified",
+      "dependsOn": [
+        "ORG-04"
+      ],
+      "evidence": [
+        {
+          "ref": "docs/development/review-fixes.md",
+          "summary": "对应审查 S-02；Claude/Grok/OpenCode 受控历史、分段合并与歧义回归通过。",
+          "kind": "offline-regression"
+        }
+      ]
+    },
+    {
+      "id": "DATA-03",
+      "title": "保留超过100条的未发送草稿",
+      "phase": "stability",
+      "priority": "P1",
+      "owner": "会话数据",
+      "paths": [
+        "prototypes/live2d-codex/backend/workspace-store.mjs",
+        "prototypes/live2d-codex/tests/agent-contract.test.mjs"
+      ],
+      "acceptance": [
+        "保存更多会话草稿不淘汰其他非空输入；跨provider/项目落盘和重载后保留；只有明确清空目标才删除该草稿。"
+      ],
+      "nextAction": "保持非空草稿不自动淘汰；未来容量策略须有可恢复的数据方案。",
+      "status": "verified",
+      "dependsOn": [
+        "ORG-04"
+      ],
+      "evidence": [
+        {
+          "ref": "docs/development/review-fixes.md",
+          "summary": "对应审查 SPEC-01；106条草稿写盘/重载及单条清空回归通过。",
+          "kind": "offline-regression"
+        }
+      ]
+    },
+    {
+      "id": "TOOL-01",
+      "title": "探针报告使用新运行目录并保护历史证据",
+      "phase": "organization",
+      "priority": "P2",
+      "owner": "开发工具",
+      "paths": [
+        "tools/qa/run-output.mjs",
+        "tools/probes/codex-probe.mjs",
+        "tools/probes/codex-tui-probe.mjs",
+        "tools/probes/windows-preflight.ps1",
+        "tests/qa-tools.test.mjs"
+      ],
+      "acceptance": [
+        "报告不写旧docs/evidence日期路径；每次新建work/qa目录，拒绝已有目录、目录外目标和重复报告。"
+      ],
+      "nextAction": "新增验收工具复用输出边界；历史结果保持原样。",
+      "status": "verified",
+      "dependsOn": [
+        "ORG-04"
+      ],
+      "evidence": [
+        {
+          "ref": "docs/development/review-fixes.md",
+          "summary": "对应审查 STD-TOOLS-01；唯一目录、范围与禁止覆盖回归通过，旧证据未修改。",
+          "kind": "offline-regression"
+        }
+      ]
+    },
+    {
+      "id": "TOOL-02",
+      "title": "显式运行门槛与旧GUI验收工具收敛",
+      "phase": "organization",
+      "priority": "P2",
+      "owner": "开发工具",
+      "paths": [
+        "tools/probes/README.md",
+        "tools/qa/gui/README.md",
+        "tools/qa/gui/run.mjs",
+        "tools/qa/gui/context.mjs",
+        "tests/qa-tools.test.mjs"
+      ],
+      "acceptance": [
+        "真实CLI/GUI工具默认帮助；15个旧check源码有带哈希归档，4个维护迁移、11个历史源码保留，人物切换一并统一；无执行逻辑的说明桩已由TOOL-03移出维护目录，avatar用例模式明确。"
+      ],
+      "nextAction": "按具体 GUI/硬件/账户任务运行显式验收；本次默认帮助与静态迁移检查不冒充真实 GUI 通过。",
+      "status": "verified",
+      "dependsOn": [
+        "ORG-04"
+      ],
+      "evidence": [
+        {
+          "ref": "docs/development/review-fixes.md",
+          "summary": "对应审查 STD-TOOLS-02 及旧工具残留建议；16份原文（15旧check+人物切换）哈希保留，5个维护用例默认帮助回归通过。",
+          "kind": "offline-regression"
+        }
+      ]
+    },
+    {
+      "id": "DOC-01",
+      "title": "更新当前指南与实验Agent支持口径",
+      "phase": "organization",
+      "priority": "P3",
+      "owner": "项目维护",
+      "paths": [
+        "prototypes/live2d-codex/PORTABLE-README.md",
+        "prototypes/live2d-codex/CLI-AGENTS.md",
+        "prototypes/live2d-codex/renderer/agent-picker.mjs",
+        "prototypes/live2d-codex/backend/agent-catalog.cjs",
+        "prototypes/live2d-codex/scripts/package-portable.mjs",
+        "docs/development/review-fixes.md"
+      ],
+      "acceptance": [
+        "用户指南去除手写旧版本；注明验证日期并区分离线/真实验收；同一catalog生成三后端实验标签和包清单。"
+      ],
+      "nextAction": "真实验收通过并决定正式支持后再修改实验标记和发布记录。",
+      "status": "verified",
+      "dependsOn": [
+        "ORG-04"
+      ],
+      "evidence": [
+        {
+          "ref": "docs/development/review-fixes.md",
+          "summary": "对应审查 SPEC-02 及发布范围风险；已更新指南、共享选择器和包清单，未制作或发布安装包。",
+          "kind": "offline-regression"
+        }
+      ]
+    },
+    {
+      "id": "FIX-06",
+      "title": "退出时等待后端替换并释放未发布实例",
+      "phase": "stability",
+      "priority": "P1",
+      "owner": "主进程",
+      "paths": [
+        "prototypes/live2d-codex/main.cjs",
+        "prototypes/live2d-codex/tests/provider-switch.test.mjs"
+      ],
+      "dependsOn": [
+        "FIX-02"
+      ],
+      "acceptance": [
+        "切换后端在构造、旧连接关闭、目录/设置保存之后检查退出状态；退出等待整个切换并释放未发布实例，不在关闭后启动替代后端。"
+      ],
+      "nextAction": "在当前源码安装候选中补真实进程退出验收；本项只验证受控异步交错。",
+      "evidence": [
+        {
+          "ref": "docs/development/quality-audit.md",
+          "summary": "STD-01：实际主进程切换与退出边界的五阶段离线回归通过，独立复审无遗留发现。",
+          "kind": "offline-regression"
+        }
+      ],
+      "status": "verified"
+    },
+    {
+      "id": "FIX-07",
+      "title": "隔离电脑听写取消、重录与晚到识别",
+      "phase": "stability",
+      "priority": "P2",
+      "owner": "语音/交互",
+      "paths": [
+        "prototypes/live2d-codex/renderer/speech-ui.js",
+        "prototypes/live2d-codex/tests/capture-lifecycle.test.mjs"
+      ],
+      "dependsOn": [
+        "BASE-03"
+      ],
+      "acceptance": [
+        "录音初始化、resume、flush、close、识别返回后均核对操作编号；旧操作不得创建新会话节点、释放新目标或回填其他provider；取消保留已有草稿。"
+      ],
+      "nextAction": "真实麦克风和RC003互斥/输入法共存继续按设备任务验收。",
+      "evidence": [
+        {
+          "ref": "docs/development/quality-audit.md",
+          "summary": "STD-02/SPEC-01：五项录音生命周期回归通过，独立复核补测旧flush晚到不发起识别或清新目标。",
+          "kind": "offline-regression"
+        }
+      ],
+      "status": "verified"
+    },
+    {
+      "id": "FIX-08",
+      "title": "旧原生Agent缓存缺失轮次结果时禁止朗读",
+      "phase": "stability",
+      "priority": "P2",
+      "owner": "Agent适配",
+      "paths": [
+        "prototypes/live2d-codex/backend/native-agent.mjs",
+        "prototypes/live2d-codex/tests/agent-contract.test.mjs"
+      ],
+      "dependsOn": [
+        "FIX-05"
+      ],
+      "acceptance": [
+        "加载整个缓存索引时将缺失turnStatus标为unknown；保留原文和明确的completed/interrupted/failed，旧缓存不能被误判为成功回复。"
+      ],
+      "nextAction": "真实原生历史变化与账户恢复继续按AGT任务验收。",
+      "evidence": [
+        {
+          "ref": "docs/development/quality-audit.md",
+          "summary": "SPEC-02：四种缓存状态回归与既有三后端历史恢复矩阵通过；无真实账户访问。",
+          "kind": "offline-regression"
+        }
+      ],
+      "status": "verified"
+    },
+    {
+      "id": "TOOL-03",
+      "title": "清理失效提示入口并统一RC003状态说明",
+      "phase": "organization",
+      "priority": "P2",
+      "owner": "开发工具/项目维护",
+      "paths": [
+        "tools/project/status.mjs",
+        "tests/project-launcher.test.mjs",
+        "tools/qa/gui/README.md",
+        "docs/development/quality-audit.md"
+      ],
+      "dependsOn": [
+        "TOOL-02",
+        "ORG-03"
+      ],
+      "acceptance": [
+        "11个无执行逻辑的GUI说明桩归档并校验哈希；维护兼容入口不变；未使用导入与重复忽略规则清理；RC003源码接入与硬件验收状态分别从台账显示。"
+      ],
+      "nextAction": "新过程输出写入work/qa；旧数据/模型/历史包继续按目录保护规则保留。",
+      "evidence": [
+        {
+          "ref": "docs/development/quality-audit.md",
+          "summary": "SPEC-03及文件整理：11个提示桩已归档，11个无用导入与7条重复忽略规则已清理；状态文字/JSON回归通过。",
+          "kind": "offline-regression"
+        }
+      ],
+      "status": "verified"
+    },
+    {
+      "id": "UI-03",
+      "title": "遥控草稿闭环与对话设置界面整理",
+      "phase": "remote",
+      "priority": "P1",
+      "status": "implemented",
+      "owner": "桌面交互",
+      "dependsOn": [
+        "UI-01",
+        "REM-03",
+        "REM-04"
+      ],
+      "paths": [
+        "prototypes/live2d-codex/renderer/composer-controls.mjs",
+        "prototypes/live2d-codex/renderer/settings-navigation.mjs",
+        "prototypes/live2d-codex/renderer/draft-session.mjs",
+        "prototypes/live2d-codex/tests/composer-controls.test.mjs",
+        "tools/qa/interface-check.mjs"
+      ],
+      "acceptance": [
+        "草稿框中确认一次发送，左键清空并持久化，右键朗读或撤销；会话切换、新输入和识别/发送保护不误改数据。",
+        "朗读入口固定，播报/录音状态分开，设置按六类展示并保留未保存字段；菜单及审批导航保留。"
+      ],
+      "nextAction": "离线和标准/紧凑 renderer 验证通过；等待用户在新测试版完成遥控实际操作。",
+      "evidence": [
+        {
+          "ref": "docs/development/remote-controls-ui.md",
+          "kind": "source-offline-and-renderer",
+          "summary": "2026-10-22：遥控草稿确认发送、清空/撤销、固定朗读入口及分类设置已接入；离线功能和真实 renderer 布局检查通过。音量 Consumer Control 编译/自检及播放增益回归通过，物理键待验收。"
+        },
+        {
+          "ref": "docs/development/release-0.5.0-review.md",
+          "kind": "source-offline-review",
+          "summary": "修复六分类确认及项目/会话列表刷新导致的遥控焦点丢失，真实 renderer 的导航/字段保留检查通过。"
+        }
+      ]
+    },
+    {
+      "id": "REM-07",
+      "title": "遥控媒体音量键与应用播报音量",
+      "phase": "remote",
+      "priority": "P1",
+      "status": "implemented",
+      "owner": "设备/语音",
+      "dependsOn": [
+        "REM-02",
+        "BASE-03"
+      ],
+      "paths": [
+        "prototypes/live2d-codex/native/rc003-helper.cs",
+        "prototypes/live2d-codex/backend/remote-config.mjs",
+        "prototypes/live2d-codex/renderer/speech-ui.js",
+        "prototypes/live2d-codex/tests/speech-ui.test.mjs",
+        "tools/qa/remote-component.mjs"
+      ],
+      "acceptance": [
+        "仅所选遥控器的键盘式或 Consumer Control 音量键进入动作通路，按下去重、断线清理且不记录普通键盘。",
+        "音量动作与屏幕滑块改变实际 Web Audio GainNode，保存并沿用于后续播放；音量设置不重载语音模型。",
+        "必须另行证实物理音量加减事件与听感变化；没有事件时保留阻断记录。"
+      ],
+      "nextAction": "C# 编译、媒体 usage/边沿自检和实际增益节点的离线回归通过；物理音量按键尚未验收。",
+      "evidence": [
+        {
+          "ref": "docs/development/remote-controls-ui.md",
+          "kind": "source-offline-and-renderer",
+          "summary": "2026-10-22：遥控草稿确认发送、清空/撤销、固定朗读入口及分类设置已接入；离线功能和真实 renderer 布局检查通过。音量 Consumer Control 编译/自检及播放增益回归通过，物理键待验收。"
+        }
+      ]
+    },
+    {
+      "id": "FIX-09",
+      "title": "旧听写结束仅清理自身超时保护",
+      "phase": "stability",
+      "priority": "P2",
+      "status": "verified",
+      "owner": "桌面/数据",
+      "dependsOn": [
+        "FIX-07"
+      ],
+      "paths": [
+        "prototypes/live2d-codex/main.cjs",
+        "prototypes/live2d-codex/tests/capture-lifecycle.test.mjs"
+      ],
+      "acceptance": [
+        "旧请求成功/失败晚到均不清除新采集计时器；当前请求正常释放自身资源。"
+      ],
+      "nextAction": "保持对应离线回归；实机与分发结果分别记录，不混用证据。",
+      "evidence": [
+        {
+          "ref": "docs/development/release-0.5.0-review.md",
+          "kind": "source-offline-review",
+          "summary": "2026-10-22：审查发现已修复，针对性回归和完整离线测试通过。"
+        }
+      ]
+    },
+    {
+      "id": "FIX-10",
+      "title": "未决发送记录保护项目入口",
+      "phase": "stability",
+      "priority": "P2",
+      "status": "verified",
+      "owner": "桌面/数据",
+      "dependsOn": [
+        "DATA-01"
+      ],
+      "paths": [
+        "prototypes/live2d-codex/backend/workspace-store.mjs",
+        "prototypes/live2d-codex/tests/submission-safety.test.mjs"
+      ],
+      "acceptance": [
+        "任何provider未决记录的目标与原目标不能移除；核查/恢复可继续，已解决记录不妨碍正常移除。"
+      ],
+      "nextAction": "保持对应离线回归；实机与分发结果分别记录，不混用证据。",
+      "evidence": [
+        {
+          "ref": "docs/development/release-0.5.0-review.md",
+          "kind": "source-offline-review",
+          "summary": "2026-10-22：审查发现已修复，针对性回归和完整离线测试通过。"
+        }
+      ]
+    },
+    {
+      "id": "REL-04",
+      "title": "发布版本一致与产物覆盖保护",
+      "phase": "release",
+      "priority": "P2",
+      "status": "verified",
+      "owner": "构建发布",
+      "dependsOn": [],
+      "paths": [
+        "tools/release/release-inputs.mjs",
+        "tools/qa/release-package.mjs",
+        "tests/release-inputs.test.mjs"
+      ],
+      "acceptance": [
+        "不同版本或已有输出在构建前拒绝；不覆盖旧安装器；发布包有版本/哈希/源码和分发边界校验。"
+      ],
+      "nextAction": "保持对应离线回归；实机与分发结果分别记录，不混用证据。",
+      "evidence": [
+        {
+          "ref": "docs/development/release-0.5.0-review.md",
+          "kind": "source-offline-review",
+          "summary": "2026-10-22：审查发现已修复，针对性回归和完整离线测试通过。"
+        }
+      ]
+    },
+    {
+      "id": "FIX-11",
+      "title": "缺失项目在Windows路径别名下保持草稿身份",
+      "phase": "stability",
+      "priority": "P1",
+      "status": "verified",
+      "owner": "数据安全",
+      "dependsOn": [
+        "DATA-02"
+      ],
+      "paths": [
+        "prototypes/live2d-codex/backend/path-identity.mjs",
+        "prototypes/live2d-codex/tests/data-safety.test.mjs",
+        "prototypes/live2d-codex/tests/submission-safety.test.mjs"
+      ],
+      "acceptance": [
+        "删除短路径或junction父目录下的项目后，草稿读取、重启与继续保存保持一个规范身份；测试不得依赖临时目录原始字符串等于realpath。"
+      ],
+      "nextAction": "持续保留别名父目录与缺失后缀回归；完整真实数据升级/回滚矩阵继续按REL-01验收。",
+      "evidence": [
+        {
+          "ref": "docs/development/release-0.5.0-review.md",
+          "kind": "ci-reproduction-and-offline-regression",
+          "summary": "远端Windows CI暴露短路径差异；真实junction多级子目录删除回归修复前失败，修复后正常。普通TEMP与junction TEMP各47项通过，最终发布范围本机314项离线回归通过。"
+        }
+      ]
+    },
+    {
+      "id": "FIX-12",
+      "title": "只读状态和启动检查不运行Electron安装钩子",
+      "phase": "stability",
+      "priority": "P2",
+      "status": "verified",
+      "owner": "项目工具",
+      "dependsOn": [
+        "ORG-01"
+      ],
+      "paths": [
+        "tools/project/start.mjs",
+        "tests/project-launcher.test.mjs"
+      ],
+      "acceptance": [
+        "缺少Electron运行文件时，status与--check仅返回缺失信息，不执行安装器、联网或污染JSON；已安装与override路径仍可识别。"
+      ],
+      "nextAction": "保持预检无副作用；新增依赖探测不能直接执行带安装行为的模块入口。",
+      "evidence": [
+        {
+          "ref": "docs/development/release-0.5.0-review.md",
+          "kind": "ci-reproduction-and-offline-regression",
+          "summary": "远端CI暴露Electron44安装钩子；改为读取元数据。四种安装状态哨兵及14项启动器回归通过，GitHub公开307项及构建/扫描全部通过。"
+        }
+      ]
+    }
+  ],
+  "updated": "2026-10-22"
+}

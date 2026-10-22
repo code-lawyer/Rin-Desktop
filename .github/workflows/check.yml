@@ -16,6 +16,8 @@ jobs:
           node-version: '24'
       - run: npm ci
       - run: npm --prefix prototypes/live2d-codex ci
+      - run: npm run check:project
       - run: npm test
       - run: npm run build
       - run: node tools/release/audit-public.mjs --staged
+      - run: npm run check:public
