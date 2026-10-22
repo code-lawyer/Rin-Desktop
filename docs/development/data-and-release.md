@@ -36,7 +36,7 @@ DATA-01/02 增加每个 provider 最近一次发送记录、提交前原稿保�
 5. 推送该开发分支到原 origin 并建立它的 upstream，再按项目流程合入 main。不要把 `origin/main` 当成开发分支的同名 upstream。
 6. 记录实际 commit、远端分支与检查结果，更新 REL-02。只有推送成功才说源码已同步。
 
-2026-10-22 开始按用户授权执行 0.5.0 发布：整合后的公共源码、文档和验证工具一并审计、提交；GitHub 同步结果与版本验证记录以[发布审查](../release-audit.md)为准。旧 Test 包、私人资料、模型和运行数据继续保留在忽略目录。
+2026-10-22 已将审查后的整合源码推送到原origin的codex/public-release，建立origin/codex/public-release upstream；源码修复提交f1e22a6的push与PR两路CI均通过。[PR #1](https://github.com/code-lawyer/Rin-Desktop/pull/1)负责合入main，后续文档与资源清单提交沿用同一审查入口。0.5.0版本、安装验证与发布入口见[发布审查](../release-audit.md)，具体版本源码以v0.5.0标签为准。旧Test包、私人资料、模型和运行数据继续保留在忽略目录；并行新建且尚未审定的视频调研工具不混入此次发布快照。
 
 ## 应用发布步骤
 

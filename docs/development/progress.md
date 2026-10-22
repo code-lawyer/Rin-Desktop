@@ -2,9 +2,9 @@
 
 由 backlog.json 与 legacy-mapping.json 生成，更新日期 2026-10-22。修改 JSON 后运行 `npm run project:docs`；不要直接编辑本页。
 
-已验证限定范围 34 项；已实现待验收 11 项；施工中 4 项；待施工 5 项；后置 4 项。这些数量不是产品完成百分比；已验证项仅对任务写明的范围有效。
+已验证限定范围 37 项；已实现待验收 12 项；施工中 2 项；待施工 5 项；后置 4 项。这些数量不是产品完成百分比；已验证项仅对任务写明的范围有效。
 
-施工中：REM-05、REL-02、REL-03、ART-02。
+施工中：REM-05、ART-02。
 
 可开始的待施工项（前置已验收，按优先级排列）：UI-02、DEC-02。阶段顺序和源码同步安排见[开发计划](roadmap.md)。
 
@@ -40,8 +40,8 @@
 | AGT-05 | OpenCode 主应用真实验收 | 待施工 | P1 | AGT-02、DEC-01、FIX-03 | Agent 验收 |
 | AGT-06 | 跨 provider 会话与草稿隔离 | 已实现待验收 | P1 | AGT-01、DATA-02 | 会话数据 |
 | REL-01 | 当前源码安装候选与数据恢复验收 | 已实现待验收 | P1 | FIX-01、FIX-02、FIX-03、DATA-02、AGT-02 | 构建发布 |
-| REL-02 | 本批源码提交同步与 upstream | 施工中 | P2 | ORG-03、ORG-04 | 仓库维护 |
-| REL-03 | 下一应用版本发布验收 | 施工中 | P1 | REL-01、SEC-01、UI-02 | 构建发布 |
+| REL-02 | 本批源码提交同步与 upstream | 已验证限定范围 | P2 | ORG-03、ORG-04 | 仓库维护 |
+| REL-03 | 下一应用版本发布验收 | 已实现待验收 | P1 | REL-01、SEC-01、UI-02 | 构建发布 |
 | DEC-01 | 确认新增后端的账户和计费边界 | 已实现待验收 | P1 | AGT-01 | 产品/Agent |
 | DEC-02 | 明确原 TUI 共存与并发任务的后续定位 | 待施工 | P2 | 无 | 产品/架构 |
 | SEC-01 | 新增后端的日志、凭据和依赖审计 | 已实现待验收 | P1 | AGT-02、DEC-01 | 隐私/发布 |
@@ -68,6 +68,8 @@
 | FIX-09 | 旧听写结束仅清理自身超时保护 | 已验证限定范围 | P2 | FIX-07 | 桌面/数据 |
 | FIX-10 | 未决发送记录保护项目入口 | 已验证限定范围 | P2 | DATA-01 | 桌面/数据 |
 | REL-04 | 发布版本一致与产物覆盖保护 | 已验证限定范围 | P2 | 无 | 构建发布 |
+| FIX-11 | 缺失项目在Windows路径别名下保持草稿身份 | 已验证限定范围 | P1 | DATA-02 | 数据安全 |
+| FIX-12 | 只读状态和启动检查不运行Electron安装钩子 | 已验证限定范围 | P2 | ORG-01 | 项目工具 |
 
 ## ORG-01 全目录盘点与保护基线
 
@@ -554,7 +556,7 @@
 
 ## REL-02 本批源码提交同步与 upstream
 
-状态：施工中；阶段：release；责任角色：仓库维护。
+状态：已验证限定范围；阶段：release；责任角色：仓库维护。
 
 实现位置：[.gitignore](../../.gitignore)、[.github/workflows/check.yml](../../.github/workflows/check.yml)、[docs/development/data-and-release.md](data-and-release.md)。
 
@@ -564,13 +566,13 @@
 
 - 本批改动经过公开扫描和 diff 审查后提交到原仓库开发分支；对应 upstream 明确；工作区不被误当已同步。
 
-下一动作：已审查全部公共源码与工作区，正在准备提交、原 origin 开发分支 upstream、main 合入与 CI；以实际推送结果结案。
+下一动作：保持原origin和同名开发分支upstream；后续变更继续公开扫描、PR与CI，不把本地新文件自动当作已发布。
 
-证据：尚无完成验收记录，不能标为完成。
+证据：[docs/development/data-and-release.md](data-and-release.md) — 2026-10-22：公开381文件index扫描通过；提交推送原code-lawyer/Rin-Desktop的codex/public-release，建立同名upstream。PR #1及f1e22a6的两路GitHub CI通过，保留原main历史。（git-push-upstream-and-ci）
 
 ## REL-03 下一应用版本发布验收
 
-状态：施工中；阶段：release；责任角色：构建发布。
+状态：已实现待验收；阶段：release；责任角色：构建发布。
 
 实现位置：[tools/release/resource-manifest.json](../../tools/release/resource-manifest.json)、[docs/release-audit.md](../release-audit.md)。
 
@@ -580,9 +582,9 @@
 
 - 稳定支持仅声明已验收范围；实验能力明确标识、默认由用户选择，不放宽审批/数据/凭据约束；版本、哈希、许可、指南与已知限制一致；完整矩阵另按依赖任务验收。
 
-下一动作：构建 0.5.0 并完成独立安装验证后发布；RC003 和新增 Agent 保持实验边界，完整硬件/账户/显示矩阵仍待验收。
+下一动作：0.5.0发布范围、安装器校验和验证已整理；继续完成REL-01、SEC-01、UI-02及RC003/新增Agent的完整矩阵，完成前不将实验能力标为全面支持。
 
-证据：[docs/development/release-0.5.0-review.md](release-0.5.0-review.md) — 0.5.0 发布前完成 Standards/Spec 两轴审查与修复；用户反馈上一候选基本可用，尚不能替代完整设备/账户矩阵。（source-offline-review）
+证据：[docs/development/release-0.5.0-review.md](release-0.5.0-review.md) — 0.5.0 发布前完成 Standards/Spec 两轴审查与修复；用户反馈上一候选基本可用，尚不能替代完整设备/账户矩阵。（source-offline-review）；[docs/release-audit.md](../release-audit.md) — 0.5.0最终安装器重新构建；隔离中文路径安装和0.4.0覆盖升级逐文件校验通过，公开307项GitHub CI及构建/扫描通过。版本发布入口与SHA-256记录完整，硬件/真实账户/完整注册安装矩阵仍待验收。（release-candidate-and-ci）
 
 ## DEC-01 确认新增后端的账户和计费边界
 
@@ -1010,3 +1012,35 @@
 下一动作：保持对应离线回归；实机与分发结果分别记录，不混用证据。
 
 证据：[docs/development/release-0.5.0-review.md](release-0.5.0-review.md) — 2026-10-22：审查发现已修复，针对性回归和完整离线测试通过。（source-offline-review）
+
+## FIX-11 缺失项目在Windows路径别名下保持草稿身份
+
+状态：已验证限定范围；阶段：stability；责任角色：数据安全。
+
+实现位置：[prototypes/live2d-codex/backend/path-identity.mjs](../../prototypes/live2d-codex/backend/path-identity.mjs)、[prototypes/live2d-codex/tests/data-safety.test.mjs](../../prototypes/live2d-codex/tests/data-safety.test.mjs)、[prototypes/live2d-codex/tests/submission-safety.test.mjs](../../prototypes/live2d-codex/tests/submission-safety.test.mjs)。
+
+依赖：DATA-02。原编号：新增工作。
+
+验收条件：
+
+- 删除短路径或junction父目录下的项目后，草稿读取、重启与继续保存保持一个规范身份；测试不得依赖临时目录原始字符串等于realpath。
+
+下一动作：持续保留别名父目录与缺失后缀回归；完整真实数据升级/回滚矩阵继续按REL-01验收。
+
+证据：[docs/development/release-0.5.0-review.md](release-0.5.0-review.md) — 远端Windows CI暴露短路径差异；真实junction多级子目录删除回归修复前失败，修复后正常。普通TEMP与junction TEMP各47项通过，最终发布范围本机314项离线回归通过。（ci-reproduction-and-offline-regression）
+
+## FIX-12 只读状态和启动检查不运行Electron安装钩子
+
+状态：已验证限定范围；阶段：stability；责任角色：项目工具。
+
+实现位置：[tools/project/start.mjs](../../tools/project/start.mjs)、[tests/project-launcher.test.mjs](../../tests/project-launcher.test.mjs)。
+
+依赖：ORG-01。原编号：新增工作。
+
+验收条件：
+
+- 缺少Electron运行文件时，status与--check仅返回缺失信息，不执行安装器、联网或污染JSON；已安装与override路径仍可识别。
+
+下一动作：保持预检无副作用；新增依赖探测不能直接执行带安装行为的模块入口。
+
+证据：[docs/development/release-0.5.0-review.md](release-0.5.0-review.md) — 远端CI暴露Electron44安装钩子；改为读取元数据。四种安装状态哨兵及14项启动器回归通过，GitHub公开307项及构建/扫描全部通过。（ci-reproduction-and-offline-regression）

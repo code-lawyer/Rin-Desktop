@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "updatedAt": "2026-10-22",
-  "releaseBaseline": "0.4.0",
+  "releaseBaseline": "0.5.0",
   "statusMeaning": {
     "verified": "限定范围有证据，不代表关联模块没有独立缺陷",
     "implemented": "已有实现，完整验收未完成",
@@ -952,7 +952,7 @@
       "title": "本批源码提交同步与 upstream",
       "phase": "release",
       "priority": "P2",
-      "status": "in_progress",
+      "status": "verified",
       "owner": "仓库维护",
       "dependsOn": [
         "ORG-03",
@@ -966,15 +966,21 @@
       "acceptance": [
         "本批改动经过公开扫描和 diff 审查后提交到原仓库开发分支；对应 upstream 明确；工作区不被误当已同步。"
       ],
-      "nextAction": "已审查全部公共源码与工作区，正在准备提交、原 origin 开发分支 upstream、main 合入与 CI；以实际推送结果结案。",
-      "evidence": []
+      "nextAction": "保持原origin和同名开发分支upstream；后续变更继续公开扫描、PR与CI，不把本地新文件自动当作已发布。",
+      "evidence": [
+        {
+          "ref": "docs/development/data-and-release.md",
+          "kind": "git-push-upstream-and-ci",
+          "summary": "2026-10-22：公开381文件index扫描通过；提交推送原code-lawyer/Rin-Desktop的codex/public-release，建立同名upstream。PR #1及f1e22a6的两路GitHub CI通过，保留原main历史。"
+        }
+      ]
     },
     {
       "id": "REL-03",
       "title": "下一应用版本发布验收",
       "phase": "release",
       "priority": "P1",
-      "status": "in_progress",
+      "status": "implemented",
       "owner": "构建发布",
       "dependsOn": [
         "REL-01",
@@ -988,12 +994,17 @@
       "acceptance": [
         "稳定支持仅声明已验收范围；实验能力明确标识、默认由用户选择，不放宽审批/数据/凭据约束；版本、哈希、许可、指南与已知限制一致；完整矩阵另按依赖任务验收。"
       ],
-      "nextAction": "构建 0.5.0 并完成独立安装验证后发布；RC003 和新增 Agent 保持实验边界，完整硬件/账户/显示矩阵仍待验收。",
+      "nextAction": "0.5.0发布范围、安装器校验和验证已整理；继续完成REL-01、SEC-01、UI-02及RC003/新增Agent的完整矩阵，完成前不将实验能力标为全面支持。",
       "evidence": [
         {
           "ref": "docs/development/release-0.5.0-review.md",
           "kind": "source-offline-review",
           "summary": "0.5.0 发布前完成 Standards/Spec 两轴审查与修复；用户反馈上一候选基本可用，尚不能替代完整设备/账户矩阵。"
+        },
+        {
+          "ref": "docs/release-audit.md",
+          "kind": "release-candidate-and-ci",
+          "summary": "0.5.0最终安装器重新构建；隔离中文路径安装和0.4.0覆盖升级逐文件校验通过，公开307项GitHub CI及构建/扫描通过。版本发布入口与SHA-256记录完整，硬件/真实账户/完整注册安装矩阵仍待验收。"
         }
       ]
     },
@@ -1707,6 +1718,59 @@
           "ref": "docs/development/release-0.5.0-review.md",
           "kind": "source-offline-review",
           "summary": "2026-10-22：审查发现已修复，针对性回归和完整离线测试通过。"
+        }
+      ]
+    },
+    {
+      "id": "FIX-11",
+      "title": "缺失项目在Windows路径别名下保持草稿身份",
+      "phase": "stability",
+      "priority": "P1",
+      "status": "verified",
+      "owner": "数据安全",
+      "dependsOn": [
+        "DATA-02"
+      ],
+      "paths": [
+        "prototypes/live2d-codex/backend/path-identity.mjs",
+        "prototypes/live2d-codex/tests/data-safety.test.mjs",
+        "prototypes/live2d-codex/tests/submission-safety.test.mjs"
+      ],
+      "acceptance": [
+        "删除短路径或junction父目录下的项目后，草稿读取、重启与继续保存保持一个规范身份；测试不得依赖临时目录原始字符串等于realpath。"
+      ],
+      "nextAction": "持续保留别名父目录与缺失后缀回归；完整真实数据升级/回滚矩阵继续按REL-01验收。",
+      "evidence": [
+        {
+          "ref": "docs/development/release-0.5.0-review.md",
+          "kind": "ci-reproduction-and-offline-regression",
+          "summary": "远端Windows CI暴露短路径差异；真实junction多级子目录删除回归修复前失败，修复后正常。普通TEMP与junction TEMP各47项通过，最终发布范围本机314项离线回归通过。"
+        }
+      ]
+    },
+    {
+      "id": "FIX-12",
+      "title": "只读状态和启动检查不运行Electron安装钩子",
+      "phase": "stability",
+      "priority": "P2",
+      "status": "verified",
+      "owner": "项目工具",
+      "dependsOn": [
+        "ORG-01"
+      ],
+      "paths": [
+        "tools/project/start.mjs",
+        "tests/project-launcher.test.mjs"
+      ],
+      "acceptance": [
+        "缺少Electron运行文件时，status与--check仅返回缺失信息，不执行安装器、联网或污染JSON；已安装与override路径仍可识别。"
+      ],
+      "nextAction": "保持预检无副作用；新增依赖探测不能直接执行带安装行为的模块入口。",
+      "evidence": [
+        {
+          "ref": "docs/development/release-0.5.0-review.md",
+          "kind": "ci-reproduction-and-offline-regression",
+          "summary": "远端CI暴露Electron44安装钩子；改为读取元数据。四种安装状态哨兵及14项启动器回归通过，GitHub公开307项及构建/扫描全部通过。"
         }
       ]
     }
