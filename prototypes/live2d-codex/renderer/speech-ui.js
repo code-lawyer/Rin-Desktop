@@ -6,7 +6,7 @@ import { remoteVoiceStatus } from './remote-voice-status.mjs';
 export { speechChunks } from '../backend/speech-plan.mjs';
 export function installSpeech({ api, state, insert, error, measure, isBusy = () => isTaskBusy(state()) }) {
   const $ = id => document.getElementById(id);
-  let settings = {}, speech = {}, workspaceVersion = -1, stream, context, processor, source, chunks, sampleCount, timer, tick, recording = false, starting = false, recognizing = false, readRequested = false, operation = 0, playGeneration = 0, audioContext, audioSource, finishPlayback, narration, pendingCompletion;
+  let settings = {}, speech = {}, workspaceVersion = -1, stream, context, processor, source, chunks, sampleCount, timer, tick, captureTarget, recording = false, starting = false, recognizing = false, readRequested = false, operation = 0, playGeneration = 0, audioContext, audioSource, finishPlayback, narration, pendingCompletion;
   const seenCompletions = new Set();
   let remoteBusy = false, playbackGain, volume = 1, volumeOperation = 0, volumePending = 0, volumeEditing = false;
   const label = text => { $('voice-status').textContent = text; $('voice-status').hidden = !text; measure(); };
@@ -76,6 +76,7 @@ export function installSpeech({ api, state, insert, error, measure, isBusy = () 
   function stopPlayback(wait = true) {
     playGeneration++; pendingCompletion = null; narration?.modelReady?.(); narration = null; readRequested = false;
     audioSource?.stop(); audioSource?.disconnect?.(); audioSource = null; finishPlayback?.(); finishPlayback = null;
+    api.playbackState?.(false);
     const drained = audio.cancel();
     $('stop-speech').hidden = true; playbackLabel(''); updateControls();
     return wait ? drained : Promise.resolve();
@@ -100,6 +101,8 @@ export function installSpeech({ api, state, insert, error, measure, isBusy = () 
         if (generation !== playGeneration || !valid(session) || !session.playRequested) return;
         audioContext ??= new AudioContext(); await audioContext.resume();
         if (generation !== playGeneration || !valid(session)) return;
+        if (api.playbackState) await check(api.playbackState(true));
+        if (generation !== playGeneration || !valid(session)) return;
         const buffer = audioContext.createBuffer(1,prepared.samples.length,prepared.sampleRate); buffer.copyToChannel(prepared.samples,0);
         if (!playbackGain) { playbackGain = audioContext.createGain(); playbackGain.connect(audioContext.destination); }
         playbackGain.gain.value = volume;
@@ -109,7 +112,7 @@ export function installSpeech({ api, state, insert, error, measure, isBusy = () 
         if (generation !== playGeneration) return;
         audioSource?.disconnect?.(); audioSource = null; finishPlayback = null;
       } catch(e) { if (generation === playGeneration && e.name !== 'AbortError') error(e.message); }
-      finally { if (generation === playGeneration) { narration = null; $('stop-speech').hidden = true; playbackLabel(!session.playRequested && audio.has(key) ? '已就绪' : ''); updateControls(); } }
+      finally { if (generation === playGeneration) { api.playbackState?.(false); narration = null; $('stop-speech').hidden = true; playbackLabel(!session.playRequested && audio.has(key) ? '已就绪' : ''); updateControls(); } }
     })();
     return session.promise;
   }
@@ -135,7 +138,7 @@ export function installSpeech({ api, state, insert, error, measure, isBusy = () 
   async function releaseCapture() {
     clearTimeout(timer); clearInterval(tick); stream?.getTracks().forEach(t => t.stop()); stream = null; source?.disconnect(); processor?.disconnect(); processor = null; source = null;
     const c = context; context = null;
-    recording = false; starting = false; $('record-button').textContent = '电脑听写'; $('record-button').setAttribute('aria-pressed','false'); $('cancel-recording').hidden = true;
+    captureTarget = null; recording = false; starting = false; $('record-button').textContent = '电脑听写'; $('record-button').setAttribute('aria-pressed','false'); $('cancel-recording').hidden = true;
     if (c && c.state !== 'closed') await c.close();
   }
   async function cancel() {
@@ -148,7 +151,7 @@ export function installSpeech({ api, state, insert, error, measure, isBusy = () 
   async function toggle() {
     if (starting || recognizing || remoteBusy) return;
     if (recording) return finish();
-    starting = true; const token = ++operation; const target = {provider:state().provider,cwd:state().cwd,threadId:state().threadId};
+    starting = true; const token = ++operation; const target = captureTarget = {provider:state().provider,cwd:state().cwd,threadId:state().threadId};
     try {
       // Stop audible playback immediately. Capture cancels backend synthesis
       // without waiting for a CPU model to finish its current native call.
@@ -170,7 +173,9 @@ export function installSpeech({ api, state, insert, error, measure, isBusy = () 
     finally { if (token === operation) starting = false; }
   }
   async function finish() {
-    if (!recording || recognizing) return; recognizing = true; const token = operation, sampleRate = context.sampleRate, target = {provider:state().provider,cwd:state().cwd,threadId:state().threadId};
+    // The audio belongs to the target selected before opening the microphone,
+    // even if a previously started backend operation changes state meanwhile.
+    if (!recording || recognizing) return; recognizing = true; const token = operation, sampleRate = context.sampleRate, target = captureTarget;
     try {
       await new Promise(resolve => { const port = processor.port, old = port.onmessage; const timeout = setTimeout(resolve,300); port.onmessage = event => { if (event.data === 'flushed') { clearTimeout(timeout); resolve(); } else old(event); }; port.postMessage('flush'); });
       if (token !== operation) return;
@@ -218,6 +223,7 @@ export function installSpeech({ api, state, insert, error, measure, isBusy = () 
   window.addEventListener('beforeunload',() => { stream?.getTracks().forEach(t => t.stop()); api.capture(null); api.stopSpeech(); });
   document.addEventListener('keydown',event => { if (event.key === 'Escape' && (recording || starting)) { event.stopImmediatePropagation(); event.preventDefault(); cancel(); } },true);
   return { isCapturing: () => recording || starting || recognizing || remoteBusy, refresh,
+    cancelCapture: cancel,
     adjustVolume: delta => saveVolume(Math.round((volume + delta) * 10) / 10),
     readReply: () => readReply().catch(e => error(e.message)), toggleCapture: () => toggle().catch(e => error(e.message)) };
 }

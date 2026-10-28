@@ -1,0 +1,91 @@
+{
+  "version": 2,
+  "recordings": [
+    {
+      "file": "light-rain.ogg",
+      "title": "Medium Light Rain",
+      "author": "Baconation",
+      "sourcePage": "https://freesound.org/people/Baconation/sounds/592482/",
+      "sourceDownload": "https://cdn.freesound.org/previews/592/592482_10870880-hq.mp3",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "sourceSha256": "115c3dd4a37773f932c724a113aa5680ba1c145a4e337c4bdf2a59dc8e38151a",
+      "sha256": "9328b75a2b7bd5bbd85fa4b654b9afdd1f945e9e790c8d2d25ea4643aec48479",
+      "bytes": 557900,
+      "duration": 60,
+      "processing": {
+        "filters": "highpass=f=400,lowpass=f=5500",
+        "selection": "20–84 s; 4 s circular equal-power overlap; 5 ms endpoint feather; 60 s output",
+        "referenceRmsDbfs": -29,
+        "softPeakCeilingDbfs": -12,
+        "sampleRate": 24000,
+        "channels": 2
+      },
+      "measured": {
+        "rmsDbfs": -29.607043114122042,
+        "peakDbfs": -10.747472173556616,
+        "loopBoundaryJump": 0.0026386984973214567
+      }
+    },
+    {
+      "file": "soft-keyboard.ogg",
+      "title": "typing on laptop keyboard 1.wav",
+      "author": "Sorinious_Genious",
+      "sourcePage": "https://freesound.org/people/Sorinious_Genious/sounds/561102/",
+      "sourceDownload": "https://cdn.freesound.org/previews/561/561102_12517458-hq.mp3",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "sourceSha256": "95400d1d7db88206f05d22bc967333ade66a937bdfaa807a8498b45a31daa57f",
+      "sha256": "88f92b8898c5a9ee13ee43078cb2baf3a8edb6bfe97bc613846f1e50f9a18e8d",
+      "bytes": 317551,
+      "duration": 35.24791666666667,
+      "processing": {
+        "filters": "highpass=f=400,lowpass=f=4200",
+        "selection": "Original timing; runtime plays only the listed short phrases, with 5–12 s pauses",
+        "referenceRmsDbfs": -29,
+        "softPeakCeilingDbfs": -12,
+        "sampleRate": 24000,
+        "channels": 2
+      },
+      "measured": {
+        "rmsDbfs": -31.51574978164744,
+        "peakDbfs": -10.517733449383194
+      }
+    }
+  ],
+  "keyboardClips": [
+    [
+      2.3,
+      2.6
+    ],
+    [
+      6.3,
+      2.7
+    ],
+    [
+      9.2,
+      1.55
+    ],
+    [
+      12.1,
+      1.8
+    ],
+    [
+      18.3,
+      2.8
+    ],
+    [
+      23.2,
+      2
+    ],
+    [
+      30.2,
+      2.4
+    ]
+  ],
+  "defaultVolumes": {
+    "rainVolume": 0.12,
+    "keyVolume": 0.08
+  },
+  "note": "Signal checks do not establish subjective listening acceptance."
+}

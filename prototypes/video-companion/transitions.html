@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>雨窗 · 三状态预览</title><link rel="stylesheet" href="/transitions.css"></head>
+<body>
+  <main>
+    <div class="stage" aria-label="人物转场预览">
+      <video muted playsinline preload="auto" data-active="false" aria-hidden="true"></video>
+      <video muted playsinline preload="auto" data-active="false" aria-hidden="true"></video>
+      <div class="caption"><span class="dot"></span><span id="status" role="status">正在准备画面…</span></div>
+    </div>
+    <section class="controls" aria-label="预览控制">
+      <div class="intro"><span class="eyebrow">RAIN AT THE WINDOW</span><h1>雨窗之间</h1><p>选择一个状态，看看她如何转向。</p></div>
+      <div class="actions"><div id="states" class="states" role="group" aria-label="人物状态"></div>
+        <div class="secondary"><button id="pause" type="button" disabled>暂停</button><button id="retry" type="button" hidden>重新载入</button><button id="fullscreen" type="button">全屏</button></div>
+      </div>
+      <p id="media-note" class="note">动作结束后停留 · 原片中的 AI 标识保留</p>
+      <p id="error" role="alert" hidden></p>
+    </section>
+  </main>
+  <script type="module" src="/transitions.mjs"></script>
+</body>
+</html>

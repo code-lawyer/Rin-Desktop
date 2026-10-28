@@ -1,0 +1,137 @@
+{
+  "format": 2,
+  "composition": "female-v2-4k: complete super-resolved frame; male: original static head composition; direct replacement",
+  "images": [
+    {
+      "file": "female/work.png",
+      "width": 3840,
+      "height": 2400,
+      "bytes": 10346212,
+      "sha256": "b13fc93ef8e51128e321b417860bc9fb47086fc36dc03ab952c39216c0aa8ded"
+    },
+    {
+      "file": "female/reading.png",
+      "width": 1586,
+      "height": 992,
+      "bytes": 2236229,
+      "sha256": "2d75114eaf035f039d3b838b1301d1c9bcf97273fa57158226b31e3e9b80821d"
+    },
+    {
+      "file": "female/window.png",
+      "width": 1586,
+      "height": 992,
+      "bytes": 2209264,
+      "sha256": "5cd2fe381ac93b1e834b9b5a66040adf23daae96f088c70591ee7b0aad9c75b0"
+    },
+    {
+      "file": "female/rest.png",
+      "width": 1586,
+      "height": 992,
+      "bytes": 2237347,
+      "sha256": "eb166ff788d394505f444384c799fe7aad26210899389a61ad75575c98a0ad39"
+    },
+    {
+      "file": "female/attention.png",
+      "width": 3840,
+      "height": 2400,
+      "bytes": 9805790,
+      "sha256": "6865e25b660da800d6210c3a6e834c6a8dbcedcaa461732faf6659ecfab7b87f"
+    },
+    {
+      "file": "female/smile.png",
+      "width": 1586,
+      "height": 992,
+      "bytes": 2147461,
+      "sha256": "21aa778f5e7f159ca03fa2f9399465b5484b672d55f4c32c8699209dfffc65bd"
+    },
+    {
+      "file": "male/work.png",
+      "width": 1586,
+      "height": 992,
+      "bytes": 2108970,
+      "sha256": "eb8dd5f5f2ae252f8dd76937bbade26ebef775e8c5fc8b212339f4dd2aa7ae03"
+    },
+    {
+      "file": "male/attention.png",
+      "width": 1586,
+      "height": 992,
+      "bytes": 2092024,
+      "sha256": "0f0db410d78791f04fe2c3186e925fe6cd4fac4ead495de0b5d1ad39c724825a"
+    },
+    {
+      "file": "female-v2/work.png",
+      "width": 1586,
+      "height": 992,
+      "bytes": 2340872,
+      "sha256": "1cc4ad6e11899b8938d7ee75691d45c676223bcef4909a05643f74aa537ccfc6"
+    },
+    {
+      "file": "female-v2/cup.png",
+      "width": 1586,
+      "height": 992,
+      "bytes": 2275008,
+      "sha256": "43a279ebddb18678d4d59ab2866e4ff7baf5ec4070a7569416b54dbfe148a88f"
+    },
+    {
+      "file": "female-v2/thinking.png",
+      "width": 1586,
+      "height": 992,
+      "bytes": 2250570,
+      "sha256": "b735463d73ec2fe4cbb06dfb674bc179a95c9a1ec4697a050a1080165c2489a3"
+    },
+    {
+      "file": "female-v2/window.png",
+      "width": 1586,
+      "height": 992,
+      "bytes": 2236031,
+      "sha256": "d62892783d09f4275004a1dcdc986afb806d0441dbc75528e0cc4a61cd3f0d7c"
+    },
+    {
+      "file": "female-v2/attention.png",
+      "width": 1586,
+      "height": 992,
+      "bytes": 2279447,
+      "sha256": "ec63c10cf392054f5358271c309e897efd9733f26be97f438828b26ac6e39e02"
+    },
+    {
+      "file": "female-v2-4k/work.png",
+      "width": 3840,
+      "height": 2400,
+      "bytes": 9953734,
+      "sha256": "9ac0a4848957d85792b41f8f38b8965294eb25524d7a35f44d51801ce9481d32"
+    },
+    {
+      "file": "female-v2-4k/cup.png",
+      "width": 3840,
+      "height": 2400,
+      "bytes": 9773843,
+      "sha256": "2125fc0eccdc9bdd8ea3f74b0244edb6bf221fb6b7a6dc7aa9ee64f688c171b2"
+    },
+    {
+      "file": "female-v2-4k/thinking.png",
+      "width": 3840,
+      "height": 2400,
+      "bytes": 9704408,
+      "sha256": "67afe0afe48b5c7a2fdb245c409cb06eb0f8458f26879dadbabb75cab58c2463"
+    },
+    {
+      "file": "female-v2-4k/window.png",
+      "width": 3840,
+      "height": 2400,
+      "bytes": 9637657,
+      "sha256": "fe063c62866586239e609bfdbdf1da97cc4aee16023f1598e1b553d478085bc6"
+    },
+    {
+      "file": "female-v2-4k/attention.png",
+      "width": 3840,
+      "height": 2400,
+      "bytes": 9827785,
+      "sha256": "3fd4964e96eb7d1b9bf6bf7ed753ef24df260cc8e62abf3a668bc7dbec942313"
+    }
+  ],
+  "active": {
+    "female": "female-v2-4k",
+    "male": "male"
+  },
+  "processing": "processing-v2-4k.json"
+}

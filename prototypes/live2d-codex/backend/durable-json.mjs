@@ -1,9 +1,10 @@
 import * as fs from 'node:fs/promises';
+import { renameSync } from 'node:fs';
 import { dirname } from 'node:path';
 
 // Callers serialize writes. Keep the previous committed bytes for recovery;
 // a failed write must never be published to the caller's in-memory state.
-export async function writeJson(file, value, io = fs) {
+async function stageJson(file, value, io) {
   const text = JSON.stringify(value, null, 2) + '\n';
   await io.mkdir(dirname(file), { recursive: true });
   async function stage(path, bytes) {
@@ -20,7 +21,22 @@ export async function writeJson(file, value, io = fs) {
     await io.rename(file + '.bak.tmp', file + '.bak');
   }
   await stage(file + '.tmp', text);
+}
+
+export async function writeJson(file, value, io = fs) {
+  await stageJson(file, value, io);
   await io.rename(file + '.tmp', file);
+}
+
+// Character paint has a synchronous final acknowledgement: all file creation,
+// serialization, backup and flushing finish first; only the atomic rename is
+// left for that acknowledgement. The caller retains its transaction queue.
+export async function prepareJson(file, value, io = fs) {
+  await stageJson(file, value, io);
+  return {
+    commit: () => (io.renameSync ?? renameSync)(file + '.tmp', file),
+    discard: async () => { try { await io.unlink(file + '.tmp'); } catch (error) { if (error.code !== 'ENOENT') throw error; } },
+  };
 }
 
 export async function readJson(file, validate = value => value, io = fs) {

@@ -1,5 +1,5 @@
 import { startAvatar } from './avatar.js';
-import { startWallpaper } from './wallpaper.js';
+import { startWallpaperRenderer } from './wallpaper-renderer.js';
 import { currentReply } from './current-reply.mjs';
 import { renderReply } from './reply-document.mjs';
 import { installSpeech } from './speech-ui.js';
@@ -23,10 +23,26 @@ let current, sending = false, composing = false, approvalKey = '', modelKey = ''
 let pendingReply = false, previousUserId = null, replyKey = '', replyText = null, replyComplete = null;
 let measureTimer, lastMeasurement = '';
 let draftTimer, speechControls, composerControls;
+let quitRequest = null;
 const seenSubmissions = new Set();
 const drafts = createDraftSession({ request: (...args) => api.draft(...args), getText: () => $('prompt').value,
   setText: text => { $('prompt').value = text; growPrompt(); }, error });
 function saveDraft() { clearTimeout(draftTimer); return drafts.save(); }
+function installDraftShutdown() {
+  api.onDraftFlush?.(async id => {
+    quitRequest = id; $('prompt').readOnly = true; clearTimeout(draftTimer); composerControls?.refresh();
+    try {
+      await speechControls?.cancelCapture();
+      await drafts.flush();
+      if (quitRequest === id) api.draftFlushed(id, { ok: true });
+    } catch (failure) {
+      if (quitRequest === id) api.draftFlushed(id, { ok: false, error: failure.message });
+    }
+  });
+  api.onDraftFlushCancelled?.(message => {
+    quitRequest = null; $('prompt').readOnly = false; composerControls?.refresh(); error(message); $('prompt').focus();
+  });
+}
 function restoreDraft(state) {
   if (isVisual) return;
   // Bind immediately on provider changes, including their connecting state.
@@ -219,8 +235,8 @@ function render(state) {
 api.onState(render);
 const initial = await call(api.snapshot()); if (initial.ok) render(initial.value);
 if (isWallpaper) {
-  startWallpaper().then(value => { wallpaper = value; if (current) wallpaper.setBackendState(current); }).catch(failure => {
-    $('wallpaper-error').textContent = `动态模型加载失败：${failure.message}。Ctrl+Alt+空格仍可打开对话。`;
+  startWallpaperRenderer().then(value => { wallpaper = value; if (current) wallpaper.setBackendState(current); }).catch(failure => {
+    $('wallpaper-error').textContent = `壁纸加载失败：${failure.message}。Ctrl+Alt+空格仍可打开对话。`;
     $('wallpaper-error').hidden = false;
   });
 } else if (isAvatar) {
@@ -234,8 +250,10 @@ if (isWallpaper) {
   api.onRemoteText(value=>drafts.appendExternal(value).then(()=>{composerControls?.refresh();}).catch(()=>error('听写文字已保存在草稿中，请重新打开这段对话。')));
   api.workspace().then(r => { if (r.ok && !r.value.legacyDotsAvailable) $('provider-select').querySelector('[value="dots"]')?.remove(); });
   speechControls = installSpeech({ api, state: () => current, isBusy: () => busy() || sending || pendingReply, error, measure: () => {scheduleMeasure();composerControls?.refresh();}, insert: text => { const prompt = $('prompt'); prompt.value += (prompt.value && !/\s$/.test(prompt.value) ? ' ' : '') + text; drafts.edited(); growPrompt(); saveDraft(); prompt.focus(); } });
-  composerControls = installComposerControls({api,drafts,submit:submitDraft,readReply:()=>speechControls.readReply(),isLocked:()=>sending || ['pending','unknown'].includes(current?.submission?.status) || ! $('approval').hidden,isCapturing:()=>speechControls.isCapturing(),error,measure:scheduleMeasure});
+  composerControls = installComposerControls({api,drafts,submit:submitDraft,readReply:()=>speechControls.readReply(),isLocked:()=>quitRequest !== null || sending || ['pending','unknown'].includes(current?.submission?.status) || ! $('approval').hidden,isCapturing:()=>speechControls.isCapturing(),error,measure:scheduleMeasure});
+  installDraftShutdown();
   api.onInputAction(action => {
+    if (quitRequest !== null) return;
     if (action === 'record') speechControls.toggleCapture();
     else if (action === 'readReply') speechControls.readReply();
     else if (action === 'send') submitDraft(true);
@@ -318,6 +336,7 @@ if (isWallpaper) {
   $('cancel-login-button').addEventListener('click', () => call(api.cancelLogin()));
   $('stop-button').addEventListener('click', () => call(current?.provider === 'dots' ? api.openDot() : api.interrupt()));
   async function submitDraft(fromShortcut = false) {
+    if (quitRequest !== null) return;
     const reject = message => { error(message); if (fromShortcut) api.windowAction('show-chat'); };
     if (['pending','unknown'].includes(current?.submission?.status)) { reject('请先核查上次发送结果，原稿已保留。'); return; }
     if (busy() || sending) { reject('当前任务尚未结束，请等待回复完成后再发送。'); return; }

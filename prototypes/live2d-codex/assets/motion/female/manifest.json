@@ -1,0 +1,59 @@
+{
+  "format": 1,
+  "clips": [
+    {
+      "id": "work-loop",
+      "file": "work-loop.mp4",
+      "duration": 1.875,
+      "fps": 24
+    },
+    {
+      "id": "work-user",
+      "file": "work-user.mp4",
+      "duration": 3.0416666666666665,
+      "fps": 24
+    },
+    {
+      "id": "user-loop",
+      "file": "user-loop.mp4",
+      "duration": 3.4166666666666665,
+      "fps": 24
+    },
+    {
+      "id": "user-work",
+      "file": "user-work.mp4",
+      "duration": 3.8333333333333335,
+      "fps": 24
+    }
+  ],
+  "posters": {
+    "work": "work.png",
+    "user": "user.png"
+  },
+  "integrity": {
+    "work-loop.mp4": {
+      "bytes": 4182559,
+      "sha256": "46cf3b697dd356e10caa5e81797ce3bf4e3913e4dfd3bcc6de8a32447c131677"
+    },
+    "work-user.mp4": {
+      "bytes": 6812402,
+      "sha256": "7c1e0bc0af3dd77bf3d14967e8d0dbc4bc2a80a6f1f902b34643ef713105abf0"
+    },
+    "user-loop.mp4": {
+      "bytes": 7277840,
+      "sha256": "5c389fb866ea4f0c104a2365131cc566ec4ada3b24f874e894ac3723ff673931"
+    },
+    "user-work.mp4": {
+      "bytes": 8543024,
+      "sha256": "03767077d63b43eb450c577ca3e7bc79bcafb8be7ee05305360b4cf824814162"
+    },
+    "work.png": {
+      "bytes": 4977631,
+      "sha256": "412e99e56324bc80a419eec5b97866d8b2677b8fa8075432e14f0634a2395e43"
+    },
+    "user.png": {
+      "bytes": 5292702,
+      "sha256": "b9cbe6fe335eecc1c66ec4a5d7bf0a8be12f05d7714043931211da15790f995e"
+    }
+  }
+}

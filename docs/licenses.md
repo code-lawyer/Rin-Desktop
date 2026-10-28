@@ -12,4 +12,8 @@ Rin-Desktop 自有源代码采用根目录 MIT 许可。安装包是多个独立
 - PyTorch CUDA 运行时中的 NVIDIA 组件与显卡驱动遵循 NVIDIA 条款。驱动需由电脑用户自行通过官方渠道安装。无兼容显卡时可以使用 CPU 听写、轻量播报和文字对话。
 - Qwen 所需 Microsoft Visual C++ 运行库不从开发电脑复制，也不重新许可；首次准备语音运行环境时，缺少的运行库会从微软固定官方地址下载、校验并启动安装。参见 [微软部署说明](https://learn.microsoft.com/en-us/cpp/windows/redistributing-visual-cpp-files)。
 
+ART-09 主应用源码另含两段 CC0 1.0 实录声音：Baconation 的小雨与 Sorinious_Genious 的笔记本键盘。处理后文件、作者链接、校验值与处理方式见[音源说明](../prototypes/live2d-codex/assets/ambience/README.md)。新增女生姿态与生成说明见[静态资源](../prototypes/live2d-codex/assets/stills/README.md)。0.6.1安装包包含这些资源；录音不属于本项目 MIT 原创素材声明。
+
 应用并非 OpenAI、Live2D 或 NVIDIA 的官方产品。完整安装清单和许可来源位于安装目录 `manifest.json`、`THIRD-PARTY-NOTICES.md`、`licenses/SOURCES.json`。
+
+0.6.1另含本项目生成的女生两态视频，来源、剪辑区间及校验清单见[动态素材说明](../prototypes/live2d-codex/assets/motion/female/README.md)。本批保留生成标识、移除生成音轨，随免费应用包供本地显示；生成媒体不声明为MIT或排他版权。[Dreamina服务条款](https://www.capcut.com/clause/dreamina-terms-of-service)第8节说明合规用户的输入与输出权益，第7节及地区/功能补充条件仍限制商业等用途，不能仅因付费生成而承诺无限制商用。生成、剪辑和超分工具不作为运行依赖分发。

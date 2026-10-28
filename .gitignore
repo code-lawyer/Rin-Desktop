@@ -30,6 +30,14 @@ prototypes/live2d-codex/tests/dots.test.mjs
 prototypes/live2d-codex/assets/*
 !prototypes/live2d-codex/assets/rainy-window-male/
 !prototypes/live2d-codex/assets/character-previews/
+!prototypes/live2d-codex/assets/ambience/
+!prototypes/live2d-codex/assets/stills/
+!prototypes/live2d-codex/assets/motion/
+prototypes/live2d-codex/assets/motion/*
+!prototypes/live2d-codex/assets/motion/female/
+prototypes/live2d-codex/assets/motion/female/*
+!prototypes/live2d-codex/assets/motion/female/manifest.json
+!prototypes/live2d-codex/assets/motion/female/README.md
 prototypes/live2d-codex/vendor/
 prototypes/live2d-codex/README.md
 prototypes/live2d-codex/THIRD_PARTY.md

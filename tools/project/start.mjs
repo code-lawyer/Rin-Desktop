@@ -3,11 +3,12 @@ import { existsSync, readFileSync, mkdirSync, openSync, closeSync, statSync } fr
 import { createRequire } from 'node:module';
 import { resolve, join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import stills from '../../prototypes/live2d-codex/backend/still-settings.cjs';
 
 export const projectRoot = resolve(import.meta.dirname, '../..');
 const providers = new Set(['codex', 'claude', 'grok', 'opencode', 'dots']);
 const pathOptions = new Set(['storage', 'project', 'qwen-root']);
-const supportedOptions = new Set(['mode', 'provider', ...pathOptions, 'debug-port', 'shortcut', 'show', 'visual']);
+const supportedOptions = new Set(['mode', 'provider', ...pathOptions, 'debug-port', 'shortcut', 'show', 'visual', 'wallpaper']);
 
 // All source entry points use this plan. Release binaries are never candidates.
 export function launchPlan(args = [], root = projectRoot) {
@@ -29,6 +30,7 @@ export function launchPlan(args = [], root = projectRoot) {
   }
   const mode = options.get('mode') ?? 'wallpaper';
   if (!['wallpaper', 'avatar'].includes(mode)) throw new Error('Mode must be wallpaper or avatar.');
+  if (options.has('wallpaper') && (options.get('wallpaper') !== 'artwork' || mode !== 'wallpaper')) throw new Error('Video wallpaper is retired. Use --wallpaper=artwork in wallpaper mode.');
   const provider = options.get('provider');
   if (provider && !providers.has(provider)) throw new Error(`Unknown provider: ${provider}`);
   if (!options.has('mode')) forwarded.unshift('--mode=wallpaper');
@@ -65,7 +67,11 @@ export function inspectLaunch(plan, { platform = process.platform, nodeVersion =
   } catch { electron = null; problems.push('Electron is unavailable. Run npm --prefix prototypes/live2d-codex ci without ELECTRON_SKIP_BINARY_DOWNLOAD.'); }
   const resources = ['vendor/live2dcubismcore.min.js'];
   if (plan.mode === 'avatar') resources.push('assets/hiyori/Hiyori.model3.json');
-  else resources.push('assets/rainy-window-v2-4k/Generated_artwork.model3.json', 'assets/rainy-window-male/Generated_artwork.model3.json');
+  else {
+    for (const pose of stills.POSES) resources.push(`assets/stills/female-v2-4k/${pose}.png`);
+    for (const pose of ['work','attention']) resources.push(`assets/stills/male/${pose}.png`);
+    resources.push('assets/ambience/light-rain.ogg', 'assets/ambience/soft-keyboard.ogg');
+  }
   const missing = resources.filter(name => !existsSync(join(plan.appRoot, name)));
   if (missing.length) problems.push(`Missing visual resources: ${missing.join(', ')}. Wallpaper resources: npm run resources. Hiyori is a local-only legacy asset.`);
   if (existsSync(join(plan.appRoot, 'portable.json'))) problems.push('The source directory contains portable.json; use a clean source tree, not a release overlay.');

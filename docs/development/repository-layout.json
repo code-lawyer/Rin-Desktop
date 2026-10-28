@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-10-21",
+  "updatedAt": "2026-10-28",
   "topLevelDirectories": [
     ".git",
     ".github",
@@ -24,6 +24,12 @@
   ],
   "rootFiles": "项目元数据、入口、开发指引；保留原 Git 身份",
   "areas": [
+    {
+      "prefix": "prototypes/video-companion/",
+      "category": "artwork-preview",
+      "responsibility": "独立本地视频人物播放器与样例窗口；素材保留在忽略目录",
+      "action": "maintain"
+    },
     {
       "prefix": "docs/development/",
       "category": "current-development",
@@ -153,7 +159,7 @@
     {
       "prefix": "work/qa/",
       "category": "qa-output",
-      "responsibility": "新的按次验证输出",
+      "responsibility": "按次追加验证证据；经清单及完整性核对后可清理可重建缓存和重复测试安装",
       "action": "append-only-runs"
     },
     {

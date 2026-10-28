@@ -22,6 +22,10 @@ test('source selection never falls back to an old release, and retains the exist
   assert.equal(checked.ready, false);
   assert.equal(checked.electron, null);
   assert.ok(checked.problems.some(problem => problem.includes('manifests')));
+  const missing=checked.problems.find(problem=>problem.startsWith('Missing visual resources:'));
+  assert.match(missing,/female-v2-4k\/cup\.png/);
+  assert.match(missing,/female-v2-4k\/thinking\.png/);
+  assert.doesNotMatch(missing,/reading\.png|rest\.png|smile\.png/);
 });
 
 test('space-containing project and data paths remain separate arguments rooted at the repository', () => {

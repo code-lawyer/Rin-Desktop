@@ -23,6 +23,8 @@ npm run check:public
 | `npm run status` | Git 与源码/资源关系 | 本地 Git；不联网刷新 |
 | `npm run qa:known-issues` | 三处已知缺陷的合成复现 | 无真实 Agent/模型/GUI；退出 1 表示仍有问题 |
 | `npm run qa:data-agent` | 数据写入/迁移/恢复与各家协议矩阵 | 无真实账户/Agent CLI/设备；Windows junction 需允许临时目录联接 |
+| `npm run qa:shutdown -- --run` | 生产preload的退出草稿握手、失败取消、恢复及磁盘读回 | 隐藏隔离Electron、真实存储、合成Agent状态；无账户/硬件 |
+| `npm run qa:inventory -- --run` | 只读目录占用和文件元数据，不跟随链接或删除 | 本地工作区；不读取文件正文 |
 | `npm run data:recover -- --source="<源>" --out="<新目录>"` | 验证并预览工作台恢复副本 | 默认不写；`--run` 复制到新目录，先关闭使用该数据的应用 |
 | `npm run qa:remote-component` | RC003 Windows 组件编译/管道/退出及输入 API 绑定 | Windows；不注册输入、不发现设备、不配对、不录音 |
 | `node --test tests/remote-buttons.test.mjs` | 设备按键归一化 | 无设备 |

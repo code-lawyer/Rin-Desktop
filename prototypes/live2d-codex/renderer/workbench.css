@@ -174,7 +174,7 @@ main { min-width: 0; min-height: 0; }
 .setting-section p { margin: 11px 0; }
 .setting-section p:empty { display: none; }
 .settings input[readonly] { caret-color: transparent; }
-.character-options { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
+.character-options { display: grid; grid-template-columns: repeat(auto-fit,minmax(180px,1fr)); gap: 16px; }
 .character-option { position: relative; cursor: pointer; min-width: 0; }
 .character-option input { position: absolute; right: 13px; top: 13px; width: 18px; height: 18px; min-height: 0; margin: 0; z-index: 1; accent-color: var(--accent); cursor: pointer; }
 .character-card { display: block; overflow: hidden; border: 2px solid var(--line); border-radius: 9px; background: var(--input); transition: border-color 160ms ease-out; }
@@ -224,3 +224,12 @@ main { min-width: 0; min-height: 0; }
 .remote-devices button { text-align: left; padding: 12px; }
 .remote-buttons label { border-radius: 8px; padding: 8px; transition: background .15s; }
 .remote-buttons .remote-pressed { background: #e1ede8; }
+.still-controls { margin-top: 16px; align-items: end; }
+.still-previews { display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: 10px; }
+.still-previews button { padding: 0; overflow: hidden; border: 2px solid var(--line); background: var(--input); }
+.still-previews img { display: block; width: 100%; aspect-ratio: 4/3; object-fit: cover; object-position: right center; }
+.still-previews span { display: block; padding: 8px 3px; font-size: 12px; }
+.still-previews button[aria-pressed=true] { border-color: var(--accent); background: #e5edf0; }
+.ambience-levels { margin-top: 16px; }
+.ambience-levels output { float: right; font-variant-numeric: tabular-nums; }
+.ambience-levels input { width: 100%; accent-color: var(--accent); }

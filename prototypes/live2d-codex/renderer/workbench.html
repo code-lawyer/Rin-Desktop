@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'"><title>Rin Desktop · 工作台</title><link rel="stylesheet" href="app://local/renderer/workbench.css"></head>
+<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'"><title>Rin Desktop · 工作台</title><link rel="stylesheet" href="app://local/renderer/workbench.css"><link rel="stylesheet" href="app://local/renderer/remote-focus.css"></head>
 <body>
 <header class="titlebar"><span class="brand">Rin Desktop</span><span class="title-sub">工作台</span><div class="window-actions"><button id="back-chat">回到对话</button><button id="close" class="close" aria-label="收起工作台"><svg class="ui-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="m5 5 10 10M15 5 5 15"/></svg></button></div></header>
 <div id="notice" role="alert" hidden></div>
@@ -25,12 +25,25 @@
       <section class="setting-section" id="wallpaper-settings" data-settings-group="wallpaper" aria-labelledby="wallpaper-heading">
         <h3 id="wallpaper-heading">壁纸人物</h3>
         <div class="character-options" role="radiogroup" aria-label="壁纸人物" aria-describedby="character-help">
-          <label class="character-option"><input type="radio" name="wallpaper-character" value="female" checked><span class="character-card"><img src="app://local/assets/character-previews/female.png" alt="雨夜窗前，穿红衬衫的黑发女生坐在扶手椅中使用笔记本电脑"><span class="character-caption"><strong>默认女生</strong><span>红衬衫 · Serena 女声</span></span></span></label>
+          <label class="character-option"><input type="radio" name="wallpaper-character" value="female" checked><span class="character-card"><img src="app://local/assets/stills/female-v2/work.png" alt="雨夜窗前，穿红衬衫的黑发女生在小桌前使用笔记本电脑"><span class="character-caption"><strong>默认女生</strong><span>红衬衫 · Serena 女声</span></span></span></label>
           <label class="character-option"><input type="radio" name="wallpaper-character" value="male"><span class="character-card"><img src="app://local/assets/character-previews/male.png" alt="雨夜窗前，戴金丝眼镜的黑色短发男青年，穿黑衬衫和西裤使用笔记本电脑"><span class="character-caption"><strong>黑衫男生</strong><span>金丝眼镜 · Dylan 男声</span></span></span></label>
         </div>
         <p id="character-help" class="hint">选择后自动保存，同时切换默认声线。加载失败会保留原人物。</p>
         <p id="character-status" class="hint" role="status" aria-live="polite"></p>
         <button id="retry-character" aria-describedby="character-status" hidden>重试加载</button>
+        <label class="check"><input id="wallpaper-motion" type="checkbox">女生动态壁纸 · 工作与看向你</label>
+        <p id="motion-hint" class="hint">工作与陪伴各自循环播放，对话时在动作接点转向你。关闭后使用静态姿态。</p>
+        <div class="field-grid still-controls"><label>人物姿态<select id="still-pose"><option value="auto">自动 · 随工作与对话切换</option><option value="work">伏案工作</option><option value="cup">捧杯休息</option><option value="thinking">托腮思考</option><option value="window">侧身看雨</option><option value="attention">转身陪伴</option></select></label><button id="pause-stills" aria-pressed="false">暂停壁纸与环境音</button></div>
+        <p id="still-status" class="hint" role="status" aria-live="polite"></p>
+        <div id="still-previews" class="still-previews" role="group" aria-label="预览人物姿态"></div>
+        <p class="hint">点击小图可固定查看；选择“自动”恢复轮换。女生以工作为主，每轮穿插捧杯、托腮和看雨；对话时转身陪伴。男生保留工作与回应。</p>
+      </section>
+      <section class="setting-section" id="ambience-settings" data-settings-group="wallpaper" aria-labelledby="ambience-heading">
+        <h3 id="ambience-heading">窗边环境音</h3>
+        <label class="check"><input id="ambience-enabled" type="checkbox">开启小雨与轻敲键盘</label>
+        <div class="field-grid ambience-levels"><label for="rain-volume">窗外小雨 <output id="rain-volume-label">12%</output><input id="rain-volume" type="range" min="0" max="100" step="1" value="12"></label><label for="key-volume">轻敲键盘 <output id="key-volume-label">8%</output><input id="key-volume" type="range" min="0" max="100" step="1" value="8"></label></div>
+        <p class="hint">轻敲只在专注工作时出现，句间留白。听写时静音，朗读时压低小雨并停止键盘声；与播报音量独立。这里的调整自动保存。</p>
+        <p id="ambience-status" class="hint" role="status" aria-live="polite"></p><button id="retry-ambience" hidden>重试加载环境音</button>
       </section>
       <section class="setting-section" id="playback-settings" data-settings-group="voice" hidden>
         <h3>回复朗读</h3>

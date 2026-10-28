@@ -37,7 +37,14 @@ test('remote approval requires two confirmations on the same focused action',t=>
   const old=globalThis.document;t.after(()=>globalThis.document=old);
   let receive,focus,clicked=0;const notices=[];
   const approve={disabled:false,tagName:'BUTTON',closest:selector=>selector==='#approval'?{}:null,getClientRects:()=>[{}],matches:()=>true,click:()=>clicked++};
-  globalThis.document={querySelectorAll:()=>[approve],activeElement:approve,addEventListener:(_event,fn)=>focus=fn};
+  globalThis.document={querySelectorAll:()=>[approve],activeElement:approve,addEventListener:(event,fn)=>{if(event==='focusin')focus=fn;}};
   installRemoteNavigation({onRemoteAction:fn=>receive=fn},{notice:value=>notices.push(value)});
   receive('confirm');assert.equal(clicked,0);focus();receive('confirm');assert.equal(clicked,0);receive('confirm');assert.equal(clicked,1);assert.equal(notices.length,2);
+});
+
+test('remote selection skips unavailable female poses when the male character is selected',t=>{
+  const old=globalThis.document;t.after(()=>globalThis.document=old);let receive,changed=0;
+  const select={tagName:'SELECT',selectedIndex:1,options:[{},{},{disabled:true},{disabled:true},{disabled:true},{}],closest:()=>null,getClientRects:()=>[{}],dispatchEvent:()=>changed++};
+  globalThis.document={querySelectorAll:()=>[select],activeElement:select,addEventListener(){}};
+  installRemoteNavigation({onRemoteAction:fn=>receive=fn});receive('right');assert.equal(select.selectedIndex,5);receive('left');assert.equal(select.selectedIndex,1);assert.equal(changed,2);
 });

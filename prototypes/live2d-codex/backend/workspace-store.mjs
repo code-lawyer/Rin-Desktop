@@ -3,16 +3,18 @@ import { join, resolve, basename } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import actions from './input-actions.cjs';
 import characters from './character-profiles.cjs';
+import wallpaperChoices from './wallpaper-choice.cjs';
+import stills from './still-settings.cjs';
 import catalog from './agent-catalog.cjs';
 import { remoteSettings } from './remote-config.mjs';
-import { readJson, writeJson } from './durable-json.mjs';
+import { readJson, writeJson, prepareJson } from './durable-json.mjs';
 import { pathKey } from './path-identity.mjs';
 export { pathKey } from './path-identity.mjs';
 const { isCliAgent } = catalog;
 
 export const { DEFAULT_SHORTCUTS, DEFAULT_REMOTE_KEYS } = actions;
 const { DEFAULT_CHARACTER, characterProfile, isCharacter, isQwenVoice, isChineseVoice } = characters;
-const defaults = () => ({ format: 1, projects: [], drafts: {}, settings: { character: DEFAULT_CHARACTER, completionSound: true, ttsResident: false, ttsEngine: 'qwen', qwenVoice: 'Serena', qwenRoot: '', autoSpeak: false, prepareSpeech: false, voice: 3, speed: 1, microphone: '', shortcuts: { ...DEFAULT_SHORTCUTS }, remoteEnabled: false, remoteKeys: { ...DEFAULT_REMOTE_KEYS } } });
+const defaults = () => ({ format: 1, projects: [], drafts: {}, settings: { character: DEFAULT_CHARACTER, wallpaperKind: 'artwork', completionSound: true, ttsResident: false, ttsEngine: 'qwen', qwenVoice: 'Serena', qwenRoot: '', autoSpeak: false, prepareSpeech: false, voice: 3, speed: 1, microphone: '', shortcuts: { ...DEFAULT_SHORTCUTS }, remoteEnabled: false, remoteKeys: { ...DEFAULT_REMOTE_KEYS } } });
 export const draftKey = target => {
   if (!target || typeof target.cwd !== 'string') throw new Error('草稿目标无效。');
   const provider = target?.provider ?? 'codex';
@@ -66,6 +68,9 @@ export class WorkspaceStore {
       for (const submission of Object.values(this.data.submissions)) if (submission.status === 'pending') submission.status = 'unknown';
       const profile = characterProfile(saved.settings?.character);
       this.data.settings.character = profile.id;
+      // Retired video selections migrate without changing the person or custom voices.
+      this.data.settings.wallpaperKind = 'artwork';
+      Object.assign(this.data.settings, stills.stillSettings(saved.settings));
       this.data.settings.rc003 = remoteSettings(saved.settings?.rc003);
       if (!isQwenVoice(saved.settings?.qwenVoice)) this.data.settings.qwenVoice = profile.qwenVoice;
       if (!isChineseVoice(saved.settings?.voice)) this.data.settings.voice = profile.voice;
@@ -147,8 +152,34 @@ export class WorkspaceStore {
   }
   saveDraft(target, text, dictationId) { return this.transaction(data => this.setDraft(data, target, text, dictationId)); }
   async updateSettings(patch) {
-    await this.transaction(data => {
+    await this.transaction(data => this.applySettings(data, patch));
+    return this.snapshot();
+  }
+  prepareSettings(patch) {
+    const ready = Promise.withResolvers();
+    this.queue = this.queue.catch(() => {}).then(async () => {
+      const next = structuredClone(this.data);
+      this.applySettings(next, patch);
+      const staged = await prepareJson(this.file, next, this.io);
+      const finished = Promise.withResolvers(); let settled = false;
+      const cancel = () => { if (!settled) { settled = true; finished.resolve(false); } };
+      ready.resolve({ cancel, commit: () => {
+        if (settled) throw new Error('人物切换已取消，请重试。');
+        try { staged.commit(); this.data = next; settled = true; finished.resolve(true); }
+        catch (error) { cancel(); throw error; }
+      } });
+      if (!await finished.promise) await staged.discard();
+    });
+    this.queue.catch(ready.reject);
+    return ready.promise;
+  }
+  applySettings(data, patch) {
     const next = data.settings;
+    Object.assign(next, stills.validateStillPatch(patch));
+    if ('wallpaperKind' in patch) {
+      if (!wallpaperChoices.isWallpaperKind(patch.wallpaperKind)) throw new Error('壁纸类型无效。');
+      next.wallpaperKind = patch.wallpaperKind;
+    } else if ('character' in patch && patch.character !== next.character) next.wallpaperKind = 'artwork';
     if ('rc003' in patch) next.rc003 = remoteSettings(patch.rc003);
     if ('character' in patch) {
       if (!isCharacter(patch.character)) throw new Error('请选择已支持的壁纸人物。');
@@ -174,7 +205,5 @@ export class WorkspaceStore {
         const v = patch[group][key]; if (typeof v !== 'string' || v.length > 80 || /[\r\n]/.test(v)) throw new Error('按键映射无效。'); next[group][key] = v;
       }
     }
-    });
-    return this.snapshot();
   }
 }
