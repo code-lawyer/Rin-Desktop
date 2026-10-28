@@ -969,8 +969,8 @@
         },
         {
           "ref": "docs/development/release-0.6.1-review.md",
-          "kind": "final-source-review-and-isolated-installer-validation",
-          "summary": "2026-10-28：用户测试ok，Standards/Spec最终复核无未解决阻断。0.6.1源码458项离线通过、构建/依赖审计/工作区扫描通过；正式包8308文件、97项源码、6项媒体与77项既有资源核对；中文路径新装、0.5升级、注册卸载、模拟数据保留和旧版便携文件回装通过。GitHub同步与CI按发布记录独立登记，不冒领真实账户或硬件矩阵。"
+          "kind": "final-review-ci-and-isolated-installer-validation",
+          "summary": "2026-10-28：用户测试ok，双轴复核无未解决阻断。0.6.1源码本机458项、GitHub公开451项、构建及539文件双重扫描通过；fc27bdf已推送原开发分支，PR #2的两路CI通过。正式包8308文件、97项源码、6媒体和77项既有资源核对；隔离新装、升级、注册卸载、模拟数据保留及旧版便携文件回装通过。版本标签、附件SHA-256及限定范围见发布记录，不冒领硬件或真实账户矩阵。"
         }
       ]
     },
@@ -1003,8 +1003,8 @@
         },
         {
           "ref": "docs/development/release-0.6.1-review.md",
-          "kind": "final-source-review-and-isolated-installer-validation",
-          "summary": "2026-10-28：用户测试ok，Standards/Spec最终复核无未解决阻断。0.6.1源码458项离线通过、构建/依赖审计/工作区扫描通过；正式包8308文件、97项源码、6项媒体与77项既有资源核对；中文路径新装、0.5升级、注册卸载、模拟数据保留和旧版便携文件回装通过。GitHub同步与CI按发布记录独立登记，不冒领真实账户或硬件矩阵。"
+          "kind": "final-review-ci-and-isolated-installer-validation",
+          "summary": "2026-10-28：用户测试ok，双轴复核无未解决阻断。0.6.1源码本机458项、GitHub公开451项、构建及539文件双重扫描通过；fc27bdf已推送原开发分支，PR #2的两路CI通过。正式包8308文件、97项源码、6媒体和77项既有资源核对；隔离新装、升级、注册卸载、模拟数据保留及旧版便携文件回装通过。版本标签、附件SHA-256及限定范围见发布记录，不冒领硬件或真实账户矩阵。"
         }
       ]
     },
@@ -1028,7 +1028,7 @@
       "acceptance": [
         "稳定支持仅声明已验收范围；实验能力明确标识、默认由用户选择，不放宽审批/数据/凭据约束；版本、哈希、许可、指南与已知限制一致；完整矩阵另按依赖任务验收。"
       ],
-      "nextAction": "0.6.1正式包已验收，完成实际index审计、GitHub CI与附件发布核对；完整硬件、真实账户和系统矩阵仍按依赖任务验收。",
+      "nextAction": "维护0.6.1发布的校验、来源与实验边界；继续完整硬件、真实账户和系统/数据回退矩阵，后续版本重新核对实际包与CI。",
       "evidence": [
         {
           "ref": "docs/development/release-0.5.0-review.md",
@@ -1042,8 +1042,8 @@
         },
         {
           "ref": "docs/development/release-0.6.1-review.md",
-          "kind": "final-source-review-and-isolated-installer-validation",
-          "summary": "2026-10-28：用户测试ok，Standards/Spec最终复核无未解决阻断。0.6.1源码458项离线通过、构建/依赖审计/工作区扫描通过；正式包8308文件、97项源码、6项媒体与77项既有资源核对；中文路径新装、0.5升级、注册卸载、模拟数据保留和旧版便携文件回装通过。GitHub同步与CI按发布记录独立登记，不冒领真实账户或硬件矩阵。"
+          "kind": "final-review-ci-and-isolated-installer-validation",
+          "summary": "2026-10-28：用户测试ok，双轴复核无未解决阻断。0.6.1源码本机458项、GitHub公开451项、构建及539文件双重扫描通过；fc27bdf已推送原开发分支，PR #2的两路CI通过。正式包8308文件、97项源码、6媒体和77项既有资源核对；隔离新装、升级、注册卸载、模拟数据保留及旧版便携文件回装通过。版本标签、附件SHA-256及限定范围见发布记录，不冒领硬件或真实账户矩阵。"
         }
       ]
     },
@@ -2363,8 +2363,8 @@
         },
         {
           "ref": "docs/development/release-0.6.1-review.md",
-          "kind": "final-source-review-and-isolated-installer-validation",
-          "summary": "2026-10-28：用户测试ok，Standards/Spec最终复核无未解决阻断。0.6.1源码458项离线通过、构建/依赖审计/工作区扫描通过；正式包8308文件、97项源码、6项媒体与77项既有资源核对；中文路径新装、0.5升级、注册卸载、模拟数据保留和旧版便携文件回装通过。GitHub同步与CI按发布记录独立登记，不冒领真实账户或硬件矩阵。"
+          "kind": "final-review-ci-and-isolated-installer-validation",
+          "summary": "2026-10-28：用户测试ok，双轴复核无未解决阻断。0.6.1源码本机458项、GitHub公开451项、构建及539文件双重扫描通过；fc27bdf已推送原开发分支，PR #2的两路CI通过。正式包8308文件、97项源码、6媒体和77项既有资源核对；隔离新装、升级、注册卸载、模拟数据保留及旧版便携文件回装通过。版本标签、附件SHA-256及限定范围见发布记录，不冒领硬件或真实账户矩阵。"
         }
       ]
     },
@@ -2746,8 +2746,8 @@
         },
         {
           "ref": "docs/development/release-0.6.1-review.md",
-          "kind": "final-source-review-and-isolated-installer-validation",
-          "summary": "2026-10-28：用户测试ok，Standards/Spec最终复核无未解决阻断。0.6.1源码458项离线通过、构建/依赖审计/工作区扫描通过；正式包8308文件、97项源码、6项媒体与77项既有资源核对；中文路径新装、0.5升级、注册卸载、模拟数据保留和旧版便携文件回装通过。GitHub同步与CI按发布记录独立登记，不冒领真实账户或硬件矩阵。"
+          "kind": "final-review-ci-and-isolated-installer-validation",
+          "summary": "2026-10-28：用户测试ok，双轴复核无未解决阻断。0.6.1源码本机458项、GitHub公开451项、构建及539文件双重扫描通过；fc27bdf已推送原开发分支，PR #2的两路CI通过。正式包8308文件、97项源码、6媒体和77项既有资源核对；隔离新装、升级、注册卸载、模拟数据保留及旧版便携文件回装通过。版本标签、附件SHA-256及限定范围见发布记录，不冒领硬件或真实账户矩阵。"
         }
       ]
     },

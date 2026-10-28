@@ -38,6 +38,8 @@ DATA-01/02 增加每个 provider 最近一次发送记录、提交前原稿保�
 
 2026-10-22 已将审查后的整合源码推送到原origin的codex/public-release，建立origin/codex/public-release upstream；源码修复提交f1e22a6的push与PR两路CI均通过。[PR #1](https://github.com/code-lawyer/Rin-Desktop/pull/1)负责合入main，后续文档与资源清单提交沿用同一审查入口。0.5.0版本、安装验证与发布入口见[发布审查](../release-audit.md)，具体版本源码以v0.5.0标签为准。旧Test包、私人资料、模型和运行数据继续保留在忽略目录；并行新建且尚未审定的视频调研工具不混入此次发布快照。
 
+2026-10-28：0.6.1整合后的源码提交`fc27bdf`推送同一开发分支，[PR #2](https://github.com/code-lawyer/Rin-Desktop/pull/2)的push/PR两路CI通过，干净Windows环境451项公开测试、构建、台账与双重扫描无问题。正式安装器、完整校验值和隔离安装生命周期见[0.6.1发布记录](release-0.6.1-review.md)；最终版本以`v0.6.1`标签和对应Release为准，旧候选与个人数据不覆盖。
+
 ## 应用发布步骤
 
 发布范围先由已通过的任务决定。未验收的设备或后端不能只因为源码已存在就进入正式支持列表。
