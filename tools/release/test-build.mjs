@@ -5,6 +5,7 @@ import { join, resolve } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { writeManifest } from './manifest.mjs';
 import { releaseVersion, requireFreshDirectory } from './release-inputs.mjs';
+import { inspectMotionAssets } from './motion-assets.mjs';
 
 const root = resolve(import.meta.dirname, '../..'), app = join(root, 'prototypes/live2d-codex');
 const id = process.argv.find(arg => arg.startsWith('--id='))?.slice(5) || new Date().toISOString().replace(/[-:TZ.]/g,'').slice(0,14) + '-data-agent';
@@ -12,6 +13,7 @@ if (!/^[a-z0-9][a-z0-9.-]{0,90}$/.test(id)) throw new Error('Invalid build id.')
 const version = await releaseVersion(root);
 const name = `Rin-Desktop-${version}-Test-${id}`, output = join(root,'release','test-builds',id), stage = join(output,name);
 await requireFreshDirectory(output);
+await inspectMotionAssets(join(app, 'assets/motion/female'));
 const compiler = process.env.INNO_ISCC || join(root,'work/release-build/tools/inno/ISCC.exe'); await access(compiler);
 execFileSync(process.execPath,[join(root,'tools/release/audit-public.mjs'),'--worktree'],{cwd:root,windowsHide:true,stdio:'inherit'});
 const git = args => execFileSync('git',['-c',`safe.directory=${root}`,...args],{cwd:root,encoding:'utf8'}).trim();

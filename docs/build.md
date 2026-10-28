@@ -19,7 +19,13 @@ RC003 输入层还使用锁定的 Koffi 3.3.3 和 `@koromix/koffi-win32-x64` 预
 npm run resources
 ```
 
-这条命令按 `tools/release/resource-manifest.json` 下载基础安装包，校验 SHA-256 后以不注册安装项的方式解包到 `work/release-resources/版本号`。不下载语音模型或 CLI。源码树缺失的运行时与 Core 目录会连接到解包目录；壁纸资源逐项补齐，已有男性素材和预览不覆盖。请先阅读第三方许可。
+这条命令按 `tools/release/resource-manifest.json` 下载基础安装包，校验 SHA-256 后以不注册安装项的方式解包到 `work/release-resources/版本号`。不下载语音模型或 CLI。源码树缺失的运行时与 Core 目录会连接到解包目录；壁纸资源递归补齐缺失文件，已有文件保留，且不写入目录联接指向的其他位置。补齐后校验动态媒体的大小与哈希，不能只因目录或清单已存在就跳过视频。请先阅读第三方许可。
+
+当前清单锁定0.6.1应用安装包。默认从该版本Release下载；已有同版安装包时可使用下列命令，仍须通过清单的大小和SHA-256校验，不能换成任意安装器。它仅提供锁定的视觉/基础运行资源，不会用安装包中的应用代码覆盖当前源码或Electron依赖。
+
+```powershell
+npm run resources -- --installer="release/v0.6.1/Rin-Desktop-0.6.1-Setup.exe"
+```
 
 准备好后，在仓库根目录运行：
 
@@ -37,12 +43,17 @@ npm start
 人物切换的原生回归检查需要已安装的 Playwright，可通过 `VIBE_PLAYWRIGHT` 指定其模块路径。先运行 `npm run build`，再执行 `node tools/qa/gui/run.mjs --case=character-switch --run`；验证便携包时追加 `--package=便携包绝对目录`。旧verify-character-switch路径也转发同一实现，默认帮助，需显式追加`--run`。检查使用独立临时数据，覆盖模型与贴图加载失败、明确重试、声线保留、快速切换和重启恢复，不发送对话或加载语音模型，结果保存在每次新建的 `work/qa/gui-character-switch/` 子目录。
 
 ```powershell
-$env:VIBE_RESOURCE_APP = (Resolve-Path 'work/release-resources/0.4.0/resources/app').Path
+$resourceVersion = (Get-Content tools/release/resource-manifest.json -Raw | ConvertFrom-Json).version
+$env:VIBE_RESOURCE_APP = (Resolve-Path "work/release-resources/$resourceVersion/resources/app").Path
 $env:INNO_ISCC = 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe'
 npm run package
 ```
 
 打包始终写入新的版本目录，已有目录会被拒绝。输出独立基础安装器，先检查根目录与应用版本一致，并拒绝覆盖已有安装器输出，再将锁定哈希写入仓库内的 `tools/release/resource-manifest.json`，不将模型或 CLI 加入应用。运行源码可执行 `npm --prefix prototypes/live2d-codex start`；语音仍在应用内按需下载。
+
+当前两态动态分支还要求 `prototypes/live2d-codex/assets/motion/female/manifest.json` 与正式四段视频、两张回退图。清单沿用播放器的 `format: 1`、`clips`、`posters`，并增加 `integrity`：以六个媒体文件名为键，记录各自的正整数字节数 `bytes` 与小写 SHA-256 `sha256`。四个片段ID为 `work-loop`、`work-user`、`user-loop`、`user-work`；每个条目包含独立的 `.mp4` 文件名、实际 `duration` 与 `fps`，两张 `.png` 由 `posters.work/user` 指定。
+
+正式/测试/便携打包入口在写入新包之前校验这些文件，缺失或哈希不符会停止；只收集六个媒体和规范化运行清单，不把生成账户响应、母片或制作目录整体打包。复制后的字节再次校验，最后才写运行清单。安装包核查还将这六个媒体与当前源码资源逐项比较。完整性校验不代表接缝、4K效果或许可验收。[本轮制作与接入记录](development/two-state-app-integration-2026-10-27.md)区分源代码、媒体和安装验收。已发布0.5.0的基础资源不包含本次四段视频；0.6.0旧候选也不包含2026-10-28后续代码与安全修复，不能用版本号代替包内容核对。
 
 内部验收使用 `npm run package:test -- --id=<新的测试标识>`，需要相同资源、Inno Setup 和 Windows tar。该命令生成独立 ZIP 与测试安装器、文件/源码指纹、离线检查、数据恢复和验收表，输出 `release/test-builds/<标识>`；不修改正式资源清单、基础版本或已有产物。测试安装器使用独立 AppId/目录/快捷方式，测试数据默认隔离。构建不启动真实 Agent 或硬件，人工验收按[测试清单](development/test-acceptance.md)进行。
 

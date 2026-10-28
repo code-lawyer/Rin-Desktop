@@ -2,6 +2,10 @@
 import {spawn} from 'node:child_process';
 import {mkdir} from 'node:fs/promises';
 import {join,resolve} from 'node:path';
+if (process.argv.includes('--help') || process.argv.includes('-h')) {
+  console.log('Usage: npm run qa:interface\nChecks the interface in isolated Electron windows. --help: help only, no files or processes.');
+  process.exit(0);
+}
 const root=resolve(import.meta.dirname,'../..');
 const output=join(root,'work/qa/interface-'+new Date().toISOString().replace(/[:.]/g,'-'));
 await mkdir(output,{recursive:true});

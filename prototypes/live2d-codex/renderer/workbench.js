@@ -1,6 +1,7 @@
 import { renderReply } from './reply-document.mjs';
 import { isTaskBusy } from '../backend/task-state.mjs';
 import characters from '../backend/character-profiles.cjs';
+import stills from '../backend/still-settings.cjs';
 import catalog from '../backend/agent-catalog.cjs';
 import { populateAgentPicker } from './agent-picker.mjs';
 import { installRemoteSettings, installRemoteNavigation } from './remote-ui.mjs';
@@ -149,7 +150,7 @@ async function saveCharacter(character) {
   $('retry-character').disabled = true;
   $('save-settings').disabled = true;
   try {
-    acceptWorkspace(await run(api.saveSettings({ character })));
+    acceptWorkspace(await run(api.saveSettings({ character, wallpaperKind: 'artwork' })));
     fillVoices(); updateSpeechStatus();
   } finally {
     updateCharacterStatus();
@@ -164,6 +165,7 @@ function fillSettings() {
   if (document.activeElement?.matches('#shortcuts input,#remote-keys input')) { updateSpeechStatus(); return; }
   const s = workspace.settings; $('auto-speak').checked = s.autoSpeak; $('speed').value = String(s.speed); $('remote-enabled').checked = s.remoteEnabled;
   fillVoices();
+  fillStills();
   keyFields('shortcuts',s.shortcuts); keyFields('remote-keys',s.remoteKeys); fillModels();
   $('tts-engine').value = s.ttsEngine || 'qwen';
   updateSpeechStatus();
@@ -171,6 +173,8 @@ function fillSettings() {
 }
 function updateSpeechStatus() {
   updateCharacterStatus();
+  updateStillStatus();
+  updateAmbienceStatus();
   updateResourceStatus();
   $('shortcut-errors').hidden = !workspace.shortcutErrors?.length; $('shortcut-errors').textContent = workspace.shortcutErrors?.join(' ') || '';
   const speech = workspace.speech ?? {}, phase = speech.phase ?? 'unloaded', qwen = $('tts-engine').value === 'qwen';
@@ -253,6 +257,63 @@ function showSettings() { $('settings').hidden = false; $('conversations').hidde
 $('settings-tab').onclick = showSettings;
 for (const radio of document.querySelectorAll('[name="wallpaper-character"]')) radio.onchange = act(() => saveCharacter(radio.value));
 $('retry-character').onclick = act(() => saveCharacter(workspace.wallpaper.character));
+let stillSaving = 0;
+let previewCharacter;
+function fillStills() {
+  if(stillSaving) return;
+  const s=stills.stillSettings(workspace.settings);
+  const animated=workspace.settings.character==='female' && s.wallpaperMotion;
+  $('wallpaper-motion').checked=s.wallpaperMotion;
+  $('wallpaper-motion').disabled=workspace.settings.character!=='female';
+  $('motion-hint').textContent=workspace.settings.character==='male'?'男生使用静态壁纸。':'工作与陪伴各自循环播放，对话时在动作接点转向你。关闭后使用静态姿态。';
+  $('still-pose').value=s.stillPose;
+  for(const option of $('still-pose').options) option.disabled=(workspace.settings.character==='male' || animated) && !['auto','work','attention'].includes(option.value);
+  if(animated && !['auto','work','attention'].includes(s.stillPose)) $('still-pose').value='auto';
+  if(workspace.settings.character==='male' && !['auto','work','attention'].includes(s.stillPose)) $('still-pose').value='work';
+  const character=workspace.settings.character==='male'?'male':'female';
+  if(previewCharacter!==`${character}:${animated}`) {
+    previewCharacter=`${character}:${animated}`;
+    $('still-previews').replaceChildren();
+    for(const pose of character==='male'||animated?['work','attention']:stills.POSES) {
+      const label=character==='male'?(pose==='work'?'专注工作':'看向你'):stills.POSE_LABELS[pose];
+      const button=node('button'); button.type='button'; button.dataset.pose=pose; button.setAttribute('aria-label','固定查看：'+label);
+      const image=node('img'); image.alt=''; image.src=animated?`app://local/assets/motion/female/${pose==='work'?'work':'user'}.png`:`app://local/assets/stills/${character==='female'?'female-v2':'male'}/${pose}.png`;
+      button.append(image,node('span',label)); button.onclick=act(()=>saveStillSetting({stillPose:pose})); $('still-previews').append(button);
+    }
+  }
+  for(const button of $('still-previews').children) button.setAttribute('aria-pressed',String(button.dataset.pose===$('still-pose').value));
+  updateStillStatus();
+  $('ambience-enabled').checked=s.ambienceEnabled;
+  for(const [field,key] of [['rain-volume','rainVolume'],['key-volume','keyVolume']]) { $(field).value=Math.round(s[key]*100); $(field+'-label').textContent=$(field).value+'%'; }
+  updateAmbienceStatus();
+}
+function updateStillStatus() {
+  const character=workspace.settings.character==='male'?'male':'female', shown=workspace.wallpaper;
+  const poseLabel=character==='male'?(shown?.pose==='attention'?'看向你':'专注工作'):stills.POSE_LABELS[shown?.pose];
+  $('still-status').textContent=shown?.character===character && poseLabel && shown?.activity
+    ? `当前画面：${poseLabel} · ${shown.motionPhase==='transition'?'正在转身':shown.model==='motion-clips' && shown.motionPhase==='loop'?'循环播放 · ':''}${shown.motionPhase==='transition'?'':stills.ACTIVITY_LABELS[shown.activity] || '等待状态更新'}` : '等待壁纸画面就绪…';
+}
+function updateAmbienceStatus() {
+  const status=workspace.ambience;
+  $('ambience-status').textContent=status?.phase==='error'?status.error:workspace.wallpaperPaused?'壁纸和环境音已暂停。':!workspace.settings.ambienceEnabled?'环境音已关闭。':status?.phase==='loading'?'正在载入声音…':status?.phase==='ready'?'已开启 · 小雨和轻敲将随当前状态播放。':'等待壁纸声音就绪…';
+  $('retry-ambience').hidden=status?.phase!=='error';
+  $('pause-stills').setAttribute('aria-pressed',String(!!workspace.wallpaperPaused));
+  $('pause-stills').textContent=workspace.wallpaperPaused?'继续壁纸与环境音':'暂停壁纸与环境音';
+}
+async function saveStillSetting(patch) {
+  stillSaving++;
+  try { acceptWorkspace(await run(api.saveSettings(patch))); }
+  finally { stillSaving--; fillStills(); }
+}
+$('still-pose').onchange=act(()=>saveStillSetting({stillPose:$('still-pose').value}));
+$('wallpaper-motion').onchange=act(()=>saveStillSetting({wallpaperMotion:$('wallpaper-motion').checked}));
+$('ambience-enabled').onchange=act(()=>saveStillSetting({ambienceEnabled:$('ambience-enabled').checked}));
+for(const [field,key] of [['rain-volume','rainVolume'],['key-volume','keyVolume']]) {
+  $(field).oninput=()=>{ $(field+'-label').textContent=$(field).value+'%'; };
+  $(field).onchange=act(()=>saveStillSetting({[key]:Number($(field).value)/100}));
+}
+$('retry-ambience').onclick=act(async()=>acceptWorkspace(await run(api.wallpaperControl('retry-audio'))));
+$('pause-stills').onclick=act(async()=>acceptWorkspace(await run(api.wallpaperControl('pause',!workspace.wallpaperPaused))));
 $('tts-resident').onchange = act(async () => { const enabled = $('tts-resident').checked; try { await saveSpeechChoice({ttsResident:enabled}); } finally { updateSpeechStatus(); } });
 $('cancel-resource').onclick = act(async () => { await run(api.cancelDownload()); });
 $('tts-engine').onchange = act(() => saveSpeechChoice({ttsEngine:$('tts-engine').value}));
@@ -265,7 +326,7 @@ $('retry-tts').onclick = act(() => saveSpeechChoice({ttsResident:true}));
 $('choose-qwen').onclick = act(async () => { acceptWorkspace(await run(api.chooseQwen())); updateSpeechStatus(); });
 $('use-existing-data').onclick = act(() => run(api.useData()));
 $('save-settings').onclick = act(saveSettings); $('preview-voice').onclick = act(async () => { await saveSettings(); await run(api.previewVoice()); }); $('refresh-microphones').onclick = act(refreshDevices);
-$('settings').addEventListener('change',event => { if (!event.target.closest('#remote-settings') && event.target.name !== 'wallpaper-character' && !['model','effort','tts-resident','tts-engine','qwen-voice','auto-speak','prepare-speech','completion-sound'].includes(event.target.id)) settingsDirty = true; });
+$('settings').addEventListener('change',event => { if (!event.target.closest('#remote-settings,#ambience-settings') && event.target.name !== 'wallpaper-character' && !['wallpaper-motion','still-pose','model','effort','tts-resident','tts-engine','qwen-voice','auto-speak','prepare-speech','completion-sound'].includes(event.target.id)) settingsDirty = true; });
 $('model').onchange = act(async () => { await run(api.chooseModel($('model').value)); }); $('effort').onchange = act(async () => { await run(api.chooseEffort($('effort').value)); });
 $('close').onclick = () => api.windowAction('hide-workbench'); $('back-chat').onclick = () => api.windowAction('show-chat');
 window.addEventListener('blur', () => { if (document.activeElement?.matches('#shortcuts input,#remote-keys input')) document.activeElement.blur(); });
@@ -286,7 +347,7 @@ api.onState(state => {
   updateActivity(); if (changedModel) fillModels();
   if (ready && (changedProvider || !wasReady) && available()) refreshWorkspace().then(() => refreshThreads()).catch(() => {});
 });
-api.onWorkspace(value => { const settingsChanged = JSON.stringify(value.settings) !== JSON.stringify(workspace.settings), characterChanged = value.settings.character !== workspace.settings.character; if (!acceptWorkspace(value) || !ready) return; renderProjects(); if (!projectId) refreshWorkspace().catch(() => {}); if (characterChanged) fillVoices(); if (settingsChanged && !settingsDirty) fillSettings(); else updateSpeechStatus(); });
-api.onWorkbenchRefresh(page => { refreshWorkspace().then(() => { if (page === 'speech' || page === 'remote') { showSettings(); settingsNavigation.show(page==='remote'?'remote-settings':'playback-settings'); } else if ($('settings').hidden) return refreshThreads(); }).catch(() => {}); });
+api.onWorkspace(value => { const settingsChanged = JSON.stringify(value.settings) !== JSON.stringify(workspace.settings), characterChanged = value.settings.character !== workspace.settings.character; if (!acceptWorkspace(value) || !ready) return; renderProjects(); if (!projectId) refreshWorkspace().catch(() => {}); if (characterChanged) { fillVoices(); fillStills(); } if (settingsChanged && !settingsDirty) fillSettings(); else updateSpeechStatus(); });
+api.onWorkbenchRefresh(page => { refreshWorkspace().then(() => { if (['speech','remote','wallpaper'].includes(page)) { showSettings(); settingsNavigation.show(page === 'remote' ? 'remote-settings' : page === 'wallpaper' ? 'wallpaper-settings' : 'playback-settings'); } else if ($('settings').hidden) return refreshThreads(); }).catch(() => {}); });
 try { current = await run(api.snapshot()); await refreshWorkspace(); ready = true; } catch { ready = true; }
 import inputActions from '../backend/input-actions.cjs';

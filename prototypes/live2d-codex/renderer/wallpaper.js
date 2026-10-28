@@ -6,8 +6,7 @@ import { typingMotion } from './typing-motion.mjs';
 import characters from '../backend/character-profiles.cjs';
 import { WallpaperScenes } from './wallpaper-scenes.mjs';
 
-export async function startWallpaper() {
-  const host = document.getElementById('wallpaper-view'), api = window.companion;
+export async function startWallpaper({ host = document.getElementById('wallpaper-view'), api = window.companion } = {}) {
   let backend = {}, presentation = {}, desired, look = 0, hands = 1, elapsed = 0;
   let model, profile, selectionAttempt, renderedRequest;
   const app = new Application();
@@ -119,6 +118,12 @@ export async function startWallpaper() {
   await selectCharacter();
   fit(); const observer = new ResizeObserver(fit); observer.observe(host); updateState();
   window.addEventListener('resize', fit);
-  window.addEventListener('beforeunload', () => { unsubscribe(); observer.disconnect(); window.removeEventListener('resize', fit); scenes.close().finally(() => app.destroy(true)); });
-  return { setBackendState(value) { backend = value; updateState(); } };
+  let destroyed = false;
+  const destroy = async () => {
+    if (destroyed) return; destroyed = true;
+    unsubscribe(); observer.disconnect(); window.removeEventListener('resize', fit); window.removeEventListener('beforeunload', destroy);
+    await scenes.close(); app.destroy(true); rain.remove();
+  };
+  window.addEventListener('beforeunload', destroy);
+  return { setBackendState(value) { backend = value; updateState(); }, destroy };
 }

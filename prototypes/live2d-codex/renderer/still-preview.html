@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'"><title>雨夜窗前 · 五姿态预览</title><link rel="stylesheet" href="/renderer/still-preview.css"></head>
+<body>
+  <main id="scene" aria-label="女生五姿态壁纸"><img id="base" alt="雨夜窗前的女生"></main>
+  <section class="controls" aria-label="壁纸小样控制">
+    <div class="heading"><div><p class="eyebrow">雨夜窗前 · 同源五姿态</p><h1>工作之余，陪你看雨。</h1></div><button id="hide-panel" title="隐藏控制栏，Esc 恢复">收起</button></div>
+    <p id="status" role="status">正在载入画面…</p>
+    <div class="actions"><button id="work" aria-pressed="true">伏案工作</button><button id="cup" aria-pressed="false">捧杯休息</button><button id="thinking" aria-pressed="false">托腮思考</button><button id="window" aria-pressed="false">侧身看雨</button><button id="attention" aria-pressed="false">转身陪伴</button></div>
+    <div class="actions"><button id="auto" aria-pressed="false">每 5 秒轮播</button><button id="pause" aria-pressed="false">暂停</button></div>
+    <p class="hint">五张完整画面，加载好后直接切换。这里是快速验收轮播，主应用会更久地停留在每个姿态。</p>
+    <div class="sound-header"><strong>环境音试听</strong><button id="sound" aria-pressed="false">开启声音</button></div>
+    <label class="slider">小雨<input id="rain-volume" type="range" min="0" max="100" value="12"><output id="rain-value">12%</output></label>
+    <label class="slider">轻敲<input id="key-volume" type="range" min="0" max="100" value="8"><output id="key-value">8%</output></label>
+    <p class="hint" id="sound-status" role="status">小雨与笔记本键盘实录。默认关闭，点击开启后试听。</p>
+    <div class="actions secondary"><button id="capture" aria-pressed="false">模拟听写静音</button><button id="speaking" aria-pressed="false">模拟朗读压低</button><button id="fullscreen">全屏查看</button></div>
+    <p class="hint">听写与朗读按钮仅模拟声音让位。鼠标移到左下角可恢复控制栏。</p>
+    <p id="error" role="alert" hidden></p><button id="retry" hidden>重试图片</button>
+  </section>
+  <button id="show-panel" hidden>显示控制栏</button>
+  <script type="module" src="/renderer/still-preview.mjs"></script>
+</body></html>

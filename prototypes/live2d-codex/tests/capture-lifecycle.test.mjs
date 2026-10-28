@@ -72,6 +72,26 @@ test('recognition cannot fill another provider with the same directory and threa
   assert.deepEqual(h.inserted, []); assert.deepEqual(h.errors, []);
 });
 
+for (const changed of [{ threadId: 'other-thread' }, { cwd: 'other-project', threadId: 'other-thread' }, { provider: 'claude' }]) {
+  test(`recording retains its starting target when ${Object.keys(changed).join('/')} changes before stop`, async t => {
+    const h = harness(t); await tick(); await h.control.toggleCapture();
+    const original = { ...h.requests.find(value => value) };
+    Object.assign(h.state, changed);
+    const finishing = h.control.toggleCapture(); await tick();
+    h.recognition.resolve({ ok: true, value: { text: 'belongs to the original target' } }); await finishing;
+    assert.deepEqual(original, { provider: 'codex', cwd: 'project', threadId: 'thread' });
+    assert.deepEqual(h.inserted, [], 'a target change during recording must not redirect recognized text');
+    assert.equal(h.control.isCapturing(), false); assert.deepEqual(h.errors, []);
+  });
+}
+
+test('recording still inserts into its unchanged starting target', async t => {
+  const h = harness(t); await tick(); await h.control.toggleCapture();
+  const finishing = h.control.toggleCapture(); await tick();
+  h.recognition.resolve({ ok: true, value: { text: 'current target draft' } }); await finishing;
+  assert.deepEqual(h.inserted, ['current target draft']); assert.deepEqual(h.errors, []);
+});
+
 const main = await readFile(new URL('../main.cjs', import.meta.url), 'utf8');
 const captureHandlers = main.slice(main.indexOf("    handler('speech:capture'"), main.indexOf('    const { speechProfile }'));
 function mainCaptureHarness(outcome = 'success') {
@@ -80,7 +100,8 @@ function mainCaptureHarness(outcome = 'success') {
   const target = { provider: 'codex', cwd: 'project', threadId: 'thread' };
   const chat = { webContents: { send: event => cancelled.push(event) } };
   const context = vm.createContext({
-    captureTarget: null, captureTimer: null, changingProvider: false, provider: 'codex',
+    captureTarget: null, captureTimer: null, changingProvider: false, provider: 'codex', suspended: false, screenLocked: false, submissions: { active: new Set() },
+    notifyPresentation() {}, applyAmbientBeforeAudio: async () => {},
     chat, backend: { state: { ...target } }, showWorkbench() {}, stopSpeech() {},
     speech: { status: () => ({ asr: true }), transcribe: async () => {
       await recognition.promise;
@@ -99,12 +120,35 @@ function mainCaptureHarness(outcome = 'success') {
     transcribe: () => handlers.get('speech:transcribe')(event, {}) };
 }
 
+for (const phase of ['connecting', 'starting', 'configuring', 'lifecycle', 'submission', 'unassigned-thread']) {
+  test(`computer and RC003 capture cannot begin during ${phase}`, async () => {
+    const h = mainCaptureHarness();
+    if (phase === 'lifecycle') h.context.backend.lifecycle = { active: Symbol('switch') };
+    else if (phase === 'submission') h.context.submissions.active.add('codex');
+    else if (phase === 'unassigned-thread') { h.context.backend.busy = true; Object.assign(h.context.backend.state, { status: 'working', threadId: null }); }
+    else h.context.backend.state.status = phase;
+    await assert.rejects(h.capture(), /连接、切换对话或发送任务/);
+    assert.equal(h.context.captureTarget, null); assert.equal(h.timers.size, 0);
+
+    Object.assign(h.context, { closing: false, quitting: false, changingData: false, voiceResources: { active: false } });
+    const begin = main.slice(main.indexOf('      begin:async id => {'), main.indexOf('      transcribe:data =>'));
+    vm.runInContext(`globalThis.remoteBegin = ({${begin}}).begin;`, h.context);
+    await assert.rejects(h.context.remoteBegin('recording'), /切换、暂停或启动/);
+    assert.equal(h.context.captureTarget, null);
+  });
+}
+
+test('capture remains available for follow-up drafts during an established working turn', async () => {
+  const h = mainCaptureHarness(); h.context.backend.busy = true; h.context.backend.state.status = 'working';
+  await h.capture(); assert.ok(h.context.captureTarget); await h.cancel();
+});
+
 for (const outcome of ['success', 'failure']) test(`late main-process transcription ${outcome} preserves the new recording watchdog`, async () => {
   const h = mainCaptureHarness(outcome);
-  h.capture();
+  await h.capture();
   const pending = h.transcribe();
   const completion = outcome === 'failure' ? assert.rejects(pending, /recognition failed/) : pending;
-  h.cancel(); h.capture();
+  await h.cancel(); await h.capture();
   const target = h.context.captureTarget, timer = h.context.captureTimer;
   h.recognition.resolve(); await completion;
   assert.equal(h.context.captureTarget, target);
@@ -116,10 +160,20 @@ for (const outcome of ['success', 'failure']) test(`late main-process transcript
 
 test('the owning main-process transcription clears its own target and watchdog', async () => {
   const h = mainCaptureHarness();
-  h.capture();
+  await h.capture();
   const pending = h.transcribe();
   h.recognition.resolve(); await pending;
   assert.equal(h.context.captureTarget, null);
   assert.equal(h.context.captureTimer, null);
   assert.equal(h.timers.size, 0);
+});
+
+test('main capture remains pending until ambient mute is acknowledged and releases ownership on failure', async () => {
+  const h=mainCaptureHarness(), muted=gate(); let opened=false;
+  h.context.applyAmbientBeforeAudio=()=>muted.promise;
+  const start=h.capture().then(()=>{opened=true;}); await tick();
+  assert.equal(opened,false); assert.ok(h.context.captureTarget);
+  muted.resolve(); await start; assert.equal(opened,true); await h.cancel();
+  h.context.applyAmbientBeforeAudio=async()=>{throw new Error('mute failed');};
+  await assert.rejects(h.capture(),/mute failed/); assert.equal(h.context.captureTarget,null); assert.equal(h.timers.size,0);
 });

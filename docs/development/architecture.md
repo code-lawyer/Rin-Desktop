@@ -2,7 +2,7 @@
 
 ## 当前技术选择
 
-主应用为 Electron 44.7.2、Node.js 24+、原生 JavaScript、esbuild；渲染使用 PixiJS 8.20.0 和 pixi-live2d-display 1.4.0。版本来自[应用依赖清单](../../prototypes/live2d-codex/package.json)与 lockfile，不表示永远不升级。
+主应用为 Electron 44.9.1、Node.js 24+、原生 JavaScript、esbuild。静态壁纸采用解码后直接绘制的画布，由壁纸窗口单独播放环境音，详见[静态壁纸接入](static-wallpaper-integration.md)。可选[两态动态模式](two-state-app-integration-2026-10-27.md)保留同一人物提交事务和音频实例，以双解码器播放同一母片剪出的四段本地媒体；现有设置默认保持静态。正式超分4K素材、生产页面与本地0.6.0候选安装包已通过限定验证，范围见[候选验收](release-0.6.0-readiness.md)。旧悬浮人物仍使用 PixiJS 8.20.0 和 pixi-live2d-display 1.4.0，相关依赖与兼容资源保留。版本来自[应用依赖清单](../../prototypes/live2d-codex/package.json)与 lockfile，不表示永远不升级。
 
 Agent 通过 Windows 原生 CLI 的结构化接口接入：Codex 为 app-server RPC；Claude 源码使用 Claude Agent SDK；Grok/OpenCode 源码使用 ACP。后两类 SDK 已锁定依赖，但真实桌面验收尚未完成。语音使用 sherpa-onnx CPU worker 承载 SenseVoice/Kokoro，Qwen 使用独立 Python/GPU worker。RC003 生产服务使用 C# Raw Input/Windows BLE，主进程 JavaScript 解码 ATVV；旧 Python 诊断独立保留。
 
@@ -73,6 +73,8 @@ Codex与Native共用 `agent-lifecycle.mjs`：在异步目录/连接操作前占�
 源码默认数据在 `work/runtime/avatar`；安装版在 `%LOCALAPPDATA%/VibeVoice` 或用户选择的已有目录。`workspaces.json` 等使用序列化写入和临时文件替换，CLI 自己维护其账户和完整历史。新 Agent 另有应用侧消息缓存。详见[数据与发布](data-and-release.md)。
 
 测试包由 `portable.json.testBuild.id` 选择独立默认数据目录，目录指针也独立。主进程在任何业务数据读取前检查目录指针，原目录丢失时不回退到空目录。设置、草稿与发送记录共用事务队列；磁盘同步/替换失败时不发布该次内存修改，损坏原件不自动覆盖。
+
+人物切换使用同一队列和设置校验入口准备备份与临时文件。壁纸重新核对暂停和最新目标后，以可信同步 IPC 完成已准备文件的最终重命名，成功后立即绘制；取消或确认过期释放队列，不提前修改保存人物与声线。同步路径不执行文件内容生成或写入，故障和通知边界见[修复复审](five-fixes-review-2026-10-22.md)。
 
 应用负责自己创建的 worker、CLI 子进程和设备连接；退出/取消不能按进程名称杀掉用户其他任务。采集/模型失败不能自动删除草稿。超时、取消、旧事件和退出并发必须在对应模块边界测试。
 

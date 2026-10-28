@@ -63,7 +63,11 @@ export function installRemoteSettings(api) {
 export function installRemoteNavigation(api,{notice=()=>{},compose=()=>false}={}) {
   let armed;
   api.onRemoteAction(action=>{
-    const controls=[...document.querySelectorAll('button,select,input,textarea,summary,a[href],[tabindex="0"]')].filter(el=>!el.disabled && !el.closest('[hidden]') && el.getClientRects().length);
+    if(!['up','down','left','right','confirm'].includes(action))return;
+    // IPC-delivered remote input does not enable Chromium's :focus-visible
+    // keyboard heuristic after mouse use. Keep its focus indication explicit.
+    document.documentElement?.setAttribute('data-navigation-input','remote');
+    const controls=[...document.querySelectorAll('button,select,input,textarea,summary,a[href],[tabindex="0"]')].filter(el=>!el.disabled && !el.closest('[hidden]') && el.getClientRects().length && el.checkVisibility?.({visibilityProperty:true})!==false);
     const active=document.activeElement,index=controls.indexOf(active);
     if(compose(action,active)){armed=null;return;}
     if(action==='confirm') {
@@ -80,8 +84,9 @@ export function installRemoteNavigation(api,{notice=()=>{},compose=()=>false}={}
     if(!['up','down','left','right'].includes(action))return;
     const delta=['up','left'].includes(action)?-1:1;
     if(active.tagName==='SELECT' && ['left','right'].includes(action)) {
-      const next=Math.max(0,Math.min(active.options.length-1,active.selectedIndex+delta));
-      if(next!==active.selectedIndex && !active.options[next].disabled){active.selectedIndex=next;active.dispatchEvent(new Event('change',{bubbles:true}));}
+      let next=active.selectedIndex+delta;
+      while(next>=0 && next<active.options.length && (active.options[next].disabled || active.options[next].hidden))next+=delta;
+      if(next>=0 && next<active.options.length && next!==active.selectedIndex){active.selectedIndex=next;active.dispatchEvent(new Event('change',{bubbles:true}));}
       return;
     }
     if(active.matches('input[type="range"]') && ['left','right'].includes(action)) {
@@ -92,4 +97,7 @@ export function installRemoteNavigation(api,{notice=()=>{},compose=()=>false}={}
     next?.focus();next?.scrollIntoView({block:'nearest'});
   });
   document.addEventListener('focusin',()=>{armed=null;});
+  const nativeInput=()=>document.documentElement?.removeAttribute('data-navigation-input');
+  document.addEventListener('pointerdown',nativeInput,{capture:true});
+  document.addEventListener('keydown',nativeInput,{capture:true});
 }

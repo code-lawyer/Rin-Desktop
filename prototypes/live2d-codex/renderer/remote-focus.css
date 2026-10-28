@@ -1,0 +1,17 @@
+/* Remote input arrives over IPC, independently of browser input modality. */
+:root[data-navigation-input="remote"] :is(button, select, input, textarea, summary, a[href], [tabindex="0"]):focus {
+  outline: 3px solid var(--focus, #27586b);
+  outline-offset: 3px;
+}
+
+/* Show the complete visual control for inputs with a custom container. */
+:root[data-navigation-input="remote"] .composer textarea:focus { outline: none; }
+:root[data-navigation-input="remote"] .composer:has(textarea:focus) {
+  outline: 3px solid var(--focus, #27586b);
+  outline-offset: 2px;
+}
+:root[data-navigation-input="remote"] .character-option input:focus { outline: none; }
+:root[data-navigation-input="remote"] .character-option input:focus + .character-card {
+  outline: 3px solid var(--focus, #27586b);
+  outline-offset: 3px;
+}

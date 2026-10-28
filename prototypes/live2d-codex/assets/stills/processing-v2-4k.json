@@ -1,0 +1,124 @@
+{
+  "format": 1,
+  "date": "2026-10-23",
+  "status": "integrated-for-user-review",
+  "method": "Previously approved local 4K processing recipe, applied to the new five-pose sources.",
+  "tool": {
+    "name": "Real-ESRGAN ncnn Vulkan",
+    "release": "v0.2.5.0 / 20220424",
+    "model": "realesrgan-x4plus",
+    "hashes": {
+      "realesrgan-ncnn-vulkan.exe": "07e49f7cbb4ede01ae4dd4c399d3a7e5846e3d2085c3128eff881e55cb7b1a0c",
+      "realesrgan-x4plus.bin": "713ee713b0353afaa27976f0563a64a5043bd70b9bd8936c2e26e25ebcdbcddf",
+      "realesrgan-x4plus.param": "35330ececcea33b6c397a72548e788d5d53becee4734c50b7fada36e89f10a86"
+    },
+    "ffmpegVersion": "ffmpeg version 8.1.1-full_build-www.gyan.dev Copyright (c) 2000-2026 the FFmpeg developers",
+    "officialUrl": "https://github.com/xinntao/Real-ESRGAN/releases/tag/v0.2.5.0",
+    "archiveBytes": 45474481,
+    "archiveSha256": "abc02804e17982a3be33675e4d471e91ea374e65b70167abc09e31acb412802d"
+  },
+  "processing": {
+    "scale": 4,
+    "tile": 192,
+    "fit": "3837x2400 with 1px left and 2px right edge extension; no crop",
+    "blend": {
+      "superResolution": 0.65,
+      "originalLanczos": 0.35
+    },
+    "faceRestoration": false,
+    "colorGrading": false
+  },
+  "caveat": "Super-resolved 4K output, not native 4K painting. SSIM is not an identity or anatomy verdict.",
+  "assets": [
+    {
+      "pose": "work",
+      "source": {
+        "file": "female-v2/work.png",
+        "width": 1586,
+        "height": 992,
+        "bytes": 2340872,
+        "sha256": "1cc4ad6e11899b8938d7ee75691d45c676223bcef4909a05643f74aa537ccfc6"
+      },
+      "output": {
+        "file": "female-v2-4k/work.png",
+        "width": 3840,
+        "height": 2400,
+        "bytes": 9953734,
+        "sha256": "9ac0a4848957d85792b41f8f38b8965294eb25524d7a35f44d51801ce9481d32"
+      },
+      "sourceResolutionSSIM": 0.983619
+    },
+    {
+      "pose": "cup",
+      "source": {
+        "file": "female-v2/cup.png",
+        "width": 1586,
+        "height": 992,
+        "bytes": 2275008,
+        "sha256": "43a279ebddb18678d4d59ab2866e4ff7baf5ec4070a7569416b54dbfe148a88f"
+      },
+      "output": {
+        "file": "female-v2-4k/cup.png",
+        "width": 3840,
+        "height": 2400,
+        "bytes": 9773843,
+        "sha256": "2125fc0eccdc9bdd8ea3f74b0244edb6bf221fb6b7a6dc7aa9ee64f688c171b2"
+      },
+      "sourceResolutionSSIM": 0.984207
+    },
+    {
+      "pose": "thinking",
+      "source": {
+        "file": "female-v2/thinking.png",
+        "width": 1586,
+        "height": 992,
+        "bytes": 2250570,
+        "sha256": "b735463d73ec2fe4cbb06dfb674bc179a95c9a1ec4697a050a1080165c2489a3"
+      },
+      "output": {
+        "file": "female-v2-4k/thinking.png",
+        "width": 3840,
+        "height": 2400,
+        "bytes": 9704408,
+        "sha256": "67afe0afe48b5c7a2fdb245c409cb06eb0f8458f26879dadbabb75cab58c2463"
+      },
+      "sourceResolutionSSIM": 0.984275
+    },
+    {
+      "pose": "window",
+      "source": {
+        "file": "female-v2/window.png",
+        "width": 1586,
+        "height": 992,
+        "bytes": 2236031,
+        "sha256": "d62892783d09f4275004a1dcdc986afb806d0441dbc75528e0cc4a61cd3f0d7c"
+      },
+      "output": {
+        "file": "female-v2-4k/window.png",
+        "width": 3840,
+        "height": 2400,
+        "bytes": 9637657,
+        "sha256": "fe063c62866586239e609bfdbdf1da97cc4aee16023f1598e1b553d478085bc6"
+      },
+      "sourceResolutionSSIM": 0.984489
+    },
+    {
+      "pose": "attention",
+      "source": {
+        "file": "female-v2/attention.png",
+        "width": 1586,
+        "height": 992,
+        "bytes": 2279447,
+        "sha256": "ec63c10cf392054f5358271c309e897efd9733f26be97f438828b26ac6e39e02"
+      },
+      "output": {
+        "file": "female-v2-4k/attention.png",
+        "width": 3840,
+        "height": 2400,
+        "bytes": 9827785,
+        "sha256": "3fd4964e96eb7d1b9bf6bf7ed753ef24df260cc8e62abf3a668bc7dbec942313"
+      },
+      "sourceResolutionSSIM": 0.984343
+    }
+  ]
+}

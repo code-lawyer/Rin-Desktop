@@ -1,0 +1,27 @@
+{
+  "tool": "built-in image_gen",
+  "date": "2026-10-22",
+  "common": "Use case: identity-preserve. Edit the supplied wallpaper, keeping exactly the original refined semi-realistic anime illustration style, adult woman identity, face size, normal anatomy, twin black ponytails, deep red shirt, seated crossed legs, laptop on lap. Retain pixel-aligned camera, perspective, crop, furniture, rainy window/city, exact warm/cool lighting and color. This is one still frame of a fixed-camera desktop wallpaper. It must align with the supplied frame on an immediate cut. No new objects, no text, no borders, no collages. Output landscape 16:10 at 3840x2400 if supported, maximum resolution and crisp detailed quality. Do not zoom, move torso, move chair, or redesign background. Change only head/eyes/facial expression and minimally hands as requested.",
+  "poses": [
+    {
+      "pose": "reading",
+      "source": "female/work.png",
+      "direction": "She pauses typing to read the laptop attentively. Lift the chin only very slightly, eyes still visibly directed downward toward the laptop screen, lips closed in a neutral relaxed expression. Both hands rest lightly on the keyboard, fingers relaxed. This is a settled reading pose, NOT an intermediate turn or facing the viewer."
+    },
+    {
+      "pose": "window",
+      "source": "female/work.png",
+      "direction": "She thoughtfully glances out toward the rainy window on the LEFT side of the image. Turn her head modestly 15-20 degrees to her own right (image left), eyes follow toward the left window/city, a soft natural three-quarter face with both eyes visible. Keep head located exactly above the same neck and shoulders; NO extreme profile, NO twisted neck, NO shoulders rotated, NO leaning back. Her hands rest on the laptop. Settled calm thoughtful pose."
+    },
+    {
+      "pose": "rest",
+      "source": "female/work.png",
+      "direction": "A brief restful pause: her head remains in its original comfortable slightly lowered position with same silhouette and location, both eyes gently fully closed, relaxed lips, shoulders and hands relaxed in the exact existing positions. No smile, no sleep slumping, no change of body pose. A peaceful closed-eyes resting still."
+    },
+    {
+      "pose": "smile",
+      "source": "female/attention.png",
+      "direction": "She looks toward the viewer, exactly the same head orientation and face proportions as this attention reference, and gives a very subtle gentle closed-mouth smile. Soften the eyes and slightly raise corners of lips only. No broad grin, no teeth, no exaggerated expression. Keep hands/body and all background unchanged."
+    }
+  ]
+}

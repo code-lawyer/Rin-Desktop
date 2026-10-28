@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Rin · 动态视频样例</title><link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <main>
+    <header class="masthead"><a href="/" class="wordmark" aria-label="Rin 动态视频样例">rin<span>动态样例</span></a><span class="local-note">本地播放 <span aria-hidden="true">·</span> 1080p</span></header>
+    <section class="viewer" aria-label="动态人物预览">
+      <div class="screen" id="screen">
+        <img id="poster" alt="" hidden>
+        <video id="deck-a" muted playsinline preload="auto" data-active="false" aria-label="人物视频 A"></video>
+        <video id="deck-b" muted playsinline preload="auto" data-active="false" aria-label="人物视频 B"></video>
+        <div class="empty" id="empty"><span>正在准备画面</span></div>
+        <div class="scene-caption"><span id="scene-caption">动态陪伴</span><span id="play-state" role="status" aria-live="polite">载入中</span></div>
+        <button type="button" class="expand" id="fullscreen" aria-label="全屏预览">⛶</button>
+      </div>
+      <div class="error" id="error" role="alert" hidden><span id="error-text"></span><button type="button" id="retry">重试加载</button></div>
+      <div class="controls">
+        <nav id="scenes" aria-label="选择人物状态"></nav>
+        <div class="transport"><button type="button" id="replay" disabled>重新入场</button><button type="button" id="pause" class="pause" disabled>暂停</button></div>
+      </div>
+      <p class="sample-note">三段参考视频用于验证播放与状态切换，人物和动作随后定制。</p>
+    </section>
+    <details class="diagnostics" id="diagnostics">
+      <summary>运行验证 <span id="summary-state">本地视频播放器</span></summary>
+      <div class="diagnostic-content">
+        <dl class="metrics"><div><dt>当前素材</dt><dd id="metric-scene">—</dd></div><div><dt>播放位置</dt><dd id="metric-time">—</dd></div><div><dt>已循环</dt><dd id="metric-loops">0</dd></div><div><dt>最近衔接耗时</dt><dd id="metric-handoff">—</dd></div></dl>
+        <p>按原始比例显示。声音关闭；此样例验证预制视频播放，不包含实时口型。暂停与窗口隐藏都会暂停视频。</p>
+        <div class="test-actions"><button type="button" id="near-boundary" disabled>跳到循环接缝</button><button type="button" id="simulate-error" disabled>模拟读取失败</button><button type="button" id="run-tests" disabled>运行播放验证（约 3 分钟）</button><button type="button" id="cancel-tests" hidden>停止验证</button></div>
+        <p id="qa-progress" role="status">验证会检查连续 10 次自然循环、状态切换、暂停、失败重试与快速切换。</p>
+        <pre id="qa-result" hidden></pre>
+      </div>
+    </details>
+  </main>
+  <script type="module" src="/preview.js"></script>
+</body>
+</html>

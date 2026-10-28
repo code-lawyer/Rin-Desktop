@@ -1,0 +1,61 @@
+{
+  "format": 1,
+  "date": "2026-10-23",
+  "status": "scene-consistency-preview-only",
+  "tool": "built-in image_gen",
+  "size": [
+    1586,
+    992
+  ],
+  "runtime": "One fixed room plate, full upper-body pose masks and a shared original seated lower body. No image warping. Source pixels remain in their original coordinates.",
+  "assets": [
+    {
+      "file": "scene-v3/room.png",
+      "width": 1586,
+      "height": 992,
+      "bytes": 2241106,
+      "sha256": "a86f2441e2e21b1a51dc4145ba90b49f75da9cd21694be8336678baecbc86f56"
+    },
+    {
+      "file": "scene-v3/thinking.png",
+      "width": 1586,
+      "height": 992,
+      "bytes": 2212830,
+      "sha256": "6f98bc1485d7b54a8673486cf09e77e354bc392c61f22e04fb8393014b4b35ea"
+    }
+  ],
+  "images": [
+    {
+      "file": "room.png",
+      "role": "fixed clean room and chair plate",
+      "references": [
+        "../female-v2/work.png"
+      ],
+      "prompt": "Use case: precise-object-edit. Create a clean background plate for this exact wallpaper. The supplied image is the EDIT TARGET. Remove ONLY the woman completely, including every part of her hair, ribbons, face, arms, hands, red shirt, skirt, tights and legs. Remove her contact shadows on the upholstery where appropriate. Leave no ghost silhouette and no human-shaped patch. Reconstruct the portions of the SAME black leather armchair, seat and floor that her body concealed. The armchair must be a single physically coherent chair with exactly two armrests, one continuous seat cushion and one backrest, with plausible perspective and unchanged existing visible exterior silhouette. Keep its existing front rounded posts, right armrest height, red cushion and grey knitted throw precisely fixed. The backrest newly uncovered behind the woman must connect naturally to the existing visible right back edge; no extra elevated middle armrest or floating support.\nCRITICAL: Preserve every other visible pixel and object position as closely as possible: exact camera/crop/perspective, rain drops, city lights, window frames, floor reflection, dark C-shaped laptop table, open laptop, laptop angle, chair's already-visible leather seams and piping, lamps, plants, bookshelf and right side table. The laptop stays on the table with an empty keyboard. Keep the one dark mug on the side table. No redesign, relocation, resizing, new props, text, border or collage. Same 16:10 full landscape composition and exact artwork style/lighting. This plate will be reused unchanged behind five separately rendered full-person poses, so spatial consistency to the input is more important than new detail. Output only the complete empty-chair background plate."
+    },
+    {
+      "file": "thinking.png",
+      "role": "revised elbow-on-table pose; no invented high chair armrest",
+      "references": [
+        "../female-v2/work.png",
+        "../female-v2/thinking.png"
+      ],
+      "prompt": "Use case: precise-object-edit / identity-preserve.\nImage 1 is the EDIT TARGET and the single authoritative furniture, room, camera and character reference. Image 2 is a POSE REFERENCE ONLY; its chair is wrong and MUST NOT be copied.\nCreate one revised 'thinking' wallpaper frame from IMAGE 1. This is a tightly localized edit of the WOMAN ONLY. Keep every visible room/furniture contour from Image 1 fixed: the two black leather armrests, front rounded armrest posts, seat cushion piping, chair back silhouette, red cushion, grey throw, laptop and its open angle, table top and single vertical leg, city, window mullions, rain, lamp and side table. Camera and image dimensions/crop unchanged. No movement, expansion, lifting, bending, replacement or re-upholstery of the chair. In particular DO NOT invent a new elevated armrest behind the laptop as shown incorrectly in Image 2. No extra leather ridge or support near the woman's raised elbow.\nWoman: same adult East Asian woman, same face proportions and age, black twin ponytails and ribbons, burgundy blouse, skirt, crossed legs and tights, same polished painted style as Image 1. Keep pelvis, legs and chair contact at identical positions. Only change her torso, head and arms to a clearly distinct settled thoughtful pose. She turns her gaze slightly left, ONE hand lightly supporting her cheek/chin, with that elbow resting naturally ON THE EXISTING LAPTOP TABLE at its current height (use the unobstructed right end of the table; do not move the laptop). Lean or lower her upper body as necessary to reach that support with anatomically plausible arms; do not raise the furniture. Other hand lies naturally on her thigh. Both shoulders and neck must be anatomically comfortable. Do not copy the unsupported/perspective-breaking elbow/chair contact of image 2.\nOnly reconstruct background newly uncovered by the changed woman, consistent with the chair's existing physical geometry. Preserve all already-visible furniture/background pixels as closely as possible. Exactly one mug remains on the right side table, no extra props. No text, labels, border or collage. Output a single full landscape frame at the same aspect and framing as Image 1."
+    }
+  ],
+  "rejectedTrials": [
+    {
+      "kind": "cup-and-window-full-frame-edits",
+      "reason": "Local edits still regenerate background texture; not used as final fixed-scene sources."
+    },
+    {
+      "kind": "transparent-cup-extraction",
+      "reason": "Generated cutout changed the subject scale and filled occluded regions; rejected."
+    }
+  ],
+  "caveats": [
+    "A 1586x992 structural preview, not a 4K final asset set.",
+    "Nine unobstructed room/furniture regions match exactly across poses; this does not certify every hair edge or occlusion.",
+    "Main wallpaper renderer and active female-v2-4k manifest are unchanged."
+  ]
+}

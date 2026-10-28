@@ -23,19 +23,20 @@ for (const stage of ['construct', 'old-close', 'mkdir', 'write', 'connect']) {
     };
     let beforeQuit;
     const context = vm.createContext({
-      closing: false, backend: old, store: {}, provider: 'codex', changingProvider: false, providerChange: null,
+      closing: false, quitting: false, pendingDataSelection: null, pendingRelaunch: null, flushChatDraft: async () => {}, backend: old, store: {}, provider: 'codex', changingProvider: false, providerChange: null,
       captureTarget: null, avatar: null, chat: null, workbench: null, previousState: null, rememberedTarget: null,
       tray: null, storageDir: 'fixture', stopSpeech() {}, isCliAgent: () => true, bindBackend() {},
       makeBackend: async () => { await pause('construct'); return replacement; },
       mkdir: () => pause('mkdir'), writeFile: () => pause('write'), join: (...parts) => parts.join('/'), agentName: kind => kind,
       app: { on: (_name, fn) => beforeQuit = fn, exit: () => events.push('exit') },
-      globalShortcut: { unregisterAll() {} }, clearTimeout() {}, captureTimer: null,
+      globalShortcut: { unregisterAll() {} }, clearTimeout() {}, captureTimer: null, ambientBarrier: {close() {}}, cancelWallpaperCommit() {},
       remote: null, voiceResources: null, speech: null, wallpaperHost: null, characterBox: null
     });
     vm.runInContext(change + '\n' + quit, context);
     const switching = context.changeProvider('claude');
     await entered.promise;
     beforeQuit({ preventDefault() {} });
+    await tick(); // Draft confirmation precedes the existing resource shutdown.
     release.resolve(); await tick();
     assert.equal(events.includes('exit'), false, 'Quit waits for replacement disposal');
     disposed.resolve(); await switching; await tick();
@@ -46,3 +47,26 @@ for (const stage of ['construct', 'old-close', 'mkdir', 'write', 'connect']) {
     await assert.rejects(context.changeProvider('codex'), /退出/);
   });
 }
+
+test('a failed quit preparation does not strand an already running provider switch', async () => {
+  const release = gate(), entered = gate(), events = [];
+  const old = { busy: false, removeAllListeners() {}, async close() { entered.resolve(); await release.promise; } };
+  const replacement = { closed: false, snapshot: () => ({}), async close() { this.closed = true; }, async connect() { events.push('connected'); } };
+  let beforeQuit;
+  const context = vm.createContext({
+    closing: false, quitting: false, pendingDataSelection: null, pendingRelaunch: null, backend: old, store: {}, provider: 'codex', changingProvider: false, providerChange: null,
+    captureTarget: null, avatar: null, chat: null, workbench: null, previousState: null, rememberedTarget: null,
+    tray: null, storageDir: 'fixture', stopSpeech() {}, isCliAgent: () => true, bindBackend() {},
+    makeBackend: async () => replacement, mkdir: async () => {}, writeFile: async () => {}, join: (...parts) => parts.join('/'), agentName: kind => kind,
+    app: { on: (_name, fn) => beforeQuit = fn, exit: () => events.push('exit') },
+    globalShortcut: { unregisterAll() {} }, registerShortcuts() {}, clearTimeout() {}, captureTimer: null, ambientBarrier: { close() {} }, cancelWallpaperCommit() {},
+    flushChatDraft: async () => { throw new Error('draft write failed'); }, dialog: { showErrorBox() {} },
+    remote: null, voiceResources: null, speech: null, wallpaperHost: null, characterBox: null,
+  });
+  vm.runInContext(change + '\n' + quit, context);
+  const switching = context.changeProvider('claude'); await entered.promise;
+  beforeQuit({ preventDefault() {} }); await tick();
+  assert.equal(context.quitting, false); assert.equal(context.closing, false);
+  release.resolve(); await switching;
+  assert.equal(context.backend, replacement); assert.equal(replacement.closed, false); assert.deepEqual(events, ['connected']);
+});

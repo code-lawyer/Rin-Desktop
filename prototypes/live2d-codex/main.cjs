@@ -9,6 +9,10 @@ const { WallpaperHost } = require('./backend/wallpaper-host.cjs');
 const { registerInputActions } = require('./backend/input-actions.cjs');
 const { RemoteInput, RESERVED_KEYS } = require('./backend/remote-input.cjs');
 const { characterProfile, isCharacter } = require('./backend/character-profiles.cjs');
+const { wallpaperChoice, isWallpaperKind } = require('./backend/wallpaper-choice.cjs');
+const { stillSettings } = require('./backend/still-settings.cjs');
+const { acceptWallpaperReport } = require('./backend/wallpaper-report.cjs');
+const { AmbientBarrier } = require('./backend/ambient-barrier.cjs');
 const { dataHome, storageLocation } = require('./backend/storage-location.cjs');
 
 const root = __dirname;
@@ -35,28 +39,34 @@ if (debugPort && /^\d{4,5}$/.test(debugPort)) {
 protocol.registerSchemesAsPrivileged([{ scheme: 'app', privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true, stream: true } }]);
 
 let avatar, chat, workbench, backend, tray, store, submissions, speech, voiceResources, remote, captureTarget, captureTimer, closing = false;
+let quitting = false, draftFlushRequest, draftFlushSerial = 0, pendingRelaunch = null, pendingDataSelection = null;
 let shortcutErrors = [], rememberedTarget = '', keyLearning = false, shortcutResumeAt = 0, workspaceVersion = 0;
 let provider = 'codex', changingProvider = false, providerChange = null, changingData = false;
 let desiredBubble = { width: 440, height: 220 }, previousState, readingMode = false, avatarAnchor = null;
 let characterScale = 1, characterBox, dragOrigin, appearanceTimer, appearanceQueue = Promise.resolve();
 let bubblePosition = null, chatDragOrigin, currentChatLayout;
-let wallpaperHost, manualPause = false, pendingMode = null, lastPresentation = '';
-let wallpaperStatus = { phase: 'loading', requestId: 0 }, appliedWallpaperRequest = -1;
+let wallpaperHost, manualPause = false, pendingMode = null, lastPresentation = '', trayMenu;
+let wallpaperStatus = { phase: 'loading', requestId: 0 }, appliedWallpaperRequest = -1, wallpaperCommit;
+let suspended = false, screenLocked = false, speaking = false, playbackRevision = 0, ambientRevision = 0, ambientRetry = 0;
+let ambienceStatus = { phase: 'off', error: '' };
+const ambientBarrier = new AmbientBarrier({ publish(revision) { ambientRevision = revision; notifyPresentation(); } });
+const applyAmbientBeforeAudio = () => ambientBarrier.wait(wallpaperMode && !!avatar && !avatar.isDestroyed());
 const remoteInput = new RemoteInput({onError:error=>remote?.disconnect().then(()=>remote.update({notice:error.message})).catch(()=>{})});
 const isLocal = url => { try { const u = new URL(url); return u.protocol === 'app:' && u.hostname === 'local' && ['/renderer/index.html', '/renderer/workbench.html'].includes(u.pathname); } catch { return false; } };
 const trusted = event => [avatar, chat, workbench].some(win => win && !win.isDestroyed() && win.webContents === event.sender) && isLocal(event.senderFrame?.url ?? '');
 const appearance = () => ({ scale: characterScale, mode: wallpaperMode ? 'wallpaper' : 'avatar' });
-const presentation = () => ({ mode: wallpaperMode ? 'wallpaper' : 'avatar', character: wallpaperStatus.character ?? characterProfile(store?.data.settings.character).id, characterRequest: wallpaperStatus.requestId, chatVisible: !!chat?.isVisible(), paused: manualPause || !!wallpaperHost?.status.occluded, manualPause, desktopAttached: !!wallpaperHost?.status.ok, desktopLayer: wallpaperHost?.status.parentClass ?? null, desktopBounds: wallpaperHost?.status.bounds ?? null });
+const presentation = () => ({ mode: wallpaperMode ? 'wallpaper' : 'avatar', wallpaperKind: wallpaperStatus.wallpaperKind || 'artwork', character: wallpaperStatus.character ?? characterProfile(store?.data.settings.character).id, characterRequest: wallpaperStatus.requestId, chatVisible: !!chat?.isVisible(), paused: manualPause || suspended || screenLocked || !!wallpaperHost?.status.occluded, manualPause, stills: stillSettings(store?.data.settings), capturing: !!captureTarget, speaking, ambientRevision, ambientRetry, desktopAttached: !!wallpaperHost?.status.ok, desktopLayer: wallpaperHost?.status.parentClass ?? null, desktopBounds: wallpaperHost?.status.bounds ?? null });
 function notifyPresentation() {
-  if (!avatar || avatar.isDestroyed()) return;
+  if (!avatar || avatar.isDestroyed() || avatar.webContents.isCrashed()) return;
   const value = presentation(), encoded = JSON.stringify(value);
   if (encoded !== lastPresentation) { lastPresentation = encoded; avatar.webContents.send('companion:presentation', value); }
 }
 function switchMode(mode) {
+  if (quitting || closing) return;
   if (packaged) return showChat();
   if (mode === (wallpaperMode ? 'wallpaper' : 'avatar')) return showChat();
   if (backend?.busy) { pendingMode = mode; return showChat(); }
-  app.relaunch({ args: [...process.argv.slice(1).filter(arg => !arg.startsWith('--mode=') && !arg.startsWith('--provider=')), `--mode=${mode}`, `--provider=${provider}`] }); app.quit();
+  pendingRelaunch = { args: [...process.argv.slice(1).filter(arg => !arg.startsWith('--mode=') && !arg.startsWith('--provider=')), `--mode=${mode}`, `--provider=${provider}`] }; app.quit();
 }
 function saveAppearance() {
   clearTimeout(appearanceTimer);
@@ -104,36 +114,94 @@ function hideChat() { if (readingMode) { readingMode = false; chat.setFullScreen
 function toggleChat() { chat?.isVisible() ? hideChat() : showChat(); }
 function recallChat() { chat?.isVisible() && chat.isFocused() ? hideChat() : showChat(); }
 function showWorkbench(page) { hideChat(); workbench?.show(); workbench?.focus(); workbench?.webContents.send('workbench:refresh', typeof page === 'string' ? page : null); }
-function workspaceSnapshot() { return { ...store.snapshot(), version: workspaceVersion, speech: speech.status(), remote: remote?.snapshot(), wallpaper: wallpaperStatus, resources: voiceResources?.snapshot(), shortcutErrors, legacyDotsAvailable }; }
-function notifyWorkspace() { workspaceVersion++; for (const win of [chat, workbench]) if (win && !win.isDestroyed()) win.webContents.send('workbench:state', workspaceSnapshot()); }
-function stopSpeech() { chat?.webContents.send('speech:stop'); return speech?.stop().catch(error => console.error('[speech:stop]', error.message)); }
+function workspaceSnapshot() { return { ...store.snapshot(), version: workspaceVersion, speech: speech.status(), remote: remote?.snapshot(), wallpaper: wallpaperStatus, ambience: ambienceStatus, wallpaperPaused: manualPause, resources: voiceResources?.snapshot(), shortcutErrors, legacyDotsAvailable }; }
+function notifyWorkspace() { workspaceVersion++; notifyPresentation(); for (const win of [chat, workbench]) if (win && !win.isDestroyed()) win.webContents.send('workbench:state', workspaceSnapshot()); }
+function stopSpeech() { playbackRevision++; speaking = false; notifyPresentation(); chat?.webContents.send('speech:stop'); return speech?.stop().catch(error => console.error('[speech:stop]', error.message)); }
 async function confirmWallpaper(info) {
   const requested = wallpaperStatus;
-  const matches = info?.character === requested.character && info.requestId === requested.requestId;
+  const rendererKind = info?.wallpaperKind || 'artwork';
+  const matches = info?.character === requested.character && info.requestId === requested.requestId && rendererKind === (requested.wallpaperKind || 'artwork');
   if (info?.error) {
-    if (!matches || requested.phase !== 'loading') return;
-    wallpaperStatus = { ...requested, phase: 'error', error: '人物壁纸未能载入，已保留原人物和声线设置。' };
-    notifyWorkspace(); return;
+    if (!matches) return false;
+    cancelWallpaperCommit();
+    wallpaperStatus = { ...requested, phase: 'error', errorFrameRevision: info.frameRevision,
+      error: info.model === 'motion-clips' ? '动态壁纸未能继续播放，已保留当前画面和声线。请重试加载或切回静态壁纸。' : '人物壁纸未能载入，已保留原人物和声线设置。' };
+    notifyWorkspace(); return false;
   }
-  if (info?.ready !== true || !isCharacter(info.character) || !Number.isSafeInteger(info.requestId) || info.requestId <= appliedWallpaperRequest || info.requestId > requested.requestId) return;
-  // A displayed scene can be confirmed while the next choice is still loading.
-  // Apply each visible scene once, without clearing a newer request or its error.
-  appliedWallpaperRequest = info.requestId;
+  if (info?.ready !== true || !isWallpaperKind(rendererKind) || !isCharacter(info.character) || !Number.isSafeInteger(info.requestId)) return false;
+  if (wallpaperCommit) {
+    if (wallpaperCommit.requestId === info.requestId) return wallpaperCommit.character === info.character ? wallpaperCommit.promise : false;
+    const pending = wallpaperCommit.promise; cancelWallpaperCommit(); await pending;
+    return confirmWallpaper(info);
+  }
+  if (info.requestId <= appliedWallpaperRequest) return info.requestId === appliedWallpaperRequest && info.character === store.data.settings.character;
+  if (!matches || requested.phase === 'error') return false;
+  // Stage bytes under the store queue, but do not publish settings yet. The
+  // renderer rechecks pause/latest intent before the synchronous final rename.
+  const commit = { requestId: info.requestId, character: info.character, requested, cancelled: false }; wallpaperCommit = commit;
+  commit.promise = (async () => {
+    try {
+      if (info.character !== store.data.settings.character || rendererKind !== store.data.settings.wallpaperKind) {
+        commit.prepared = await store.prepareSettings({ character: info.character, wallpaperKind: rendererKind });
+      }
+      if (commit.cancelled || wallpaperStatus !== requested) { commit.cancelled = true; commit.prepared?.cancel(); return false; }
+      commit.ready = true;
+      commit.timer = setTimeout(() => {
+        if (wallpaperCommit !== commit) return;
+        cancelWallpaperCommit();
+        if (wallpaperStatus === requested) wallpaperStatus = { ...requested, phase: 'error', error: '人物切换未能及时完成，已保留原画面和声线。请重试。' };
+        notifyWorkspace();
+      }, 5000);
+      return true;
+    } catch (error) {
+      if (wallpaperStatus === requested) wallpaperStatus = { ...requested, phase: 'error', error: '人物设置未能保存，已保留原画面和声线。请重试。' };
+      console.error('[wallpaper:settings]', error.message);
+      commit.cancelled = true;
+      return false;
+    } finally {
+      if (commit.cancelled && wallpaperCommit === commit) wallpaperCommit = null;
+      notifyWorkspace();
+    }
+  })();
+  return commit.promise;
+}
+function cancelWallpaperCommit() {
+  const commit = wallpaperCommit;
+  if (!commit) return;
+  commit.cancelled = true; clearTimeout(commit.timer); commit.prepared?.cancel(); wallpaperCommit = null;
+}
+function finishWallpaper(info, accept) {
+  const commit = wallpaperCommit;
+  if (!commit) return accept === true && info?.requestId === appliedWallpaperRequest && info?.character === store.data.settings.character;
+  if (info?.requestId !== commit.requestId || info?.character !== commit.character) return false;
   try {
-    // Keep the last working character and both voices until its replacement renders.
-    if (info.character !== store.data.settings.character) stopSpeech();
-    await store.updateSettings({ character: info.character });
-    if (matches && wallpaperStatus === requested) wallpaperStatus = { ...requested, phase: 'ready' };
+    if (accept !== true || !commit.ready || commit.cancelled || wallpaperStatus !== commit.requested || (presentation().paused && info.initial !== true)) { cancelWallpaperCommit(); return false; }
+    if (commit.prepared) stopSpeech();
+    commit.prepared?.commit();
+    appliedWallpaperRequest = info.requestId;
+    wallpaperStatus = { ...commit.requested, phase: 'ready' };
+    return true;
   } catch (error) {
-    if (matches && wallpaperStatus === requested) wallpaperStatus = { ...requested, phase: 'error', error: '人物已载入，但设置未能保存，请重试。' };
-    console.error('[wallpaper:settings]', error.message);
+    cancelWallpaperCommit();
+    wallpaperStatus = { ...commit.requested, phase: 'error', error: '人物设置未能保存，已保留原画面和声线。请重试。' };
+    console.error('[wallpaper:settings]', error.message); return false;
   } finally {
-    notifyWorkspace();
+    clearTimeout(commit.timer); if (wallpaperCommit === commit) wallpaperCommit = null;
+    // A notification failure after rename must not tell the renderer to keep
+    // the old canvas: the durable character and voices have already changed.
+    try { notifyWorkspace(); } catch (error) { console.error('[wallpaper:notify]', error.message); }
   }
+}
+function recoverWallpaperRenderer() {
+  if (!wallpaperMode || !ambientBarrier.stopped || !avatar || avatar.isDestroyed()) return;
+  if (wallpaperStatus.phase === 'error') wallpaperStatus = { phase: 'loading', character: wallpaperStatus.character,
+    wallpaperKind: wallpaperStatus.wallpaperKind || 'artwork', requestId: wallpaperStatus.requestId + 1 };
+  lastPresentation = '';
+  avatar.webContents.reload();
 }
 function switchAllowed() { if (captureTarget) throw new Error('请先完成或取消听写，再切换对话。'); if (!isCliAgent(provider)) throw new Error('请先选择 CLI Agent。'); stopSpeech(); }
 function sendInputAction(action) {
-  if (changingData) return;
+  if (changingData || quitting || closing) return;
   if (action === 'record') showChat();
   if (['record', 'send', 'readReply', 'clearDraft', 'undoDraft', 'volumeUp', 'volumeDown'].includes(action)) chat?.webContents.send('companion:input-action', action);
 }
@@ -189,7 +257,7 @@ function bindBackend() {
   });
 }
 async function changeProvider(next, { reconnect = false } = {}) {
-  if (closing) throw new Error('应用正在退出。');
+  if (closing || quitting) throw new Error('应用正在退出。');
   if (!backend || !store) throw new Error('应用正在启动，请稍候。');
   if (captureTarget) throw new Error('请先完成或取消听写。');
   stopSpeech();
@@ -266,16 +334,20 @@ else {
   app.whenReady().then(async () => {
     if (startupStorageError) throw startupStorageError;
     console.info('[companion:startup]', 'ready');
+    if (argument('wallpaper') && argument('wallpaper') !== 'artwork') throw new Error('视频壁纸路线已停用，请使用原画壁纸入口。');
+    const { createMotionMedia } = await import(pathToFileURL(join(root, 'backend/motion-media.mjs')).href);
+    const motionMedia = await createMotionMedia(join(root, 'assets/motion/female'));
     protocol.handle('app', async request => {
       try {
         const url = new URL(request.url);
         if (url.hostname !== 'local' || !['GET', 'HEAD'].includes(request.method)) return new Response('', { status: 403 });
         const name = decodeURIComponent(url.pathname).replace(/^\/+/, '');
+        if (name.startsWith('assets/motion/')) return motionMedia.respond(request);
         if (!['renderer/', 'dist/', 'assets/', 'vendor/'].some(prefix => name.startsWith(prefix))) return new Response('', { status: 403 });
         const file = resolve(root, name), rel = relative(root, file);
         if (rel.startsWith('..' + sep) || rel === '..' || rel.startsWith(sep)) return new Response('', { status: 403 });
         if (!['renderer/', 'dist/', 'assets/', 'vendor/'].some(prefix => rel.split(sep).join('/').startsWith(prefix))) return new Response('', { status: 403 });
-        const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.png': 'image/png', '.moc3': 'application/octet-stream' };
+        const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.png': 'image/png', '.ogg': 'audio/ogg', '.moc3': 'application/octet-stream' };
         return new Response(request.method === 'HEAD' ? null : await readFile(file), { headers: { 'Content-Type': types[extname(file)] ?? 'application/octet-stream', 'X-Content-Type-Options': 'nosniff' } });
       } catch { return new Response('', { status: 404 }); }
     });
@@ -292,6 +364,7 @@ else {
     submissions = new SubmissionGuard(store);
     submissions.on('state', value => { if (value.provider === provider && !closing) backend?.changed(); });
     wallpaperStatus.character = store.data.settings.character;
+    wallpaperStatus.wallpaperKind = store.data.settings.wallpaperKind || 'artwork';
     const { VoiceResources, MODEL_FOLDERS } = await import(pathToFileURL(join(root, 'backend/voice-resources.mjs')).href);
     const { upstreamProxyEnvironment } = await import(pathToFileURL(join(root, 'backend/voice-runtime.mjs')).href);
     const { activateVoiceResource } = await import(pathToFileURL(join(root, 'backend/voice-activation.mjs')).href);
@@ -323,7 +396,7 @@ else {
     characterBox = avatarBounds(savedPosition, displayArea, characterScale);
     const common = { frame: false, transparent: true, backgroundColor: '#00000000', alwaysOnTop: true, show: false,
       webPreferences: { preload: join(root, 'preload.cjs'), nodeIntegration: false, contextIsolation: true, sandbox: true, webSecurity: true, backgroundThrottling: false, spellcheck: false } };
-    avatar = new BrowserWindow({ ...common, ...(wallpaperMode ? screen.getPrimaryDisplay().bounds : characterBox),
+    avatar = new BrowserWindow({ ...common, webPreferences: { ...common.webPreferences, autoplayPolicy: 'no-user-gesture-required' }, ...(wallpaperMode ? screen.getPrimaryDisplay().bounds : characterBox),
       ...(wallpaperMode ? { transparent: false, backgroundColor: '#111821', alwaysOnTop: false, focusable: false } : {}),
       resizable: !wallpaperMode, ...(wallpaperMode ? { thickFrame: false } : {}), skipTaskbar: true, hasShadow: false, title: wallpaperMode ? 'Vibe Voice · 雨夜壁纸' : 'Vibe Voice · Live2D' });
     // Normalize the constructor's native frame rounding before the first draw.
@@ -352,22 +425,24 @@ else {
       prepareKeys:()=>remoteInput.start(),
       createTransport:() => new NativeRemote({root,storageDir,packaged}),
       save:async rc003 => { await store.updateSettings({rc003}); notifyWorkspace(); },
-      begin:id => {
-        if(closing || changingData || changingProvider || backend.state.status === 'starting') throw new Error('应用正在切换或启动，请稍后再按住语音键。');
+      begin:async id => {
+        if(closing || quitting || changingData || changingProvider || suspended || screenLocked || backend.lifecycle?.active || backend.busy && !backend.state.threadId || ['connecting','starting','configuring'].includes(backend.state.status) || submissions.active.has(provider)) throw new Error('应用正在切换、暂停或启动，请稍后再按住语音键。');
         if(captureTarget)throw new Error('已有听写正在进行，请先结束或取消。');
         if(voiceResources.active)throw new Error('语音模型正在准备，请完成或取消准备后再按住语音键。');
         if(!speech.status().asr) { showWorkbench('speech'); throw new Error('首次使用请在语音模型中下载听写资源，然后按住遥控器语音键。'); }
         const target={provider,cwd:backend.state.cwd,threadId:backend.state.threadId};
-        captureTarget={...target,origin:'rc003',id}; stopSpeech(); showChat(); return target;
+        const owned = captureTarget = {...target,origin:'rc003',id}; stopSpeech(); showChat();
+        try { await applyAmbientBeforeAudio(); return target; }
+        catch(error) { if(captureTarget === owned) captureTarget = null; notifyPresentation(); throw error; }
       },
       transcribe:data => speech.transcribe(data),
       deliver:async (target,text,id) => {
         await store.appendDictation(target,text,id);
         if(!chat.isDestroyed()) chat.webContents.send('remote:text',{target,text,id});
       },
-      end:id => { if(captureTarget?.origin==='rc003' && captureTarget.id===id) captureTarget=null; },
+      end:id => { if(captureTarget?.origin==='rc003' && captureTarget.id===id) { captureTarget=null; notifyPresentation(); } },
       action:async action => {
-        if(changingData || changingProvider || closing || keyLearning) return;
+        if(changingData || changingProvider || closing || quitting || keyLearning) return;
         if(action==='chat')return recallChat();
         if(action==='workbench')return showWorkbench();
         if(action==='remoteSettings')return showWorkbench('remote');
@@ -392,11 +467,24 @@ else {
       if(remoteShortcuts!==remoteInput.enabled){remoteShortcuts=remoteInput.enabled;registerShortcuts();notifyWorkspace();}
       for(const win of [chat,workbench])if(!win.isDestroyed())win.webContents.send('remote:state',value);
     });
-    powerMonitor.on('suspend',()=>remote.suspend()); powerMonitor.on('resume',()=>remote.resume());
+    powerMonitor.on('suspend',()=>{ suspended=true; notifyPresentation(); stopSpeech(); remote.suspend(); chat.webContents.send('speech:cancel'); });
+    powerMonitor.on('resume',()=>{ suspended=false; notifyPresentation(); remote.resume(); });
+    powerMonitor.on('lock-screen',()=>{ screenLocked=true; notifyPresentation(); stopSpeech(); remote.cancel(); chat.webContents.send('speech:cancel'); });
+    powerMonitor.on('unlock-screen',()=>{ screenLocked=false; notifyPresentation(); });
+    chat.webContents.on('render-process-gone',()=>{ playbackRevision++; speaking=false; if(captureTarget?.origin!=='rc003')captureTarget=null; clearTimeout(captureTimer); notifyPresentation(); });
+    avatar.webContents.on('did-start-loading',()=>ambientBarrier.startOwner());
+    avatar.webContents.on('render-process-gone',()=>{
+      cancelWallpaperCommit();
+      ambientBarrier.stopOwner();
+      ambienceStatus={phase:'error',error:'壁纸窗口已停止，环境音已静音；听写与朗读仍可使用。请重试恢复壁纸。'};
+      wallpaperStatus={...wallpaperStatus,phase:'error',error:'壁纸窗口已停止，请重试加载。'};
+      notifyWorkspace();
+    });
     console.info('[companion:startup]', 'windows');
     const handler = (channel, fn) => ipcMain.handle(channel, async (event, ...args) => {
       if (!trusted(event)) return { ok: false, error: '不受信任的窗口。' };
       if (closing) return { ok: false, error: '应用正在退出。' };
+      if (quitting && channel !== 'workbench:draft' && channel !== 'speech:stop' && !(channel === 'speech:capture' && args[0] === null) && !(channel === 'speech:playback' && args[0] === false)) return { ok: false, error: '正在保存草稿并退出，请稍候。' };
       if (submissions.active.has(provider) && /^(companion:(send|new|provider|reconnect|model)|workbench:(new|resume|effort|use-data))$/.test(channel)) return { ok: false, error: '正在保存发送记录，请稍候。' };
       if (changingProvider && /^(companion:(send|new|provider|reconnect|login|model|respond|submission)|workbench:(list|history|resume|new|rename|effort))$/.test(channel)) return { ok: false, error: '正在连接 Agent，请稍候。' };
       if (changingData && /^(companion:(send|new|provider|model)|speech:capture|workbench:(new|resume|remove|add|use-data))$/.test(channel)) return {ok:false,error:'正在选择数据目录，请稍候。'};
@@ -415,8 +503,8 @@ else {
       if (backend.busy || captureTarget || closing || changingProvider) throw new Error('应用状态已改变，数据目录未切换。');
       const pointer = join(defaultStorage,'data-location.json');
       await store.queue;
-      await selectDataDirectory(directory, pointer);
-      app.relaunch({ args:[...process.argv.slice(1).filter(value=>!value.startsWith('--storage=')),`--storage=${directory}`] }); app.quit();
+      pendingDataSelection = () => selectDataDirectory(directory, pointer);
+      pendingRelaunch = { args:[...process.argv.slice(1).filter(value=>!value.startsWith('--storage=')),`--storage=${directory}`] }; app.quit();
       } finally { changingData = false; if (!closing) registerShortcuts(); }
     });
     handler('companion:login', async () => {
@@ -489,12 +577,19 @@ else {
     handler('workbench:rename', (_event, id, name, expected) => { requireProvider(expected); return backend.renameConversation(id, name); });
     handler('workbench:effort', (_event, effort) => backend.chooseEffort(effort));
     handler('workbench:draft', (_event, target, text) => text === undefined ? store.draftSnapshot(target) : store.saveDraft(target, text));
+    ipcMain.on('draft:flushed', (event, id, result) => {
+      const pending = draftFlushRequest;
+      if (!trusted(event) || event.sender !== chat?.webContents || pending?.sender !== event.sender || pending.id !== id) return;
+      if (result?.ok === true) pending.confirm();
+      else pending.finish(new Error(typeof result?.error === 'string' ? result.error.slice(0, 1000) : '聊天窗口未能确认草稿已保存。'));
+    });
     handler('workbench:settings', async (_event, patch) => {
       if (!patch || typeof patch !== 'object') throw new Error('设置无效。');
-      const character = wallpaperMode && 'character' in patch ? patch.character : undefined;
-      if (wallpaperMode && 'character' in patch && !isCharacter(character)) throw new Error('请选择已支持的壁纸人物。');
-      // Character selection is a load request; only render-ready commits it.
-      if (character !== undefined) { patch = { ...patch }; delete patch.character; }
+      const choice = wallpaperMode ? wallpaperChoice(patch, store.data.settings) : null;
+      if (choice) cancelWallpaperCommit();
+      // Character selection is a load request; a decoded frame must commit its
+      // settings before the renderer replaces the currently visible canvas.
+      if (choice) { patch = { ...patch }; delete patch.character; delete patch.wallpaperKind; }
       const previous = store.data.settings;
       const changesEngine = ['ttsResident','ttsEngine','qwenRoot'].some(key => key in patch && patch[key] !== previous[key]);
       if (voiceResources.active && changesEngine) throw new Error('模型正在准备，请先取消下载或等待载入完成。');
@@ -506,8 +601,9 @@ else {
       else if ((previous.autoSpeak && !next.autoSpeak) || next.character !== previous.character || next.qwenVoice !== previous.qwenVoice || next.voice !== previous.voice || next.speed !== previous.speed) stopSpeech();
       if (patch.completionSound === false) chat.webContents.send('notification:sound', { action: 'stop' });
       if (!closing && !voiceResources.active && (changesEngine || patch.ttsResident === true && speech.phase === 'error')) speech.configure(next);
-      if (character !== undefined) {
-        wallpaperStatus = { phase: 'loading', character, requestId: wallpaperStatus.requestId + 1 };
+      if (choice) {
+        wallpaperStatus = { phase: 'loading', ...choice, requestId: wallpaperStatus.requestId + 1 };
+        recoverWallpaperRenderer();
         notifyPresentation();
       }
       notifyWorkspace(); return workspaceSnapshot();
@@ -525,11 +621,19 @@ else {
       if (learning) { keyLearning = true; globalShortcut.unregisterAll(); }
       else finishKeyLearning();
     });
-    handler('speech:capture', (event, target) => {
+    handler('speech:capture', async (event, target) => {
       if (event.sender !== chat.webContents) throw new Error('请从对话气泡开始听写。');
       if (target && !speech.status().asr) { showWorkbench('speech'); throw new Error('请先在工作台下载听写资源，完成后即可使用。'); }
-      if (target) { if (captureTarget) throw new Error('听写正在进行。'); if (changingProvider || target.provider && target.provider !== provider || target.threadId !== backend.state.threadId || target.cwd !== backend.state.cwd) throw new Error('当前对话已切换，请重试。'); stopSpeech(); captureTarget = target; clearTimeout(captureTimer); captureTimer = setTimeout(() => { captureTarget = null; chat.webContents.send('speech:cancel'); }, 180000); }
-      else if(captureTarget?.origin!=='rc003') { captureTarget = null; clearTimeout(captureTimer); }
+      if (target) {
+        if (suspended || screenLocked) throw new Error('电脑已暂停，请解锁后重试。');
+        if (captureTarget) throw new Error('听写正在进行。');
+        if (backend.lifecycle?.active || backend.busy && !backend.state.threadId || ['connecting','starting','configuring'].includes(backend.state.status) || submissions.active.has(provider)) throw new Error('正在连接、切换对话或发送任务，请稍后再开始听写。');
+        if (changingProvider || target.provider && target.provider !== provider || target.threadId !== backend.state.threadId || target.cwd !== backend.state.cwd) throw new Error('当前对话已切换，请重试。');
+        stopSpeech(); captureTarget = target; clearTimeout(captureTimer);
+        captureTimer = setTimeout(() => { captureTarget = null; notifyPresentation(); chat.webContents.send('speech:cancel'); }, 180000);
+        try { await applyAmbientBeforeAudio(); }
+        catch(error) { if(captureTarget === target) { captureTarget=null; clearTimeout(captureTimer); } notifyPresentation(); throw error; }
+      } else if(captureTarget?.origin!=='rc003') { captureTarget = null; clearTimeout(captureTimer); notifyPresentation(); }
     });
     handler('speech:transcribe', async (event, data) => {
       if (event.sender !== chat.webContents || !captureTarget || captureTarget.origin === 'rc003') throw new Error('没有进行中的电脑听写。');
@@ -538,10 +642,38 @@ else {
       finally {
         // A cancelled request may finish after another recording has started.
         // Its cleanup owns neither the newer target nor the newer watchdog.
-        if (captureTarget === owned) { captureTarget = null; clearTimeout(captureTimer); captureTimer = null; }
+        if (captureTarget === owned) { captureTarget = null; clearTimeout(captureTimer); captureTimer = null; notifyPresentation(); }
       }
     });
     const { speechProfile } = await import(pathToFileURL(join(root,'backend/speech-plan.mjs')).href);
+    handler('speech:playback', async (event, active) => {
+      if (event.sender !== chat.webContents || typeof active !== 'boolean') throw new Error('播放状态无效。');
+      if(active && (captureTarget || suspended || screenLocked)) throw new Error('请先结束听写或恢复电脑，再朗读。');
+      const owned = ++playbackRevision; speaking=active;
+      if(active) {
+        try {
+          await applyAmbientBeforeAudio();
+          if (owned !== playbackRevision) throw new Error('本次朗读已取消。');
+        } catch(error) { if (owned === playbackRevision) { speaking=false; notifyPresentation(); } throw error; }
+      }
+      else notifyPresentation();
+    });
+    handler('wallpaper:control', (_event, action, value) => {
+      if(action==='retry-audio') { ambientRetry++; recoverWallpaperRenderer(); notifyWorkspace(); }
+      else if(action==='pause' && typeof value==='boolean') { manualPause=value; const item=trayMenu?.getMenuItemById('pause-wallpaper'); if(item)item.checked=value; notifyWorkspace(); }
+      else throw new Error('壁纸操作无效。');
+      return workspaceSnapshot();
+    });
+    handler('wallpaper:commit', (event, info) => {
+      if (!wallpaperMode || event.sender !== avatar.webContents) throw new Error('请从壁纸窗口提交人物画面。');
+      return confirmWallpaper(info);
+    });
+    ipcMain.on('wallpaper:finish', (event, info, accept) => {
+      if (!wallpaperMode || !trusted(event) || event.sender !== avatar.webContents) { event.returnValue = { ok: false, error: '请从壁纸窗口确认人物画面。' }; return; }
+      // Only a prepared atomic rename occurs synchronously. Returning before
+      // paint lets the renderer keep both canvas and saved voices on failure.
+      event.returnValue = { ok: true, value: finishWallpaper(info, accept) };
+    });
     handler('speech:synthesize', (_event, text, profile) => {
       const settings = {...store.data.settings};
       if (profile !== undefined && profile !== speechProfile(settings)) throw new Error('声音设置已改变，请重新朗读。');
@@ -604,13 +736,25 @@ else {
     });
     ipcMain.on('companion:render-ready', (event, info) => {
       if (!trusted(event) || event.sender !== avatar.webContents) return;
-      if (wallpaperMode) confirmWallpaper(info).catch(error => console.error('[wallpaper:ready]', error.message));
+      if (wallpaperMode && info?.error) confirmWallpaper(info).catch(error => console.error('[wallpaper:ready]', error.message));
       if (trusted(event) && event.sender === avatar.webContents && info?.ready === true) {
+        const reported = acceptWallpaperReport(wallpaperStatus, info, appliedWallpaperRequest, store.data.settings.character);
+        if (reported !== wallpaperStatus) {
+          wallpaperStatus = reported;
+          notifyWorkspace();
+        }
         avatar.setTitle(wallpaperMode ? 'Vibe Voice · 雨夜窗前' : 'Vibe Voice · Hiyori Live2D');
         console.info('[companion:render-ready]', JSON.stringify({ kind: info.kind, model: info.model,
+          character: info.character, pose: info.pose, activity: info.activity,
           sourceWidth: info.sourceWidth, sourceHeight: info.sourceHeight,
           renderWidth: info.renderWidth, renderHeight: info.renderHeight }));
       }
+    });
+    ipcMain.on('wallpaper:ambient-applied', (event, revision) => { if(trusted(event) && event.sender===avatar.webContents) ambientBarrier.acknowledge(revision); });
+    ipcMain.on('wallpaper:ambient-status', (event, value) => {
+      if(!trusted(event) || event.sender!==avatar.webContents || !['off','loading','ready','error'].includes(value?.phase))return;
+      const next={phase:value.phase,error:typeof value.error==='string'?value.error.slice(0,300):''};
+      if(JSON.stringify(next)!==JSON.stringify(ambienceStatus)) { ambienceStatus=next; notifyWorkspace(); }
     });
     ipcMain.on('companion:avatar-anchor', (event, anchor) => {
       if (!trusted(event) || event.sender !== avatar.webContents || !anchor) return;
@@ -629,28 +773,65 @@ else {
       screen.on('display-metrics-changed', () => { wallpaperHost.command('ensure'); positionChat(); });
     } else if (argument('visual') !== 'hidden') avatar.showInactive(); // Isolated UI verification can omit the legacy character window.
     tray = new Tray(icon()); tray.setToolTip(`${portable?.testBuild ? 'Rin Desktop 测试版' : 'Vibe Voice'} · ${agentName(provider)} 桌面伙伴`);
-    tray.setContextMenu(Menu.buildFromTemplate([{ label: '打开对话  Ctrl+Alt+空格', click: showChat },
+    trayMenu = Menu.buildFromTemplate([{ label: '打开对话  Ctrl+Alt+空格', click: showChat },
+      { label: '壁纸人物', click: () => showWorkbench('wallpaper') },
       { label: '项目与对话工作台', click: showWorkbench }, { label:'连接与设置遥控器', click:()=>showWorkbench('remote') }, { label: '听写 / 完成听写', click: () => sendInputAction('record') },
       { label: '发送当前草稿', click: () => sendInputAction('send') }, { label: '朗读此条', click: () => sendInputAction('readReply') }, { label: '停止播报', click: stopSpeech },
-      ...(wallpaperMode ? [{ label: '暂停壁纸动画', type: 'checkbox', checked: manualPause, click: item => { manualPause = item.checked; notifyPresentation(); } }, ...(!packaged ? [{ label: '切换为悬浮角色', click: () => switchMode('avatar') }] : [])]
+      ...(wallpaperMode ? [{ id: 'pause-wallpaper', label: '暂停壁纸动画', type: 'checkbox', checked: manualPause, click: item => { manualPause = item.checked; notifyPresentation(); notifyWorkspace(); } }, ...(!packaged ? [{ label: '切换为悬浮角色', click: () => switchMode('avatar') }] : [])]
         : [{ label: '显示 / 隐藏角色', click: () => avatar.isVisible() ? avatar.hide() : avatar.showInactive() }, { label: '恢复默认位置与大小', click: resetAvatar }, { label: '切换为雨夜壁纸', click: () => switchMode('wallpaper') }]),
-      { type: 'separator' }, { label: '退出桌面伙伴', click: () => app.quit() }]));
+      { type: 'separator' }, { label: '退出桌面伙伴', click: () => app.quit() }]);
+    tray.setContextMenu(trayMenu);
     tray.on('click', toggleChat);
     registerShortcuts(); speech.configure(store.data.settings); notifyWorkspace();
     remote.start();
     await backend.connect();
-    if (argument('show') === 'workbench') showWorkbench();
+    if (argument('show') === 'wallpaper') showWorkbench('wallpaper');
+    else if (argument('show') === 'workbench') showWorkbench();
+    else if (argument('show') === 'chat') showChat();
   }).catch(error => {
     // Closing the CLI during startup rejects its connection promise. A native
     // error dialog here would block the pending quit until somebody dismissed it.
     if (closing) return;
     console.error('[companion:startup]', error.stack); dialog.showErrorBox('桌面伙伴未能启动', error.message); closing = true; app.exit(1);
   });
+  function flushChatDraft() {
+    // A missing or already crashed renderer has no remaining editable memory.
+    // Its previously dispatched saves are still drained by the store queue.
+    return new Promise((resolveFlush, rejectFlush) => {
+      const id = ++draftFlushSerial;
+      const sender = chat && !chat.isDestroyed() && !chat.webContents.isDestroyed() && !chat.webContents.isCrashed() ? chat.webContents : null;
+      const finish = error => {
+        if (draftFlushRequest?.id !== id) return;
+        clearTimeout(timer); draftFlushRequest = null;
+        error ? rejectFlush(error) : resolveFlush();
+      };
+      const timer = setTimeout(() => finish(new Error('聊天窗口未能及时确认草稿已保存，退出已取消。请检查草稿后重试。')), 10000);
+      const confirm = () => Promise.resolve(store?.queue).then(() => finish(), finish);
+      draftFlushRequest = { id, sender, finish, confirm };
+      if (!sender) { confirm(); return; }
+      try { sender.send('draft:flush', id); } catch (error) { finish(error); }
+    });
+  }
   app.on('before-quit', event => {
-    if (closing) return; event.preventDefault(); closing = true;
-    globalShortcut.unregisterAll(); tray?.destroy(); clearTimeout(captureTimer);
-    Promise.allSettled([remote?.close(), voiceResources?.close(), speech?.close(), wallpaperHost?.close(), backend?.close(), providerChange, store?.queue, characterBox ? saveAppearance() : Promise.resolve()])
-      .then(() => speech?.close()).finally(() => app.exit(0));
+    if (closing) return; event.preventDefault(); if (quitting) return;
+    quitting = true; globalShortcut.unregisterAll(); cancelWallpaperCommit();
+    (async () => {
+      try {
+        remote?.cancel().catch(() => {});
+        await flushChatDraft();
+        if (pendingDataSelection) { await pendingDataSelection(); pendingDataSelection = null; }
+        if (pendingRelaunch) { app.relaunch(pendingRelaunch); pendingRelaunch = null; }
+      } catch (error) {
+        quitting = false; pendingDataSelection = null; pendingRelaunch = null; registerShortcuts();
+        try { if (chat && !chat.isDestroyed()) { chat.webContents.send('draft:flush-cancelled', error.message); showChat(); } } catch { /* A renderer can disappear while the flush is pending. */ }
+        dialog.showErrorBox('草稿尚未保存，退出已取消', error.message);
+        return;
+      }
+      closing = true;
+      tray?.destroy(); clearTimeout(captureTimer); ambientBarrier.close();
+      await Promise.allSettled([remote?.close(), voiceResources?.close(), speech?.close(), wallpaperHost?.close(), backend?.close(), providerChange, store?.queue, characterBox ? saveAppearance() : Promise.resolve()]);
+      try { await speech?.close(); } finally { app.exit(0); }
+    })();
   });
   app.on('window-all-closed', () => { if (closing) app.quit(); });
 }

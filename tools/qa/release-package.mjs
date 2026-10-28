@@ -5,6 +5,7 @@ import { createReadStream } from 'node:fs';
 import { readFile, readdir, stat } from 'node:fs/promises';
 import { join, resolve, relative, isAbsolute } from 'node:path';
 import { createRunDirectory, writeRunReport } from './run-output.mjs';
+import { inspectMotionAssets } from '../release/motion-assets.mjs';
 
 const option = key => process.argv.find(arg => arg.startsWith(`--${key}=`))?.slice(key.length + 3);
 if (!option('package') || process.argv.includes('--help')) {
@@ -16,6 +17,9 @@ const output = await createRunDirectory('release-package', option('output'));
 const json = async file => JSON.parse(await readFile(file, 'utf8'));
 const hash = async file => { const h = createHash('sha256'); for await (const chunk of createReadStream(file)) h.update(chunk); return h.digest('hex'); };
 const manifest = await json(join(directory, 'manifest.json'));
+const motion = await inspectMotionAssets(join(directory, 'resources/app/assets/motion/female'));
+const sourceMotion = await inspectMotionAssets(join(root, 'prototypes/live2d-codex/assets/motion/female'));
+assert.deepEqual(motion.manifest, sourceMotion.manifest, 'Packaged motion media differs from the current approved runtime files');
 assert.equal(manifest.version, (await json(join(root, 'package.json'))).version);
 assert.equal(manifest.version, (await json(join(directory, 'resources/app/package.json'))).version);
 assert.equal(manifest.version, (await json(join(directory, 'resources/app/portable.json'))).version);
@@ -54,6 +58,6 @@ if (option('baseline')) {
   }
   assert.ok(preserved > 10);
 }
-const report = {version:manifest.version,files:names.size,bytes,sourceMatches,preservedArtworkAndCpuFiles:preserved,noModelsCredentialsOrCli:true,accounts:false,hardware:false,passed:true};
+const report = {version:manifest.version,files:names.size,bytes,sourceMatches,motionMediaFiles:motion.names.length,preservedArtworkAndCpuFiles:preserved,noModelsCredentialsOrCli:true,accounts:false,hardware:false,passed:true};
 await writeRunReport(output,report);
 console.log(JSON.stringify({output,...report}));

@@ -61,7 +61,9 @@ button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-
 .bubble-shell { position: relative; width: 100%; height: 100%; padding: 10px 18px 12px; --tail-y: 78px; }
 .bubble-surface { position: absolute; inset: 0; opacity: var(--surface-opacity); pointer-events: none; }
 .bubble-backdrop { position: absolute; inset: 10px 18px 12px; background: #f6fafd; border-radius: var(--radius); box-shadow: 0 7px 20px #142f3d20; }
-.bubble-card { position: relative; height: 100%; display: flex; flex-direction: column; padding: 12px 20px 16px; border: 1px solid transparent; border-radius: var(--radius); overflow: hidden; }
+/* When the work area cannot fit the fixed controls, keep them reachable by
+   scrolling the card. The usual reply-only scroll remains at normal sizes. */
+.bubble-card { position: relative; height: 100%; display: flex; flex-direction: column; padding: 12px 20px 16px; border: 1px solid transparent; border-radius: var(--radius); overflow-x: hidden; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #647f8b80 transparent; }
 .bubble-tail { position: absolute; top: calc(var(--tail-y) - 11.5px); width: 20px; height: 23px; background: #f6fafd; }
 .bubble-shell[data-side=right] .bubble-tail { right: 3px; clip-path: polygon(0 0,100% 50%,0 100%); }
 .bubble-shell[data-side=left] .bubble-tail { left: 3px; clip-path: polygon(100% 0,0 50%,100% 100%); }
@@ -82,7 +84,7 @@ button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-
 .reading-button { gap: 5px; padding: 0 7px; font-size: 11px; white-space: nowrap; }
 .reading-icon { width: 15px; height: 15px; flex-basis: 15px; }
 .bubble-shell[data-reading=true] .reading-icon { transform: rotate(180deg); }
-.bubble-content { flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;padding:3px;margin:-3px -3px 0;scrollbar-width:thin;scrollbar-color:#647f8b80 transparent; }
+.bubble-content { flex:1;min-height:64px;overflow:auto;overscroll-behavior:contain;padding:3px;margin:-3px -3px 0;scrollbar-width:thin;scrollbar-color:#647f8b80 transparent; }
 .reply-scroll { min-height: 44px; margin: 0 0 16px; padding: 0 4px 0 0; }
 .welcome { margin: 0; color: var(--muted); font-size: 15px; line-height: 1.8; padding: 3px 0; }
 .message { margin: 0; }
@@ -165,9 +167,9 @@ button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-
 .interaction-help { font-size: 11px; color: var(--muted); line-height: 1.8; margin: 9px 0 0; }
 #connection-label { flex: 1 1 140px;overflow-wrap:anywhere;line-height:1.7; }
 #session-label { font-size: 10px; font-variant-numeric: tabular-nums; }
-.approval { display:flex;flex-direction:column;flex: 0 1 auto; min-height:130px; margin: 8px 0 12px; padding: 14px; background: var(--approval-surface); border-radius: 12px; max-height: 42vh; overflow: hidden; font-size: 12px; overflow-wrap:anywhere; }
+.approval { display:flex;flex-direction:column;flex: 0 0 auto; margin: 8px 0 12px; padding: 14px; background: var(--approval-surface); border-radius: 12px; font-size: 12px; overflow-wrap:anywhere; }
 .approval h3, .login-panel h3 { flex:0 0 auto;font-size: 13px; line-height:1.6;margin: 0 0 8px; font-weight: 650; }
-.approval-body { min-height:0;overflow:auto;padding:3px 4px 3px 3px;margin:-3px;overscroll-behavior:contain;scrollbar-width:thin; }
+.approval-body { min-height:0;max-height:max(96px,24vh);overflow:auto;padding:3px 4px 3px 3px;margin:-3px;overscroll-behavior:contain;scrollbar-width:thin; }
 .approval p { margin: 6px 0; line-height: 1.75; }
 .approval-directory { color:#6e5839;font-size:11px; }
 .approval pre { font-family:"Cascadia Code",Consolas,monospace;font-size: 11px; line-height:1.7;white-space: pre-wrap; overflow-wrap:anywhere;background: #f2e7d6; padding: 10px; border-radius: 6px; }
@@ -219,7 +221,9 @@ button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-
 @keyframes breathe { 50% { opacity: .45; } }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
 /* Wallpaper artwork owns the complete desktop canvas. Desktop input passes through. */
-#wallpaper-view { position: fixed; inset: 0; overflow: hidden; background: #111821 url('app://local/assets/rainy-window/poster.png') center / cover no-repeat; }
+#wallpaper-view { position: fixed; inset: 0; overflow: hidden; background: #111821; }
 #wallpaper-view > canvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+#wallpaper-view > .wallpaper-motion { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; pointer-events: none; opacity: 0; }
+#wallpaper-view > .wallpaper-motion[data-active="true"] { opacity: 1; }
 #wallpaper-view .wallpaper-rain { z-index: 1; }
 #wallpaper-error { position: absolute; left: 24px; bottom: 68px; z-index: 2; padding: 12px 16px; max-width: min(480px,calc(100vw - 48px)); max-height:35vh;overflow:auto;overflow-wrap:anywhere;line-height:1.7;color: #fff; background: rgba(24,31,40,.85); border-radius: 12px; font-size: 13px; }
