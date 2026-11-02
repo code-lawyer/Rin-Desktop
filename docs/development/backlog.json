@@ -1012,7 +1012,8 @@
         ".gitignore",
         ".github/workflows/check.yml",
         "docs/development/data-and-release.md",
-        "docs/development/release-0.6.1-review.md"
+        "docs/development/release-0.6.1-review.md",
+        "docs/development/release-0.6.2-review.md"
       ],
       "acceptance": [
         "本批改动经过公开扫描和 diff 审查后提交到原仓库开发分支；对应 upstream 明确；工作区不被误当已同步。"
@@ -1028,6 +1029,11 @@
           "ref": "docs/development/release-0.6.1-review.md",
           "kind": "final-review-ci-and-isolated-installer-validation",
           "summary": "2026-10-28：用户测试ok，双轴复核无未解决阻断。0.6.1源码本机458项、GitHub公开451项、构建及539文件双重扫描通过；fc27bdf已推送原开发分支，PR #2的两路CI通过。正式包8308文件、97项源码、6媒体和77项既有资源核对；隔离新装、升级、注册卸载、模拟数据保留及旧版便携文件回装通过。版本标签、附件SHA-256及限定范围见发布记录，不冒领硬件或真实账户矩阵。"
+        },
+        {
+          "ref": "docs/development/release-0.6.2-review.md",
+          "kind": "source-push-upstream-and-public-ci",
+          "summary": "2026-11-02：实际暂存区与工作区各538公共文件扫描通过；源码a3a075a推送原origin/codex/public-release，同名upstream保留。push CI在干净Windows通过459项公开测试、构建、台账及双重扫描；PR #3与最终发布继续单独核对。"
         }
       ]
     },
@@ -3075,12 +3081,17 @@
         "在隔离路径验证新装、旧0.6.1覆盖升级与允许范围内的安装生命周期；不操作日用数据，不冒领完整账户/硬件/系统矩阵。",
         "实际暂存区公开扫描与必要检查通过；源码提交原开发分支，经PR和CI合入main，标签与公开Release安装器大小和SHA-256对应；旧发布保留。"
       ],
-      "nextAction": "正式包与隔离安装已通过；审计实际暂存区，提交原开发分支，经PR和CI合入后发布并核对远端安装器。",
+      "nextAction": "源码已提交同步且push CI通过，等待PR最终检查与合入后发布0.6.2，并核对远端标签和安装器。",
       "evidence": [
         {
           "ref": "docs/development/release-0.6.2-review.md",
           "kind": "formal-package-and-isolated-installer-validation",
           "summary": "2026-11-02：0.6.2正式包8301文件/100源码/6媒体通过，67保留美术及CPU语音文件匹配0.6.1，男士素材排除；本机466项离线测试、构建和官方依赖审计通过。隔离中文路径新装、0.6.1覆盖升级、注册快捷方式、卸载、外部模拟数据保留及旧版便携文件回装通过；未启动真实账户/硬件或操作日用数据。源码同步与公开发布继续由REL-05记录。"
+        },
+        {
+          "ref": "docs/development/release-0.6.2-review.md",
+          "kind": "source-push-upstream-and-public-ci",
+          "summary": "2026-11-02：实际暂存区与工作区各538公共文件扫描通过；源码a3a075a推送原origin/codex/public-release，同名upstream保留。push CI在干净Windows通过459项公开测试、构建、台账及双重扫描；PR #3与最终发布继续单独核对。"
         }
       ]
     }

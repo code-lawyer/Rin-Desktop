@@ -42,6 +42,8 @@ DATA-01/02 增加每个 provider 最近一次发送记录、提交前原稿保�
 
 ## 应用发布步骤
 
+2026-11-02：0.6.2源码提交 `a3a075a` 已推送原开发分支，[PR #3](https://github.com/code-lawyer/Rin-Desktop/pull/3)负责检查与合入。459项公开测试的push CI通过；正式包、隔离安装和发布状态见[0.6.2发布验证](release-0.6.2-review.md)。真实账户/设备与完整系统矩阵继续独立验收。
+
 发布范围先由已通过的任务决定。未验收的设备或后端不能只因为源码已存在就进入正式支持列表。
 
 当前Claude/Grok/OpenCode在界面和portable.json的experimentalBackends中标为实验，标记来自同一catalog。保留源码功能不代表允许跳过REL-01/03；正式支持前仍需逐家真实账户与安装验收。
