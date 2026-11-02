@@ -2,9 +2,9 @@
 
 由 backlog.json 与 legacy-mapping.json 生成，更新日期 2026-11-02。修改 JSON 后运行 `npm run project:docs`；不要直接编辑本页。
 
-已验证限定范围 59 项；已实现待验收 12 项；施工中 2 项；待施工 5 项；后置 7 项。这些数量不是产品完成百分比；已验证项仅对任务写明的范围有效。
+已验证限定范围 60 项；已实现待验收 12 项；施工中 1 项；待施工 5 项；后置 7 项。这些数量不是产品完成百分比；已验证项仅对任务写明的范围有效。
 
-施工中：REM-05、REL-05。
+施工中：REM-05。
 
 可开始的待施工项（前置已验收，按优先级排列）：UI-02、DEC-02。阶段顺序和源码同步安排见[开发计划](roadmap.md)。
 
@@ -94,7 +94,7 @@
 | DOC-02 | 壁纸自动姿态说明随静态与动态模式切换 | 已验证限定范围 | P3 | ART-09 | 界面/项目维护 |
 | PRIVATE-02 | 本机可选扩展的锁定依赖更新与回归 | 已验证限定范围 | P2 | PRIVATE-01 | 私人扩展 |
 | ART-10 | 壁纸收敛为动漫静态与真人动态，移除男士资源 | 已验证限定范围 | P1 | ART-09、TOOL-06、DOC-02 | 桌面/界面/质量 |
-| REL-05 | 0.6.2两风格与修复版本提交、同步和发布 | 施工中 | P1 | ART-10、REL-02、REL-04 | 构建发布 |
+| REL-05 | 0.6.2两风格与修复版本提交、同步和发布 | 已验证限定范围 | P1 | ART-10、REL-02、REL-04 | 构建发布 |
 
 ## ORG-01 全目录盘点与保护基线
 
@@ -593,7 +593,7 @@
 
 下一动作：保持原origin和同名开发分支upstream；后续变更继续公开扫描、PR与CI，不把本地新文件自动当作已发布。
 
-证据：[docs/development/data-and-release.md](data-and-release.md) — 2026-10-22：公开381文件index扫描通过；提交推送原code-lawyer/Rin-Desktop的codex/public-release，建立同名upstream。PR #1及f1e22a6的两路GitHub CI通过，保留原main历史。（git-push-upstream-and-ci）；[docs/development/release-0.6.1-review.md](release-0.6.1-review.md) — 2026-10-28：用户测试ok，双轴复核无未解决阻断。0.6.1源码本机458项、GitHub公开451项、构建及539文件双重扫描通过；fc27bdf已推送原开发分支，PR #2的两路CI通过。正式包8308文件、97项源码、6媒体和77项既有资源核对；隔离新装、升级、注册卸载、模拟数据保留及旧版便携文件回装通过。版本标签、附件SHA-256及限定范围见发布记录，不冒领硬件或真实账户矩阵。（final-review-ci-and-isolated-installer-validation）；[docs/development/release-0.6.2-review.md](release-0.6.2-review.md) — 2026-11-02：实际暂存区与工作区各538公共文件扫描通过；源码a3a075a推送原origin/codex/public-release，同名upstream保留。push CI在干净Windows通过459项公开测试、构建、台账及双重扫描；PR #3与最终发布继续单独核对。（source-push-upstream-and-public-ci）
+证据：[docs/development/data-and-release.md](data-and-release.md) — 2026-10-22：公开381文件index扫描通过；提交推送原code-lawyer/Rin-Desktop的codex/public-release，建立同名upstream。PR #1及f1e22a6的两路GitHub CI通过，保留原main历史。（git-push-upstream-and-ci）；[docs/development/release-0.6.1-review.md](release-0.6.1-review.md) — 2026-10-28：用户测试ok，双轴复核无未解决阻断。0.6.1源码本机458项、GitHub公开451项、构建及539文件双重扫描通过；fc27bdf已推送原开发分支，PR #2的两路CI通过。正式包8308文件、97项源码、6媒体和77项既有资源核对；隔离新装、升级、注册卸载、模拟数据保留及旧版便携文件回装通过。版本标签、附件SHA-256及限定范围见发布记录，不冒领硬件或真实账户矩阵。（final-review-ci-and-isolated-installer-validation）；[docs/development/release-0.6.2-review.md](release-0.6.2-review.md) — 2026-11-02：实际暂存区与工作区各538公共文件扫描通过；源码a3a075a推送原origin/codex/public-release，同名upstream保留。push CI在干净Windows通过459项公开测试、构建、台账及双重扫描；PR #3与最终发布继续单独核对。（source-push-upstream-and-public-ci）；[docs/development/release-0.6.2-review.md](release-0.6.2-review.md) — 2026-11-02：PR #3最终提交097dd1e的push/PR CI通过并合入main；v0.6.2指向3f867fe，main和标签CI同样通过。Release于10:22:54 UTC公开并设为Latest；唯一Setup为405164922字节，远端SHA-256与锁定清单及本地安装器一致，匿名下载HTTP 200。旧版发布保留；发布后文档补记不改变标签或安装器，不冒领真实账户/硬件/完整系统与数据回退矩阵。（published-release-tag-ci-and-asset-verification）
 
 ## REL-03 下一应用版本发布验收
 
@@ -609,7 +609,7 @@
 
 下一动作：按0.6.2记录发布校验、来源与实验边界；继续完整硬件、真实账户和系统/数据回退矩阵，不把单版本发布计作全部完成。
 
-证据：[docs/development/release-0.5.0-review.md](release-0.5.0-review.md) — 0.5.0 发布前完成 Standards/Spec 两轴审查与修复；用户反馈上一候选基本可用，尚不能替代完整设备/账户矩阵。（source-offline-review）；[docs/release-audit.md](../release-audit.md) — 0.5.0最终安装器重新构建；隔离中文路径安装和0.4.0覆盖升级逐文件校验通过，公开307项GitHub CI及构建/扫描通过。版本发布入口与SHA-256记录完整，硬件/真实账户/完整注册安装矩阵仍待验收。（release-candidate-and-ci）；[docs/development/release-0.6.1-review.md](release-0.6.1-review.md) — 2026-10-28：用户测试ok，双轴复核无未解决阻断。0.6.1源码本机458项、GitHub公开451项、构建及539文件双重扫描通过；fc27bdf已推送原开发分支，PR #2的两路CI通过。正式包8308文件、97项源码、6媒体和77项既有资源核对；隔离新装、升级、注册卸载、模拟数据保留及旧版便携文件回装通过。版本标签、附件SHA-256及限定范围见发布记录，不冒领硬件或真实账户矩阵。（final-review-ci-and-isolated-installer-validation）；[docs/development/release-0.6.2-review.md](release-0.6.2-review.md) — 2026-11-02：0.6.2正式包8301文件/100源码/6媒体通过，67保留美术及CPU语音文件匹配0.6.1，男士素材排除；本机466项离线测试、构建和官方依赖审计通过。隔离中文路径新装、0.6.1覆盖升级、注册快捷方式、卸载、外部模拟数据保留及旧版便携文件回装通过；未启动真实账户/硬件或操作日用数据。源码同步与公开发布继续由REL-05记录。（formal-package-and-isolated-installer-validation）
+证据：[docs/development/release-0.5.0-review.md](release-0.5.0-review.md) — 0.5.0 发布前完成 Standards/Spec 两轴审查与修复；用户反馈上一候选基本可用，尚不能替代完整设备/账户矩阵。（source-offline-review）；[docs/release-audit.md](../release-audit.md) — 0.5.0最终安装器重新构建；隔离中文路径安装和0.4.0覆盖升级逐文件校验通过，公开307项GitHub CI及构建/扫描通过。版本发布入口与SHA-256记录完整，硬件/真实账户/完整注册安装矩阵仍待验收。（release-candidate-and-ci）；[docs/development/release-0.6.1-review.md](release-0.6.1-review.md) — 2026-10-28：用户测试ok，双轴复核无未解决阻断。0.6.1源码本机458项、GitHub公开451项、构建及539文件双重扫描通过；fc27bdf已推送原开发分支，PR #2的两路CI通过。正式包8308文件、97项源码、6媒体和77项既有资源核对；隔离新装、升级、注册卸载、模拟数据保留及旧版便携文件回装通过。版本标签、附件SHA-256及限定范围见发布记录，不冒领硬件或真实账户矩阵。（final-review-ci-and-isolated-installer-validation）；[docs/development/release-0.6.2-review.md](release-0.6.2-review.md) — 2026-11-02：0.6.2正式包8301文件/100源码/6媒体通过，67保留美术及CPU语音文件匹配0.6.1，男士素材排除；本机466项离线测试、构建和官方依赖审计通过。隔离中文路径新装、0.6.1覆盖升级、注册快捷方式、卸载、外部模拟数据保留及旧版便携文件回装通过；未启动真实账户/硬件或操作日用数据。源码同步与公开发布继续由REL-05记录。（formal-package-and-isolated-installer-validation）；[docs/development/release-0.6.2-review.md](release-0.6.2-review.md) — 2026-11-02：PR #3最终提交097dd1e的push/PR CI通过并合入main；v0.6.2指向3f867fe，main和标签CI同样通过。Release于10:22:54 UTC公开并设为Latest；唯一Setup为405164922字节，远端SHA-256与锁定清单及本地安装器一致，匿名下载HTTP 200。旧版发布保留；发布后文档补记不改变标签或安装器，不冒领真实账户/硬件/完整系统与数据回退矩阵。（published-release-tag-ci-and-asset-verification）
 
 ## DEC-01 确认新增后端的账户和计费边界
 
@@ -1476,7 +1476,7 @@
 
 状态：已验证限定范围；阶段：baseline；责任角色：桌面/界面/质量。
 
-实现位置：[prototypes/live2d-codex/backend/character-profiles.cjs](../../prototypes/live2d-codex/backend/character-profiles.cjs)、[prototypes/live2d-codex/backend/workspace-store.mjs](../../prototypes/live2d-codex/backend/workspace-store.mjs)、[prototypes/live2d-codex/backend/wallpaper-choice.cjs](../../prototypes/live2d-codex/backend/wallpaper-choice.cjs)、[prototypes/live2d-codex/main.cjs](../../prototypes/live2d-codex/main.cjs)、[prototypes/live2d-codex/renderer/still-wallpaper.js](../../prototypes/live2d-codex/renderer/still-wallpaper.js)、[prototypes/live2d-codex/renderer/workbench.html](../../prototypes/live2d-codex/renderer/workbench.html)、[prototypes/live2d-codex/renderer/workbench.js](../../prototypes/live2d-codex/renderer/workbench.js)、[prototypes/live2d-codex/scripts/package-portable.mjs](../../prototypes/live2d-codex/scripts/package-portable.mjs)、[tools/release/resource-assets.mjs](../../tools/release/resource-assets.mjs)、[tools/qa/still-fixture.cjs](../../tools/qa/still-fixture.cjs)、[tools/qa/release-package.mjs](../../tools/qa/release-package.mjs)、[prototypes/live2d-codex/assets/stills/manifest.json](../../prototypes/live2d-codex/assets/stills/manifest.json)、[tools/release/installer.iss](../../tools/release/installer.iss)、[tools/qa/installer-check.ps1](../../tools/qa/installer-check.ps1)、[tools/qa/interface-fixture.cjs](../../tools/qa/interface-fixture.cjs)、[tools/qa/visual-cases.cjs](../../tools/qa/visual-cases.cjs)、[prototypes/live2d-codex/tests/character-profiles.test.mjs](../../prototypes/live2d-codex/tests/character-profiles.test.mjs)、[tests/resource-assets.test.mjs](../../tests/resource-assets.test.mjs)。
+实现位置：[prototypes/live2d-codex/backend/character-profiles.cjs](../../prototypes/live2d-codex/backend/character-profiles.cjs)、[prototypes/live2d-codex/backend/workspace-store.mjs](../../prototypes/live2d-codex/backend/workspace-store.mjs)、[prototypes/live2d-codex/backend/wallpaper-choice.cjs](../../prototypes/live2d-codex/backend/wallpaper-choice.cjs)、[prototypes/live2d-codex/main.cjs](../../prototypes/live2d-codex/main.cjs)、[prototypes/live2d-codex/renderer/still-wallpaper.js](../../prototypes/live2d-codex/renderer/still-wallpaper.js)、[prototypes/live2d-codex/renderer/workbench.html](../../prototypes/live2d-codex/renderer/workbench.html)、[prototypes/live2d-codex/renderer/workbench.js](../../prototypes/live2d-codex/renderer/workbench.js)、[prototypes/live2d-codex/scripts/package-portable.mjs](../../prototypes/live2d-codex/scripts/package-portable.mjs)、[tools/release/resource-assets.mjs](../../tools/release/resource-assets.mjs)、[tools/qa/still-fixture.cjs](../../tools/qa/still-fixture.cjs)、[tools/qa/release-package.mjs](../../tools/qa/release-package.mjs)、[prototypes/live2d-codex/assets/stills/manifest.json](../../prototypes/live2d-codex/assets/stills/manifest.json)、[tools/release/installer.iss](../../tools/release/installer.iss)、[tools/qa/installer-check.ps1](../../tools/qa/installer-check.ps1)、[tools/qa/interface-fixture.cjs](../../tools/qa/interface-fixture.cjs)、[tools/qa/visual-cases.cjs](../../tools/qa/visual-cases.cjs)、[prototypes/live2d-codex/tests/character-profiles.test.mjs](../../prototypes/live2d-codex/tests/character-profiles.test.mjs)、[tests/resource-assets.test.mjs](../../tests/resource-assets.test.mjs)、[docs/development/release-0.6.2-review.md](release-0.6.2-review.md)。
 
 依赖：ART-09、TOOL-06、DOC-02。原编号：新增工作。
 
@@ -1487,13 +1487,13 @@
 - 保留五静态姿态、两态循环/双向转身、暂停、声音优先与独立男女声线；隔离桌面验证重试、快速切换和新进程恢复。
 - 按用户指定顺序进行 code-review 双轴审核、impeccable 实际界面审查，修复发现后复查；全量离线、构建、项目/公共检查和实际候选包内容验证通过。
 
-下一动作：维护两种风格、迁移及男士资源排除回归；候选包已验证、尚未公开发布，真实账户/硬件/全安装矩阵继续由原任务独立验收。
+下一动作：两种风格与迁移已随0.6.2公开发布；维护退役素材排除回归，真实账户/硬件/完整安装矩阵继续由原任务独立验收。
 
-证据：[docs/development/wallpaper-styles-2026-11-01.md](wallpaper-styles-2026-11-01.md) — 2026-11-01：466项本机离线测试、构建与项目/公共检查通过；静态15组、风格故障/独立进程恢复5组、正式4K动态7组、界面12组和焦点15组通过。code-review Standards/Spec各2项发现修复后均0未关闭；impeccable两轮44状态检查和对比度复核无新增阻断。候选8322文件/100源码/6媒体核验，67保留资产与旧版相同，中文路径新装与旧0.6.1便携覆盖升级通过，8个男士素材均不存在。未提交/推送/公开发布，未启动真实账户或执行RC003及注册卸载验收。（implementation-and-release-review）
+证据：[docs/development/wallpaper-styles-2026-11-01.md](wallpaper-styles-2026-11-01.md) — 2026-11-01：466项本机离线测试、构建与项目/公共检查通过；静态15组、风格故障/独立进程恢复5组、正式4K动态7组、界面12组和焦点15组通过。code-review Standards/Spec各2项发现修复后均0未关闭；impeccable两轮44状态检查和对比度复核无新增阻断。候选8322文件/100源码/6媒体核验，67保留资产与旧版相同，中文路径新装与旧0.6.1便携覆盖升级通过，8个男士素材均不存在。未提交/推送/公开发布，未启动真实账户或执行RC003及注册卸载验收。（implementation-and-release-review）；[docs/development/release-0.6.2-review.md](release-0.6.2-review.md) — 2026-11-02：PR #3最终提交097dd1e的push/PR CI通过并合入main；v0.6.2指向3f867fe，main和标签CI同样通过。Release于10:22:54 UTC公开并设为Latest；唯一Setup为405164922字节，远端SHA-256与锁定清单及本地安装器一致，匿名下载HTTP 200。旧版发布保留；发布后文档补记不改变标签或安装器，不冒领真实账户/硬件/完整系统与数据回退矩阵。（published-release-tag-ci-and-asset-verification）
 
 ## REL-05 0.6.2两风格与修复版本提交、同步和发布
 
-状态：施工中；阶段：release；责任角色：构建发布。
+状态：已验证限定范围；阶段：release；责任角色：构建发布。
 
 实现位置：[package.json](../../package.json)、[prototypes/live2d-codex/package.json](../../prototypes/live2d-codex/package.json)、[tools/release/resource-manifest.json](../../tools/release/resource-manifest.json)、[docs/development/release-0.6.2-review.md](release-0.6.2-review.md)。
 
@@ -1505,6 +1505,6 @@
 - 在隔离路径验证新装、旧0.6.1覆盖升级与允许范围内的安装生命周期；不操作日用数据，不冒领完整账户/硬件/系统矩阵。
 - 实际暂存区公开扫描与必要检查通过；源码提交原开发分支，经PR和CI合入main，标签与公开Release安装器大小和SHA-256对应；旧发布保留。
 
-下一动作：源码已提交同步且push CI通过，等待PR最终检查与合入后发布0.6.2，并核对远端标签和安装器。
+下一动作：0.6.2已发布，保留对应标签、哈希、CI与安装证据；后续变更另建版本，完整矩阵继续按REL-01/03、REM与AGT任务验收。
 
-证据：[docs/development/release-0.6.2-review.md](release-0.6.2-review.md) — 2026-11-02：0.6.2正式包8301文件/100源码/6媒体通过，67保留美术及CPU语音文件匹配0.6.1，男士素材排除；本机466项离线测试、构建和官方依赖审计通过。隔离中文路径新装、0.6.1覆盖升级、注册快捷方式、卸载、外部模拟数据保留及旧版便携文件回装通过；未启动真实账户/硬件或操作日用数据。源码同步与公开发布继续由REL-05记录。（formal-package-and-isolated-installer-validation）；[docs/development/release-0.6.2-review.md](release-0.6.2-review.md) — 2026-11-02：实际暂存区与工作区各538公共文件扫描通过；源码a3a075a推送原origin/codex/public-release，同名upstream保留。push CI在干净Windows通过459项公开测试、构建、台账及双重扫描；PR #3与最终发布继续单独核对。（source-push-upstream-and-public-ci）
+证据：[docs/development/release-0.6.2-review.md](release-0.6.2-review.md) — 2026-11-02：0.6.2正式包8301文件/100源码/6媒体通过，67保留美术及CPU语音文件匹配0.6.1，男士素材排除；本机466项离线测试、构建和官方依赖审计通过。隔离中文路径新装、0.6.1覆盖升级、注册快捷方式、卸载、外部模拟数据保留及旧版便携文件回装通过；未启动真实账户/硬件或操作日用数据。源码同步与公开发布继续由REL-05记录。（formal-package-and-isolated-installer-validation）；[docs/development/release-0.6.2-review.md](release-0.6.2-review.md) — 2026-11-02：实际暂存区与工作区各538公共文件扫描通过；源码a3a075a推送原origin/codex/public-release，同名upstream保留。push CI在干净Windows通过459项公开测试、构建、台账及双重扫描；PR #3与最终发布继续单独核对。（source-push-upstream-and-public-ci）；[docs/development/release-0.6.2-review.md](release-0.6.2-review.md) — 2026-11-02：PR #3最终提交097dd1e的push/PR CI通过并合入main；v0.6.2指向3f867fe，main和标签CI同样通过。Release于10:22:54 UTC公开并设为Latest；唯一Setup为405164922字节，远端SHA-256与锁定清单及本地安装器一致，匿名下载HTTP 200。旧版发布保留；发布后文档补记不改变标签或安装器，不冒领真实账户/硬件/完整系统与数据回退矩阵。（published-release-tag-ci-and-asset-verification）

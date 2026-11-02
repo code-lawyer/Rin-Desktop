@@ -10,7 +10,7 @@ Rin Desktop 的目标是把 Windows 动态壁纸、Agent 工作台、本地语�
 
 继续使用 [code-lawyer/Rin-Desktop](https://github.com/code-lawyer/Rin-Desktop)，没有新建仓库、替换 origin 或重写历史。0.4.0 基线为 `9293be972414243c62d4e6c52a1ea8322e71d8a6`；0.5.0 的版本、安装器校验和实际验证见[发布记录](release-audit.md)。
 
-本轮交付版本为0.6.2，正式安装包校验、审查及同步进度见[0.6.2发布记录](development/release-0.6.2-review.md)。2026-10-27的[本地候选](development/release-0.6.0-readiness.md)保留原哈希，但不含本轮退出草稿、听写目标与Electron补丁。正式发布、历史候选和修复后的源码/测试构建分别记录，不能仅凭相同版本号混用验证结论。
+本轮已发布版本为0.6.2，原仓库main与版本标签已同步；正式安装包校验、审查、公开下载及检查结果见[0.6.2发布记录](development/release-0.6.2-review.md)。2026-10-27的[本地候选](development/release-0.6.0-readiness.md)保留原哈希，但不含后续退出草稿、听写目标与Electron补丁。正式发布、历史候选和修复后的源码/测试构建分别记录，不能仅凭相同版本号混用验证结论。
 
 `npm run status` 只读显示本地分支、origin、upstream、未提交文件和启动条件；它不自动 fetch、push、下载或启动应用。本地源码、远端 main 与 Release 安装包分别核对，不能只比较版本号。
 
