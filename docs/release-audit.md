@@ -1,6 +1,6 @@
 # 应用发布审查
 
-本轮0.6.1交付的范围、独立双轴审查、正式包与安装/CI核对见[0.6.1最终审查与发布验证](development/release-0.6.1-review.md)。以下保留0.5.0历史证据，不用于替代新版本验收。
+本轮0.6.2交付的范围、正式包与安装/CI核对见[0.6.2发布验证](development/release-0.6.2-review.md)，两种壁纸的独立双轴和界面审查见[实现与审查记录](development/wallpaper-styles-2026-11-01.md)。[0.6.1发布验证](development/release-0.6.1-review.md)及以下0.5.0内容保留为历史证据，不用于替代新版本验收。
 
 # 0.5.0 发布范围与验证
 

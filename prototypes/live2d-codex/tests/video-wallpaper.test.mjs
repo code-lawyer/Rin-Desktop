@@ -29,17 +29,20 @@ test('video anchor uses uniform scaling and remains a valid bubble anchor on wid
   assert.equal(videoAnchor(1920,1080).x,.68);
 });
 test('wallpaper requests are validated before they can change character or voices', () => {
-  const settings={character:'male',wallpaperKind:'artwork'};
+  const settings={character:'female',wallpaperKind:'artwork'};
   assert.throws(()=>choices.wallpaperChoice({wallpaperKind:'video'},settings));
-  assert.deepEqual(choices.wallpaperChoice({wallpaperKind:'artwork'},settings),{character:'male',wallpaperKind:'artwork'});
-  assert.deepEqual(choices.wallpaperChoice({character:'male'},settings),{character:'male',wallpaperKind:'artwork'});
+  assert.deepEqual(choices.wallpaperChoice({wallpaperKind:'artwork'},settings),{character:'female',wallpaperKind:'artwork',wallpaperMotion:false});
+  assert.deepEqual(choices.wallpaperChoice({wallpaperMotion:true},settings),{character:'female',wallpaperKind:'artwork',wallpaperMotion:true});
+  assert.throws(()=>choices.wallpaperChoice({character:'male'},settings));
+  assert.throws(()=>choices.wallpaperChoice({wallpaperMotion:'true'},settings));
+  assert.throws(()=>choices.wallpaperChoice({wallpaperMotion:null},settings));
   assert.equal(choices.wallpaperChoice({speed:1.1},settings),null);
   for(const patch of [{wallpaperKind:'remote'},{character:'male',wallpaperKind:'video'},{character:'unknown'}])assert.throws(()=>choices.wallpaperChoice(patch,settings));
-  assert.equal(settings.character,'male');
+  assert.equal(settings.character,'female');
 });
 test('artwork restores preserve settings and reject retired video selections atomically', async t => {
   const directory=await fixture(t),store=new WorkspaceStore(directory);await store.load();
-  await store.updateSettings({character:'male',ttsResident:true,autoSpeak:true,playbackVolume:.6,speed:1.1});
+  await store.updateSettings({wallpaperMotion:true,ttsResident:true,autoSpeak:true,playbackVolume:.6,speed:1.1});
   const remote=structuredClone(store.data.settings.remoteKeys);
   await store.updateSettings({character:'female',wallpaperKind:'artwork'});
   const s=store.data.settings;assert.equal(s.qwenVoice,'Serena');assert.equal(s.voice,3);
@@ -81,15 +84,15 @@ test('render acknowledgement preserves voices on failure and rejects retired vid
   // Execute the real main-process function against a store, without Electron or accounts.
   const main=await readFile(new URL('../main.cjs',import.meta.url),'utf8');
   const body=main.slice(main.indexOf('async function confirmWallpaper('),main.indexOf('\nfunction switchAllowed()'));
-  const directory=await fixture(t),store=new WorkspaceStore(directory);await store.load();await store.updateSettings({character:'male'});
+  const directory=await fixture(t),store=new WorkspaceStore(directory);await store.load();await store.updateSettings({qwenVoice:'Dylan',voice:58});
   // Lexical state deliberately matches the main process, including late confirmations.
   const wrapped=Function('store','isCharacter','isWallpaperKind',`let wallpaperStatus={phase:'loading',character:'female',wallpaperKind:'artwork',requestId:1};let appliedWallpaperRequest=-1,wallpaperCommit;const presentation=()=>({paused:false});const stopSpeech=()=>{};const notifyWorkspace=()=>{};${body};return {run:async info=>await confirmWallpaper(info)&&finishWallpaper(info,true),state:()=>wallpaperStatus,retry:()=>{wallpaperStatus={...wallpaperStatus,phase:'loading',requestId:2};}};`);
-  const fixtureApi=wrapped(store,id=>['female','male'].includes(id),choices.isWallpaperKind);
+  const fixtureApi=wrapped(store,id=>id==='female',choices.isWallpaperKind);
   await fixtureApi.run({character:'female',wallpaperKind:'artwork',requestId:1,error:'broken'});
-  assert.equal(store.data.settings.character,'male');assert.equal(store.data.settings.qwenVoice,'Dylan');assert.equal(fixtureApi.state().phase,'error');
+  assert.equal(store.data.settings.character,'female');assert.equal(store.data.settings.qwenVoice,'Dylan');assert.equal(fixtureApi.state().phase,'error');
   await fixtureApi.run({character:'female',wallpaperKind:'video',requestId:1,ready:true});
-  assert.equal(store.data.settings.character,'male');
+  assert.equal(store.data.settings.character,'female');
   fixtureApi.retry();
   await fixtureApi.run({character:'female',wallpaperKind:'artwork',requestId:2,ready:true});
-  assert.equal(store.data.settings.character,'female');assert.equal(store.data.settings.wallpaperKind,'artwork');assert.equal(store.data.settings.qwenVoice,'Serena');
+  assert.equal(store.data.settings.character,'female');assert.equal(store.data.settings.wallpaperKind,'artwork');assert.equal(store.data.settings.qwenVoice,'Dylan');
 });

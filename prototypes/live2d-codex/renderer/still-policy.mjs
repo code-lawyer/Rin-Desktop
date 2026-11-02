@@ -32,7 +32,7 @@ export function stillActivity(state = {}, presentation = {}, hidden = false) {
   if (state.status === 'waiting') return 'waiting';
   if (['starting', 'working', 'stopping'].includes(state.status)) return 'task';
   if (presentation.chatVisible) return 'chat';
-  return presentation.character === 'male' ? 'male' : 'auto';
+  return 'auto';
 }
 export function stillPose(state = {}, presentation = {}, idle = 'work') {
   const choice = settings.stillSettings(presentation.stills).stillPose;
@@ -43,6 +43,5 @@ export function stillPose(state = {}, presentation = {}, idle = 'work') {
   else if (['starting', 'working', 'stopping'].includes(state.status)) pose = 'work';
   else if (presentation.chatVisible) pose = 'attention';
   else pose = IDLE_POSES.includes(idle) ? idle : 'work';
-  return presentation.character === 'male' && !['work', 'attention'].includes(pose)
-    ? 'work' : pose;
+  return pose;
 }

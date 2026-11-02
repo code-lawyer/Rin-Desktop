@@ -11,7 +11,7 @@ npm test
 npm run build
 ```
 
-单元测试和前端构建不需要语音模型。Windows 设备组件可执行 `npm run qa:remote-component` 编译并检查管道，不访问设备。源码初次连接时自动准备组件；打包脚本预编译到 runtime，使用 Windows 自带 .NET Framework 4.8 和 WinMetadata，不依赖 Python 或 Windows SDK。用户自行安装所选 Agent 的 Windows 原生 CLI：Codex、Claude Code、Grok Build 或 OpenCode V2。新版协议依赖锁定在应用目录的 `package-lock.json`；发布脚本收集 SDK 及必要依赖，不打包 CLI 程序或账号。新增 Agent 的使用和手动验收见 [CLI Agent 说明](../prototypes/live2d-codex/CLI-AGENTS.md)；基础构建通过不等于新增后端完成主应用验收，当前范围见[项目状态](project-status.md)。应用的 Node 运行时、默认女性壁纸与 Cubism Core 从锁定的基础安装包获取。新增男性人物运行资源和两张设置预览位于源码的 `assets/rainy-window-male` 与 `assets/character-previews`，打包时使用源码中的版本。
+单元测试和前端构建不需要语音模型。Windows 设备组件可执行 `npm run qa:remote-component` 编译并检查管道，不访问设备。源码初次连接时自动准备组件；打包脚本预编译到 runtime，使用 Windows 自带 .NET Framework 4.8 和 WinMetadata，不依赖 Python 或 Windows SDK。用户自行安装所选 Agent 的 Windows 原生 CLI：Codex、Claude Code、Grok Build 或 OpenCode V2。新版协议依赖锁定在应用目录的 `package-lock.json`；发布脚本收集 SDK 及必要依赖，不打包 CLI 程序或账号。新增 Agent 的使用和手动验收见 [CLI Agent 说明](../prototypes/live2d-codex/CLI-AGENTS.md)；基础构建通过不等于新增后端完成主应用验收，当前范围见[项目状态](project-status.md)。应用的 Node 运行时、默认女性壁纸与 Cubism Core 从锁定的基础安装包获取。当前壁纸仅使用 `assets/stills/female-v2`、`assets/stills/female-v2-4k` 和 `assets/motion/female`；男士资源已删除，旧安装包恢复工具会过滤它们，打包保留兼容女生素材并明确排除男士资源。
 
 RC003 输入层还使用锁定的 Koffi 3.3.3 和 `@koromix/koffi-win32-x64` 预编译包，通过上述 npm 安装。不要省略 Windows 本平台的 optional dependency。打包脚本显式复制该原生包及许可，并在输出目录加载输入模块；组件检查还在独立副本中用 Electron 的 Node 模式核对加载。连接、按钮设置、麦克风和待验收范围见 [RC003 接入说明](development/remote-integration.md)。
 
@@ -21,10 +21,10 @@ npm run resources
 
 这条命令按 `tools/release/resource-manifest.json` 下载基础安装包，校验 SHA-256 后以不注册安装项的方式解包到 `work/release-resources/版本号`。不下载语音模型或 CLI。源码树缺失的运行时与 Core 目录会连接到解包目录；壁纸资源递归补齐缺失文件，已有文件保留，且不写入目录联接指向的其他位置。补齐后校验动态媒体的大小与哈希，不能只因目录或清单已存在就跳过视频。请先阅读第三方许可。
 
-当前清单锁定0.6.1应用安装包。默认从该版本Release下载；已有同版安装包时可使用下列命令，仍须通过清单的大小和SHA-256校验，不能换成任意安装器。它仅提供锁定的视觉/基础运行资源，不会用安装包中的应用代码覆盖当前源码或Electron依赖。
+当前清单锁定0.6.2应用安装包。默认从该版本Release下载；已有同版安装包时可使用下列命令，仍须通过清单的大小和SHA-256校验，不能换成任意安装器。它仅提供锁定的视觉/基础运行资源，不会用安装包中的应用代码覆盖当前源码或Electron依赖。
 
 ```powershell
-npm run resources -- --installer="release/v0.6.1/Rin-Desktop-0.6.1-Setup.exe"
+npm run resources -- --installer="release/v0.6.2/Rin-Desktop-0.6.2-Setup.exe"
 ```
 
 准备好后，在仓库根目录运行：
@@ -40,7 +40,7 @@ npm start
 
 `npm run start:avatar` 需要本地旧 Hiyori 素材；`npm run start:dots` 需要本地私人桥接。它们不构成公开安装版的新功能。`npm run remote:diagnose` 是需要单独准备环境的硬件诊断，不会随正常启动自动运行。
 
-人物切换的原生回归检查需要已安装的 Playwright，可通过 `VIBE_PLAYWRIGHT` 指定其模块路径。先运行 `npm run build`，再执行 `node tools/qa/gui/run.mjs --case=character-switch --run`；验证便携包时追加 `--package=便携包绝对目录`。旧verify-character-switch路径也转发同一实现，默认帮助，需显式追加`--run`。检查使用独立临时数据，覆盖模型与贴图加载失败、明确重试、声线保留、快速切换和重启恢复，不发送对话或加载语音模型，结果保存在每次新建的 `work/qa/gui-character-switch/` 子目录。
+壁纸风格切换回归先运行 `npm run build`，再执行 `npm run qa:stills -- --character-switch`。它使用生产页面、preload、真实存储与合成后端，在隔离 Electron 中验证当前图片失败、明确重试、声线保留、快速切换和新进程恢复；不需要 Playwright，不连接 CLI、账户或设备。结果保存在每次新建的 `work/qa/still-desktop/` 子目录，可追加 `--output=work/qa/新的目录`。旧 GUI character-switch 与 verify-character-switch 路径仍可带 `--run` 转发，默认仅帮助。旧 `--package` 已明确退役；安装包必须按当前发布验收清单单独验证，不能用源码 fixture 代替。动态媒体使用 `npm run qa:motion -- --run`。
 
 ```powershell
 $resourceVersion = (Get-Content tools/release/resource-manifest.json -Raw | ConvertFrom-Json).version

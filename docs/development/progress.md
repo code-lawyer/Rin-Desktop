@@ -1,10 +1,10 @@
 # 开发进度与统一施工清单
 
-由 backlog.json 与 legacy-mapping.json 生成，更新日期 2026-10-28。修改 JSON 后运行 `npm run project:docs`；不要直接编辑本页。
+由 backlog.json 与 legacy-mapping.json 生成，更新日期 2026-11-02。修改 JSON 后运行 `npm run project:docs`；不要直接编辑本页。
 
-已验证限定范围 53 项；已实现待验收 12 项；施工中 1 项；待施工 5 项；后置 7 项。这些数量不是产品完成百分比；已验证项仅对任务写明的范围有效。
+已验证限定范围 59 项；已实现待验收 12 项；施工中 2 项；待施工 5 项；后置 7 项。这些数量不是产品完成百分比；已验证项仅对任务写明的范围有效。
 
-施工中：REM-05。
+施工中：REM-05、REL-05。
 
 可开始的待施工项（前置已验收，按优先级排列）：UI-02、DEC-02。阶段顺序和源码同步安排见[开发计划](roadmap.md)。
 
@@ -35,7 +35,7 @@
 | REM-06 | 遥控组件安装与退出验收 | 已实现待验收 | P1 | REM-05、REL-01 | 构建发布 |
 | AGT-01 | Claude/Grok/OpenCode 源码适配器 | 已验证限定范围 | P1 | 无 | Agent 适配 |
 | AGT-02 | 新 Agent 的统一契约和失败路径测试 | 已验证限定范围 | P1 | AGT-01、FIX-03 | Agent 适配 |
-| AGT-03 | Claude 主应用真实验收 | 待施工 | P1 | AGT-02、DEC-01、FIX-01、FIX-02 | Agent 验收 |
+| AGT-03 | Claude 主应用真实验收 | 待施工 | P1 | AGT-02、DEC-01、FIX-01、FIX-02、TOOL-05 | Agent 验收 |
 | AGT-04 | Grok 主应用真实验收 | 待施工 | P1 | AGT-02、DEC-01、FIX-03 | Agent 验收 |
 | AGT-05 | OpenCode 主应用真实验收 | 待施工 | P1 | AGT-02、DEC-01、FIX-03 | Agent 验收 |
 | AGT-06 | 跨 provider 会话与草稿隔离 | 已实现待验收 | P1 | AGT-01、DATA-02 | 会话数据 |
@@ -88,6 +88,13 @@
 | FIX-19 | 退出前确认草稿保存并延后数据切换和重启 | 已验证限定范围 | P2 | BASE-03、BASE-04 | 桌面/质量维护 |
 | FIX-20 | 资源恢复补齐已有目录内部缺失的媒体 | 已验证限定范围 | P2 | BASE-03 | 资源/发布 |
 | FIX-21 | 静态预览处理非法URL并避免HEAD读取整图 | 已验证限定范围 | P2 | ART-09 | 预览/质量工具 |
+| ORG-06 | 当前完整源码、目标进度与质量复核 | 已验证限定范围 | P1 | ORG-04 | 项目维护/质量审查 |
+| TOOL-05 | Claude 维护探针与应用认证契约一致 | 已验证限定范围 | P2 | AGT-02、TOOL-02 | 开发工具/Agent验收 |
+| TOOL-06 | 壁纸风格切换 GUI 故障注入适配当前资源 | 已验证限定范围 | P2 | TOOL-02、ART-09 | 质量工具 |
+| DOC-02 | 壁纸自动姿态说明随静态与动态模式切换 | 已验证限定范围 | P3 | ART-09 | 界面/项目维护 |
+| PRIVATE-02 | 本机可选扩展的锁定依赖更新与回归 | 已验证限定范围 | P2 | PRIVATE-01 | 私人扩展 |
+| ART-10 | 壁纸收敛为动漫静态与真人动态，移除男士资源 | 已验证限定范围 | P1 | ART-09、TOOL-06、DOC-02 | 桌面/界面/质量 |
+| REL-05 | 0.6.2两风格与修复版本提交、同步和发布 | 施工中 | P1 | ART-10、REL-02、REL-04 | 构建发布 |
 
 ## ORG-01 全目录盘点与保护基线
 
@@ -163,11 +170,11 @@
 
 验收条件：
 
-- 已发布 0.4.0 的单屏壁纸、对话气泡、工作台与两人物选择保留。
+- 已发布0.4.0的单屏壁纸、对话气泡与工作台基础保留；壁纸选择遵循ART-10最新目标：动漫静态与真人动态两种风格，男士壁纸退役并迁移旧设置。
 
-下一动作：涉及 UI 变更时运行人物恢复与布局验收。
+下一动作：涉及UI变更时运行风格恢复与布局验收，保留历史版本证据。
 
-证据：[docs/release-audit.md](../release-audit.md) — 0.4.0 源码及安装包人物失败恢复、切换、重启验收；不代表全部机器兼容。（release）
+证据：[docs/release-audit.md](../release-audit.md) — 0.4.0 源码及安装包人物失败恢复、切换、重启验收；不代表全部机器兼容。（release）；[docs/development/wallpaper-styles-2026-11-01.md](wallpaper-styles-2026-11-01.md) — 2026-11-01按用户新目标仅保留动漫静态与真人动态，男士壁纸退役；保留旧证据，不反向宣称历史版本无男士。当前数据/声线、5组风格恢复、15组静态、7组正式动态与界面检查通过。（wallpaper-style-scope-update）
 
 ## BASE-02 Codex 会话、流式回复、审批与模型设置
 
@@ -498,15 +505,15 @@
 
 实现位置：[prototypes/live2d-codex/backend/claude-agent.mjs](../../prototypes/live2d-codex/backend/claude-agent.mjs)、[tools/probes/cli-agents/claude-probe.mjs](../../tools/probes/cli-agents/claude-probe.mjs)。
 
-依赖：AGT-02、DEC-01、FIX-01、FIX-02。原编号：G-03、R-14、R-28、R-30、R-36、B-05、B-20、B-22、T-23、T-24、S-02、D-04、D-16。
+依赖：AGT-02、DEC-01、FIX-01、FIX-02、TOOL-05。原编号：G-03、R-14、R-28、R-30、R-36、B-05、B-20、B-22、T-23、T-24、S-02、D-04、D-16。
 
 验收条件：
 
 - 原有 CLI 登录、两轮任务、审批/拒绝、提问、运行工具取消、重启恢复、模型、草稿和朗读分别记录。
 
-下一动作：先用独立探针验证当前 CLI，再验证主应用完整路径。
+下一动作：TOOL-05已完成，探针与应用认证策略一致；以符合现行产品约束的API/云API执行独立探针和主应用完整真实验收，当前仍未使用真实账户。
 
-证据：尚无完成验收记录，不能标为完成。
+证据：[docs/development/source-review-2026-10-28.md](source-review-2026-10-28.md) — 2026-10-28全源码审查确认维护探针与应用认证规则相反，已登记TOOL-05为真实验收前置；本轮未使用账户，AGT-03仍待施工。（new-verification-prerequisite）；[docs/development/source-review-fixes-2026-10-28.md](source-review-fixes-2026-10-28.md) — TOOL-05认证前置已修复并通过离线契约；不是Claude真实账户/主应用验收，AGT-03仍待施工。（verification-tool-prerequisite-fixed）
 
 ## AGT-04 Grok 主应用真实验收
 
@@ -560,7 +567,7 @@
 
 状态：已实现待验收；阶段：release；责任角色：构建发布。
 
-实现位置：[tools/release/build.mjs](../../tools/release/build.mjs)、[prototypes/live2d-codex/scripts/package-portable.mjs](../../prototypes/live2d-codex/scripts/package-portable.mjs)、[docs/build.md](../build.md)、[tools/release/test-build.mjs](../../tools/release/test-build.mjs)、[docs/development/test-acceptance.md](test-acceptance.md)、[docs/development/release-0.6.1-review.md](release-0.6.1-review.md)。
+实现位置：[tools/release/build.mjs](../../tools/release/build.mjs)、[prototypes/live2d-codex/scripts/package-portable.mjs](../../prototypes/live2d-codex/scripts/package-portable.mjs)、[docs/build.md](../build.md)、[tools/release/test-build.mjs](../../tools/release/test-build.mjs)、[docs/development/test-acceptance.md](test-acceptance.md)、[docs/development/release-0.6.1-review.md](release-0.6.1-review.md)、[docs/development/release-0.6.2-review.md](release-0.6.2-review.md)。
 
 依赖：FIX-01、FIX-02、FIX-03、DATA-02、AGT-02。原编号：R-01、R-31、B-24、B-26、T-21、S-05、K-09。
 
@@ -568,9 +575,9 @@
 
 - 新版本独立目录安装、升级/回滚、卸载、中文路径、缺 CLI/模型/无 GPU 均有证据；不复用旧 0.4 报告充当新结果。
 
-下一动作：0.6.1隔离新装、升级、注册卸载与旧版便携文件回装已验证；继续真实数据跨版本回退、缺CLI/模型/无GPU及全新Windows矩阵。
+下一动作：0.6.2隔离新装、0.6.1升级、注册卸载与旧版便携文件回装已验证；继续真实数据跨版本回退、缺CLI/模型/无GPU及全新Windows矩阵。
 
-证据：[docs/development/data-agent-validation.md](data-agent-validation.md) — 内部候选 20261022-data-agent-02 的 ZIP 与独立 Test 安装器已构建；包内 106 项离线回归通过、8255 个文件校验通过；真实安装/升级/回滚仍未测。（test-candidate）；[docs/development/test-acceptance.md](test-acceptance.md) — 人工场景初始均为未测，包含数据、四家 Agent、RC003 及安装回滚；待用户执行。（acceptance-plan）；[docs/development/remote-integration.md](remote-integration.md) — 2026-10-21：生成20261022-remote-voice-01候选（ZIP与独立Test安装器）；包内37项遥控器离线回归通过，8260个文件哈希和应用源码指纹核对通过。本机已启动并观察到协议连接及按键接口就绪；尚无本次录音成功证据，安装器仍未实装验收。（test-candidate）；[docs/development/remote-controls-ui.md](remote-controls-ui.md) — 2026-10-22：生成 20261022-remote-controls-02 ZIP/Setup。8263 个包文件哈希、68 个已打包应用源文件与源码快照匹配，ZIP 9261 项 CRC 通过；随包45项遥控/语音专项通过。新便携程序实际启动、Agent ready、RC003 connected；继续原测试数据，项目/草稿/发送记录及已有设置逐项一致，只新增音量按钮默认配置。未验证安装器或物理音量效果。（built-test-candidate）；[docs/release-audit.md](../release-audit.md) — 2026-10-22：0.5.0正式安装器在隔离中文/空格路径PORTABLE解包及0.4.0覆盖升级通过；两份安装各8242文件校验一致，实际安装版5组人物故障/恢复/重启检查通过。未覆盖注册安装、卸载、真实数据回滚或物理设备。（isolated-installer-and-gui）；[docs/development/release-0.6.0-readiness.md](release-0.6.0-readiness.md) — 2026-10-27：0.6.0本地候选新装、0.5目录升级、默认注册/快捷方式、卸载清理、外置模拟数据保留及0.5便携文件回装通过。不是旧版读取真实新数据或全新系统验收；2026-10-28补丁不在该旧候选中。（isolated-candidate-lifecycle-scope）；[docs/development/project-audit-2026-10-28.md](project-audit-2026-10-28.md) — 2026-10-28：修复后20261028-audit-02独立候选8329文件校验，中文空格路径便携解包后再核对，随包120项离线通过；保留旧发布。未注册当前候选、未对日用数据做升级/回滚，不取代完整安装矩阵。（patched-test-candidate-portable-install-and-offline-package-validation）；[docs/development/release-0.6.1-review.md](release-0.6.1-review.md) — 2026-10-28：用户测试ok，双轴复核无未解决阻断。0.6.1源码本机458项、GitHub公开451项、构建及539文件双重扫描通过；fc27bdf已推送原开发分支，PR #2的两路CI通过。正式包8308文件、97项源码、6媒体和77项既有资源核对；隔离新装、升级、注册卸载、模拟数据保留及旧版便携文件回装通过。版本标签、附件SHA-256及限定范围见发布记录，不冒领硬件或真实账户矩阵。（final-review-ci-and-isolated-installer-validation）
+证据：[docs/development/data-agent-validation.md](data-agent-validation.md) — 内部候选 20261022-data-agent-02 的 ZIP 与独立 Test 安装器已构建；包内 106 项离线回归通过、8255 个文件校验通过；真实安装/升级/回滚仍未测。（test-candidate）；[docs/development/test-acceptance.md](test-acceptance.md) — 人工场景初始均为未测，包含数据、四家 Agent、RC003 及安装回滚；待用户执行。（acceptance-plan）；[docs/development/remote-integration.md](remote-integration.md) — 2026-10-21：生成20261022-remote-voice-01候选（ZIP与独立Test安装器）；包内37项遥控器离线回归通过，8260个文件哈希和应用源码指纹核对通过。本机已启动并观察到协议连接及按键接口就绪；尚无本次录音成功证据，安装器仍未实装验收。（test-candidate）；[docs/development/remote-controls-ui.md](remote-controls-ui.md) — 2026-10-22：生成 20261022-remote-controls-02 ZIP/Setup。8263 个包文件哈希、68 个已打包应用源文件与源码快照匹配，ZIP 9261 项 CRC 通过；随包45项遥控/语音专项通过。新便携程序实际启动、Agent ready、RC003 connected；继续原测试数据，项目/草稿/发送记录及已有设置逐项一致，只新增音量按钮默认配置。未验证安装器或物理音量效果。（built-test-candidate）；[docs/release-audit.md](../release-audit.md) — 2026-10-22：0.5.0正式安装器在隔离中文/空格路径PORTABLE解包及0.4.0覆盖升级通过；两份安装各8242文件校验一致，实际安装版5组人物故障/恢复/重启检查通过。未覆盖注册安装、卸载、真实数据回滚或物理设备。（isolated-installer-and-gui）；[docs/development/release-0.6.0-readiness.md](release-0.6.0-readiness.md) — 2026-10-27：0.6.0本地候选新装、0.5目录升级、默认注册/快捷方式、卸载清理、外置模拟数据保留及0.5便携文件回装通过。不是旧版读取真实新数据或全新系统验收；2026-10-28补丁不在该旧候选中。（isolated-candidate-lifecycle-scope）；[docs/development/project-audit-2026-10-28.md](project-audit-2026-10-28.md) — 2026-10-28：修复后20261028-audit-02独立候选8329文件校验，中文空格路径便携解包后再核对，随包120项离线通过；保留旧发布。未注册当前候选、未对日用数据做升级/回滚，不取代完整安装矩阵。（patched-test-candidate-portable-install-and-offline-package-validation）；[docs/development/release-0.6.1-review.md](release-0.6.1-review.md) — 2026-10-28：用户测试ok，双轴复核无未解决阻断。0.6.1源码本机458项、GitHub公开451项、构建及539文件双重扫描通过；fc27bdf已推送原开发分支，PR #2的两路CI通过。正式包8308文件、97项源码、6媒体和77项既有资源核对；隔离新装、升级、注册卸载、模拟数据保留及旧版便携文件回装通过。版本标签、附件SHA-256及限定范围见发布记录，不冒领硬件或真实账户矩阵。（final-review-ci-and-isolated-installer-validation）；[docs/development/release-0.6.2-review.md](release-0.6.2-review.md) — 2026-11-02：0.6.2正式包8301文件/100源码/6媒体通过，67保留美术及CPU语音文件匹配0.6.1，男士素材排除；本机466项离线测试、构建和官方依赖审计通过。隔离中文路径新装、0.6.1覆盖升级、注册快捷方式、卸载、外部模拟数据保留及旧版便携文件回装通过；未启动真实账户/硬件或操作日用数据。源码同步与公开发布继续由REL-05记录。（formal-package-and-isolated-installer-validation）
 
 ## REL-02 本批源码提交同步与 upstream
 
@@ -592,7 +599,7 @@
 
 状态：已实现待验收；阶段：release；责任角色：构建发布。
 
-实现位置：[tools/release/resource-manifest.json](../../tools/release/resource-manifest.json)、[docs/release-audit.md](../release-audit.md)、[docs/development/release-0.6.1-review.md](release-0.6.1-review.md)。
+实现位置：[tools/release/resource-manifest.json](../../tools/release/resource-manifest.json)、[docs/release-audit.md](../release-audit.md)、[docs/development/release-0.6.1-review.md](release-0.6.1-review.md)、[docs/development/release-0.6.2-review.md](release-0.6.2-review.md)。
 
 依赖：REL-01、SEC-01、UI-02。原编号：B-28、K-12。
 
@@ -600,9 +607,9 @@
 
 - 稳定支持仅声明已验收范围；实验能力明确标识、默认由用户选择，不放宽审批/数据/凭据约束；版本、哈希、许可、指南与已知限制一致；完整矩阵另按依赖任务验收。
 
-下一动作：维护0.6.1发布的校验、来源与实验边界；继续完整硬件、真实账户和系统/数据回退矩阵，后续版本重新核对实际包与CI。
+下一动作：按0.6.2记录发布校验、来源与实验边界；继续完整硬件、真实账户和系统/数据回退矩阵，不把单版本发布计作全部完成。
 
-证据：[docs/development/release-0.5.0-review.md](release-0.5.0-review.md) — 0.5.0 发布前完成 Standards/Spec 两轴审查与修复；用户反馈上一候选基本可用，尚不能替代完整设备/账户矩阵。（source-offline-review）；[docs/release-audit.md](../release-audit.md) — 0.5.0最终安装器重新构建；隔离中文路径安装和0.4.0覆盖升级逐文件校验通过，公开307项GitHub CI及构建/扫描通过。版本发布入口与SHA-256记录完整，硬件/真实账户/完整注册安装矩阵仍待验收。（release-candidate-and-ci）；[docs/development/release-0.6.1-review.md](release-0.6.1-review.md) — 2026-10-28：用户测试ok，双轴复核无未解决阻断。0.6.1源码本机458项、GitHub公开451项、构建及539文件双重扫描通过；fc27bdf已推送原开发分支，PR #2的两路CI通过。正式包8308文件、97项源码、6媒体和77项既有资源核对；隔离新装、升级、注册卸载、模拟数据保留及旧版便携文件回装通过。版本标签、附件SHA-256及限定范围见发布记录，不冒领硬件或真实账户矩阵。（final-review-ci-and-isolated-installer-validation）
+证据：[docs/development/release-0.5.0-review.md](release-0.5.0-review.md) — 0.5.0 发布前完成 Standards/Spec 两轴审查与修复；用户反馈上一候选基本可用，尚不能替代完整设备/账户矩阵。（source-offline-review）；[docs/release-audit.md](../release-audit.md) — 0.5.0最终安装器重新构建；隔离中文路径安装和0.4.0覆盖升级逐文件校验通过，公开307项GitHub CI及构建/扫描通过。版本发布入口与SHA-256记录完整，硬件/真实账户/完整注册安装矩阵仍待验收。（release-candidate-and-ci）；[docs/development/release-0.6.1-review.md](release-0.6.1-review.md) — 2026-10-28：用户测试ok，双轴复核无未解决阻断。0.6.1源码本机458项、GitHub公开451项、构建及539文件双重扫描通过；fc27bdf已推送原开发分支，PR #2的两路CI通过。正式包8308文件、97项源码、6媒体和77项既有资源核对；隔离新装、升级、注册卸载、模拟数据保留及旧版便携文件回装通过。版本标签、附件SHA-256及限定范围见发布记录，不冒领硬件或真实账户矩阵。（final-review-ci-and-isolated-installer-validation）；[docs/development/release-0.6.2-review.md](release-0.6.2-review.md) — 2026-11-02：0.6.2正式包8301文件/100源码/6媒体通过，67保留美术及CPU语音文件匹配0.6.1，男士素材排除；本机466项离线测试、构建和官方依赖审计通过。隔离中文路径新装、0.6.1覆盖升级、注册快捷方式、卸载、外部模拟数据保留及旧版便携文件回装通过；未启动真实账户/硬件或操作日用数据。源码同步与公开发布继续由REL-05记录。（formal-package-and-isolated-installer-validation）
 
 ## DEC-01 确认新增后端的账户和计费边界
 
@@ -650,7 +657,7 @@
 
 下一动作：公开文件、锁定依赖及源码数据流已审查；真实新增后端账户的数据流仍按 AGT-03/04/05 验证。
 
-证据：[docs/development/release-0.5.0-review.md](release-0.5.0-review.md) — npm 官方审计无已知漏洞；保留各SDK许可，纠正本地诊断隐私说明，并检查不分发CLI、模型或凭据。（source-offline-review）；[docs/development/project-audit-2026-10-28.md](project-audit-2026-10-28.md) — 2026-10-28：npm官方registry审计发现并修复body-parser/fast-uri/Electron/undici已知漏洞，实际Electron二进制44.9.1；根与应用含开发/可选依赖最终均0项。真实新增后端账户的数据流仍待验收，维持implemented。（locked-dependency-audit-and-security-patches）
+证据：[docs/development/release-0.5.0-review.md](release-0.5.0-review.md) — npm 官方审计无已知漏洞；保留各SDK许可，纠正本地诊断隐私说明，并检查不分发CLI、模型或凭据。（source-offline-review）；[docs/development/project-audit-2026-10-28.md](project-audit-2026-10-28.md) — 2026-10-28：npm官方registry审计发现并修复body-parser/fast-uri/Electron/undici已知漏洞，实际Electron二进制44.9.1；根与应用含开发/可选依赖最终均0项。真实新增后端账户的数据流仍待验收，维持implemented。（locked-dependency-audit-and-security-patches）；[docs/development/source-review-2026-10-28.md](source-review-2026-10-28.md) — 2026-10-28：根目录与主应用官方npm完整审计均0项已知告警；真实新增后端账户数据流仍未验收。本机可选扩展的独立依赖问题在PRIVATE-02跟踪，不混入公共包结论。（scoped-npm-audit-and-static-dataflow-review）
 
 ## PRIVATE-01 私人 Dots 通道保留与隔离
 
@@ -882,9 +889,9 @@
 
 - 真实CLI/GUI工具默认帮助；15个旧check源码有带哈希归档，4个维护迁移、11个历史源码保留，人物切换一并统一；无执行逻辑的说明桩已由TOOL-03移出维护目录，avatar用例模式明确。
 
-下一动作：按具体 GUI/硬件/账户任务运行显式验收；本次默认帮助与静态迁移检查不冒充真实 GUI 通过。
+下一动作：历史迁移和默认帮助范围保持；TOOL-06已将人物入口迁到现行隔离图片事务验证，源码fixture与安装包/账户验收分别记录。
 
-证据：[docs/development/review-fixes.md](review-fixes.md) — 对应审查 STD-TOOLS-02 及旧工具残留建议；16份原文（15旧check+人物切换）哈希保留，5个维护用例默认帮助回归通过。（offline-regression）
+证据：[docs/development/review-fixes.md](review-fixes.md) — 对应审查 STD-TOOLS-02 及旧工具残留建议；16份原文（15旧check+人物切换）哈希保留，5个维护用例默认帮助回归通过。（offline-regression）；[docs/development/source-review-2026-10-28.md](source-review-2026-10-28.md) — 2026-10-28：STD-02发现人物切换用例仍拦截退役Live2D资源，新增TOOL-06；不撤销既有迁移/帮助验证，也不冒称旧用例已通过当前GUI。（new-independent-verification-tool-defect）；[docs/development/source-review-fixes-2026-10-28.md](source-review-fixes-2026-10-28.md) — TOOL-06已修复旧资源注入漂移；旧命令继续显式运行并转发当前用例，旧package参数明确拒绝，现行5组检查通过。（maintained-character-check-migrated）
 
 ## DOC-01 更新当前指南与实验Agent支持口径
 
@@ -1171,7 +1178,7 @@
 - 新增生成仅在本次明确255积分上限内单次提交一条15秒720p母片，保留原始字节、哈希和操作记录，不自动付费重试；报价不冒充钱包实际结算。
 - 同一母片按实际动作切为工作循环、工作到用户、用户循环、用户到工作四段；两类停留均持续顺向播放。排除片内强制首尾参考图跳变，检查两个循环自接和返回工作接点，保留细微接缝差异与完整连续预览。
 - 使用已有免费工具统一超分3840×2160，记录生成与交付分辨率、帧数和时间戳，实际视频回退图与片段同源；不得将超分4K称原生4K、数值诊断称逐像素无缝、缩放屏幕测试称4K全屏性能验收。
-- 四段直接接入主应用，静态选择、男生和原设置兼容保留。呼出/结束对话请求相应姿态，界面和采音即时响应，人物在片段边界跟随；快速请求保留最新目标，暂停和隐藏不串状态。
+- 四段直接接入主应用，静态选择和原设置兼容保留；男士壁纸按2026-11-01的ART-10要求退役并迁移。呼出/结束对话请求相应姿态，界面和采音即时响应，人物在片段边界跟随；快速请求保留最新目标，暂停和隐藏不串状态。
 - 加载失败保留画面并有显式重试；文件修复后无需重启服务即可重试。统一人物声线事务不因姿态或动态开关而重置自定义声线，实际有效画面清除对应旧错误。
 - 小雨与轻敲由唯一环境音实例持有；键盘只随工作循环，采音静音、朗读降音。离线及真实生产页面回归覆盖对话、工作台、语音状态、播放和遥控焦点；真实听感、麦克风和物理遥控仍需对应实机验收。
 - 正式资源哈希封装，排除账户、母片、CLI和私人制作材料；保持既有美术及CPU语音组件。完成双轴代码复审、前端构建、项目/公开审计及隔离新装、升级、注册、卸载和旧版便携文件回装验证；不把文件回装当作旧版读取真实新数据兼容性。
@@ -1179,7 +1186,7 @@
 
 下一动作：2026-10-28用户已确认当前两态方案基本测试通过，继续维护静态选择与历史证据；真实4K显示、语音听感、RC003/IME和多CLI账户按对应任务独立验收，不自动新增付费生成。
 
-证据：[docs/development/release-0.6.0-readiness.md](release-0.6.0-readiness.md) — 2026-10-27：仅生成获批的一条15秒720p连续母片，361帧免费统一超分并切为四段4K视频，三个闭合接点未检出整体突跳。正式媒体生产页面和真实桌面重启通过，保留静态及原语音/对话/工作台/遥控通道。最终419项离线测试、双轴复审0项；0.6.0成品8305文件通过、40项既有美术和CPU组件未变。隔离新装、升级、注册、卸载、0.5.0便携文件回装通过。本地候选已准备，未公开发布；实际显示尺寸小于4K，用户美术接受度和真实语音/设备/多CLI验收未冒领。（two-state-formal-media-main-app-and-local-release-candidate-verified）；[docs/development/two-state-continuous-master-2026-10-27.md](two-state-continuous-master-2026-10-27.md) — 2026-10-27：用户明确同意新增最多255积分、仅一条后，复核相同报价并仅提交一次；同一任务成功，下载原片10950001字节，SHA-256核对通过。实际1280×720、361帧、视频15.016667秒。剔除首帧及末端强制参考帧变化，按26/71/144/226/318帧剪四段，交付时不增减帧统一24fps。工作/用户循环和返回工作接点未触发整体突跳诊断，头部、手部和眨眼候选已查看；本地免费4K处理中，尚不代表正式媒体验收或可发布。（single-approved-master-generated-and-cut）；[docs/development/video-upscale-trial-2026-10-24.md](video-upscale-trial-2026-10-24.md) — 2026-10-24：按明确积分上限仅提交一条4秒720p双图转场，任务成功且原片下载哈希核对通过。97帧使用已有x4plus统一分块超分至3840×2160，原片/4K/并排均完整解码、逐帧时间戳完全一致；浏览器三模式加载、并排与4K播放及暂停位置切换通过，另交付同帧脸部对照。发丝/眼睛更清楚但皮肤更平滑，转头集中在前约1秒；用户美术验收仍开放，无额外付费生成或主应用替换。（approved-single-video-generation-local-upscale-and-preview）；[docs/development/dreamina-three-state-plan-2026-10-24.md](dreamina-three-state-plan-2026-10-24.md) — 2026-10-24：核查Real-ESRGAN、Video2X、SeedVR2官方资料。现有ncnn程序及x4plus两模型文件哈希匹配历史加工记录，帮助可调用，FFmpeg/FFprobe为8.1.1；Dreamina upscale帮助仅列image。建议先复用免费逐帧工具验证4秒样片，明确闪烁、分块边界和原片几何限制；SeedVR2需要另行部署且可能过锐。没有下载安装、GPU推理、视频转换、收费调用、主应用变更或实机/美术验收。（free-upscale-research-and-existing-tool-inventory）；[docs/development/dreamina-three-state-plan-2026-10-24.md](dreamina-three-state-plan-2026-10-24.md) — 2026-10-24：按用户720p超分4K提问核查Topaz官方模型、硬件和价格资料；建议将直接4K首轮改为1条4秒720p原片先验几何，再保守超分，清晰度不足才对照1080p。明确超分不能修扶手/脸型漂移、不能宣称原生4K；新增软件费用可能抵消六段短片的生成节省。仅调研及更新方案，未下载安装、付费、生成、超分或实机性能/美术验收。（topaz-upscale-feasibility-and-revised-proposal-only）；[docs/development/dreamina-three-state-plan-2026-10-24.md](dreamina-three-state-plan-2026-10-24.md) — 2026-10-24：读取CLI 1.1.1 schema及实时模型规格，确认三模型双图首尾帧、4秒可用；2.0列4K、2.5最高1080p、Mini为720p，均未列16:10且分辨率有会员标记。形成统一画幅、两段4秒先行、验片后扩六段的方案；报价必须基于保存节点，本轮未执行。专用sample文档与当前schema存在差异，不纳入主流程。未创建画布、上传、保存、生成或扣生成积分。（live-cli-capability-inspection-and-plan-only）；[docs/development/dreamina-cli-setup-2026-10-24.md](dreamina-cli-setup-2026-10-24.md) — 2026-10-24：按用户提供的官方PowerShell命令安装Dreamina Canvas CLI 1.1.1及Skill；version/schema通过，用户完成浏览器授权，同一等待流程返回logged_in并使用系统keyring。已验证服务端账户和三种视频模型目录可读；受限沙箱不能读凭据，在获准环境中同profile验证成功，未重置或导出凭据。未生成素材、消耗生成积分或改变主应用。（user-requested-cli-install-and-authentication-verified）；[docs/development/three-state-video-kit-2026-10-24.md](three-state-video-kit-2026-10-24.md) — 2026-10-24：用户选择工作、望窗、看向用户三态，明确稍后提供工具、先准备素材。逐张检查旧写实候选后，独立整理三张原图、六条完整提示词、首尾映射和静帧预览；原图哈希/1586×992尺寸及六个有向配对核对通过。没有新图或视频生成、模型下载、收费调用、主应用修改或用户美术验收。（three-state-materials-prepared-no-video-generation）；[docs/development/static-wallpaper-plan.md](static-wallpaper-plan.md) — 2026-10-22：核对原女生两张4K图、模型容器/雨滴/姿态状态、声线提交及语音采集边界；形成六常驻+两过渡、相邻切换、环境音让位和定向退出视频的方案。未生成新图/音源，未实现新功能，待施工。（design-only-and-source-inspection）；[docs/development/static-wallpaper-preview.md](static-wallpaper-preview.md) — 2026-10-22：用户授权实施后，主应用恢复原画，移除视频产品入口并保留人物/声线就绪提交及遥控焦点修复；旧视频设置保留自定义声线和草稿。独立预览提供原图、可选轻抬头、暂停/重试和细雨/键盘试听。完整离线344项、构建、Electron界面与遥控焦点合成检查通过；内置浏览器检查切换及控件，控制台无警告/错误。生成候选仅1586×992且背景有差异，未通过正式4K美术，未替换原图；环境音未接入真实麦克风/TTS，无硬件/账户/安装验收。（source-rollback-and-independent-audition）；[docs/development/static-wallpaper-preview.md](static-wallpaper-preview.md) — 2026-10-22：用户否定中间图与厚重合成音。取消过渡候选入口/资源及叠化，保留原4K图直接切换；改用CC0小雨与笔记本键盘实录，处理低频、尖锐高频和突兀峰值，60秒雨声环接、短句轻敲与长停顿，默认12%/8%且关闭。12项专项测试及构建通过，浏览器成功加载声音和直切，控制台无错误。保留旧失败候选证据，听感及真实采音/硬件未验收。（user-feedback-direct-cuts-and-recorded-ambience）；[docs/development/static-wallpaper-integration.md](static-wallpaper-integration.md) — 2026-10-22：新增四个女生姿态并与原两姿态接入主应用；以原4K场景绘制头部局部，明确新增源图1586×992。直接切换、随机闲置、成功回复微笑、单一环境音、电脑/遥控器开麦静音回执及真实朗读降音已实现。全量356项离线测试、构建、静态集成和原界面/遥控焦点检查通过；已从当前源码启动并确认桌面挂载和静态渲染。艺术质量、听感、真实设备及安装验收未完成，未提交或发布。（main-application-integration-and-offline-regression）；[docs/development/project-review-2026-10-22.md](project-review-2026-10-22.md) — 2026-10-22：356项离线测试及构建通过；全项目审查额外复现人物显示/设置写盘失败失配、旧朗读超时覆盖新状态和壁纸renderer退出后语音门禁不可恢复。已登记FIX-14/15/16，均未修复，不以测试通过代替失败路径验收。（whole-project-review）；[docs/development/five-fixes-review-2026-10-22.md](five-fixes-review-2026-10-22.md) — 2026-10-22：人物持久化/暂停一致性、朗读请求归属及 renderer 退出后的语音门禁恢复已修复；376项离线测试、静态 Electron/原界面/遥控焦点检查及双轴复审通过。ART-09 仍施工中，艺术与实机验收未完成。（dependency-fixes-and-regression）；[docs/development/visual-final-check-2026-10-22.md](visual-final-check-2026-10-22.md) — 2026-10-22：检查女生六姿态、男生两姿态与3840×2400输出，比例与背景衔接无明显异常；新增头部细节较原图柔和，1586×992素材不能据截图或布局测试视为原生4K美术通过。保持施工中。（visual-review-with-art-acceptance-open）；[docs/development/still-state-diagnosis-2026-10-23.md](still-state-diagnosis-2026-10-23.md) — 2026-10-23：用户反馈仅见同动作不同面部。核对六资源尺寸/哈希、头部局部合成、随机停留与暂停门槛及实际日志；当前自动模式，早期错误后已恢复空闲，无图像加载失败证据。20项离线专项通过，但工作/阅读动作辨识度和画风一致性未达体验要求，保持施工中。本轮没有修改运行设置或美术。（user-feedback-and-read-only-diagnosis）；[docs/development/still-set-v2-proposal.md](still-set-v2-proposal.md) — 2026-10-23：针对同动作不同脸反馈提出共同母版/人物参考、固定背景、三图先行、六图整套返修与完整帧切换方案；强调实际分辨率验收、生成不保证一致性及日常状态可观察性。本轮仅方案，没有生成、替换或改变运行逻辑。（proposal-only）；[docs/development/still-set-v2-implementation.md](still-set-v2-implementation.md) — 2026-10-23：用户删除读书并授权施工。内置image_gen完成同源五张完整动作，主应用整帧直切、五图预览/状态、每轮覆盖休息姿态及旧设置迁移已接入；381项离线、构建、16项桌面、44张视觉与28项焦点检查通过，启动检查另复跑14项通过。源图1586×992，不声称原生4K或用户美术/实机验收，未发布。（generated-art-and-offline-renderer-regression）；[docs/development/still-set-v2-implementation.md](still-set-v2-implementation.md) — 2026-10-23：用户确认按五姿态继续施工。通过应用原有正常退出/重启流程将当前源码载入同一数据目录的壁纸模式，核对设置与草稿保持一致。一次锁定人物/构图的高清试验仍输出1586×992并重绘雨滴纹理，因此不采用，五张正式试用图保持原哈希。未声称4K美术、真实语音/遥控或发布验收。（user-direction-confirmed-and-source-activation）；[docs/development/still-set-v2-implementation.md](still-set-v2-implementation.md) — 2026-10-23：用户提醒核对旧流程；确认此前两张女生壁纸也是Real-ESRGAN静态超分。原工具目录缺失，恢复官方同版45MB便携包并核对历史SHA-256；按原65%超分/35%原图混合参数处理五张完整姿态，实际3840×2400，原图与旧素材未覆盖。已检查脸/手和首图雨窗对比，SSIM 0.983619–0.984489仅作整体辅助证据。窄窗口预览改为完整横图与下方控制区；381项离线、构建、16项桌面、44张视觉截图/4项检查及启动检查再次通过。主应用正常重启至壁纸模式，工作区配置和草稿一致，浏览器确认3840×2400源图；用户美术/设备验收仍开放。（prior-approved-upscale-recipe-reused）；[docs/development/still-set-v2-review-2026-10-23.md](still-set-v2-review-2026-10-23.md) — 2026-10-23：Standards 0项，Spec 1项P2（FIX-17）；381项离线、构建、16项静态桌面、12项界面与28项遥控焦点检查通过。额外坏姿态→有效姿态恢复复现失败：实际看雨而工作台仍为工作/error；显式重试可恢复且自定义声线保留。未修复或声称实机验收。（two-axis-review-and-pose-recovery-reproduction）；[docs/development/still-scene-consistency-2026-10-23.md](still-scene-consistency-2026-10-23.md) — 2026-10-23：确认原图包含额外高扶手及背景重绘，不能由超分修复。内置image_gen修正托腮支撑并制作空房间底图；淘汰重绘纹理和改变比例的候选。独立五姿态预览共用固定场景、保留原坐标人物轮廓，隔离Electron验证9处固定区域像素一致。原尺寸检查后调整轮廓柔化；383项测试、构建、项目与工作区公共审计通过。仍是1586×992结构小样，边缘精修、4K、主应用替换和实机验收未完成。（user-art-rejection-and-fixed-scene-preview）；[docs/development/still-scene-consistency-2026-10-23.md](still-scene-consistency-2026-10-23.md) — 2026-10-23：用户再次否定小样扶手与靠背稳定性。检查五张实际合成图、底图和绘制实现，确认粗人物蒙版、扩边模糊及缺失遮挡分层仍会混入旧家具；9处抽样不能证明整条轮廓一致。制定唯一家具母版、精确人物透明层/孔洞、前景遮挡、固定坐姿接触及统一4K合成的返工方案，先验工作/捧杯两态。本轮仅诊断与方案，未生成/替换素材，未宣称问题解决。（second-art-rejection-and-layered-rework-plan）；[docs/development/five-pose-continuity-plan-2026-10-23.md](five-pose-continuity-plan-2026-10-23.md) — 2026-10-23：用户确认仍保留全部五姿态，开放视频等路线并以一致性/自然衔接为准。核查H3首尾模式、Runway官方模型目录/SDK、现有本地播放器及三维/视频抠像一手资料；提出简化家具构图、固定场景、同一最终时间线导出静帧和短动作，先试拿杯/放杯闭环再扩五态。明确抠像不修复人体错误，生成试验失败则停止扩量并评估三维同资产路线。Runway可添加但未安装/连接；本轮只交付方案与来源，未付费生成、下载模型、替换主应用或宣称画质通过。（five-poses-retained-and-video-reopened-plan-only）；[docs/development/three-state-transition-production-2026-10-27.md](three-state-transition-production-2026-10-27.md) — 2026-10-27：用户认可首条并明确授权新增五条有上限生成，五条均仅提交一次成功，原片哈希保留。六条总计582帧，均3840×2160超分、每条4.016667秒，时间戳与原片一致；原片/4K完整解码及各12种接缝对照完成，抽帧未见严重脸手家具变形但仍有细微纹理差异。两个独立预览已启动，6条4K范围读取通过；新增11项及旧播放器10项测试、构建和项目检查通过。浏览器工具初始化失败，整套视觉、主应用集成与实机验收仍开放。（approved-generation-and-offline-transition-preview）；[docs/development/three-state-continuous-demo-2026-10-27.md](three-state-continuous-demo-2026-10-27.md) — 2026-10-27：按用户要求，用既有工作→望窗、望窗→用户、用户→工作三条成片及各4秒真实端点停留制作28.05秒连续样片。3840×2160和1920×1080均1683帧，完整解码及60Hz时间点核对通过；查看全片联系表与两处实际接缝帧，仍有画面细节差异，未宣称修复。新命令帮助无副作用纳入11项测试，无新增生成费用，主应用未改。（continuous-local-demo-and-seam-review）；[docs/development/three-state-continuous-demo-2026-10-27.md](three-state-continuous-demo-2026-10-27.md) — 2026-10-27：按用户建议检查三条720p及4K全帧，确认原片约0.05秒及3.88–3.92秒存在片内突变；原末帧/首帧是扫描范围内最佳静态配对，裁剪旨在去掉边界突变而非声称切口更一致。已制作25.80秒、1548帧的纯裁剪4K/1080p完整样片，重选停留帧，保留原片；完整解码/时序及11项离线测试通过。三个边界变化峰值辅助指标约下降37%/41%/53%，局部细节差异及用户连续播放验收仍开放。无新增付费生成，主应用未改。（temporal-boundary-diagnosis-and-trim-only-comparison）；[docs/development/three-state-continuous-demo-2026-10-27.md](three-state-continuous-demo-2026-10-27.md) — 2026-10-27：用户指出同状态应循环播放视频，确认现有六条均为双向转场，未生成任何同状态循环；播放器结束暂停、完整样片每态4秒冻结与反馈吻合。记录三种循环加六种转场的最低素材结构及三类衔接验收，先验工作循环。仅库存/实现核对和需求记录，未新增生成、收费、播放器改动或主应用集成，不排除另有解码性能问题。（dynamic-idle-loop-requirement-and-existing-six-clip-inventory）；[docs/development/work-idle-loop-pilot-2026-10-27.md](work-idle-loop-pilot-2026-10-27.md) — 2026-10-27：经上传及新增单条积分上限两次明确授权，仅生成一条6秒720p工作循环，原片1280×720、145帧、6.016667秒，下载哈希核对通过。已有x4plus免费超分3840×2160，145帧时间戳保留；原片/4K/并排完整解码。生成构图略有放大及纹理重绘，统一裁剪旧转场后仍有差异。顺向保留5.45秒循环，导出39.55秒4K/1080p往返样片各2373帧及54.50秒十遍循环3270帧，尺寸、全帧时序、完整解码通过，查看动作联系表、同帧脸部及四类实际接缝；连续视觉验收仍开放。11项离线测试通过，无第二次收费提交，无另外两种循环或主应用替换。（single-approved-work-loop-local-upscale-and-continuous-comparison）；[docs/development/work-idle-loop-pilot-2026-10-27.md](work-idle-loop-pilot-2026-10-27.md) — 2026-10-27：用户指出约23秒整幅跳动，确认23.20秒第1391→1392帧为返回工作原片第88帧切入新循环第1帧。成品及两秒最小复现均触发固定窗景/窗框/灯/沙发突变，帧间隔1/60秒正常。同帧整帧差异720p未裁剪14.82、裁剪8.64、4K裁剪8.34、最终成品8.38，证明主要差异已存在原始生成素材；取消裁剪更差，额外全局配准不能同时改善整幅画面。原因已定位但接点未修复，保留失败复现与原片，无新增生成或主应用替换。（reported-23-second-whole-frame-jump-reproduced-and-isolated）；[docs/development/work-idle-loop-pilot-2026-10-27.md](work-idle-loop-pilot-2026-10-27.md) — 2026-10-27：复核首尾有序引用、同图资源和上传验证均正确，但新循环实际第0帧及片内帧仍偏离参考图。梳理独立六转场后补循环的边界不统一问题，提出先对23秒附近2–3秒做固定场景、精确视频人物选区和局部接头小样；明确沿用旧粗轮廓会带入旧家具，分割不等于发丝透明抠像，单帧替换/整幅渐变/统一缩放不保证连续。只读核查Dreamina可调用视频参考及首尾图模式，保留先验循环后围绕实际端点制作必要转场的后备方案；尚未施工、安装模型、上传或新增生成，原跳动仍未修复。（continuity-pipeline-reassessment-and-unexecuted-local-repair-plan）；[docs/development/two-state-continuous-master-2026-10-27.md](two-state-continuous-master-2026-10-27.md) — 2026-10-27：用户将状态减少为工作/看向用户并要求开始，将一条连续母片切为四段。已只读核查CLI1.1.1、账户权限及模型能力，复用原画布已有同图首尾节点，无新上传；保存单条15秒720p、16:9、单输出草稿并读回核对提示词/参数/引用顺序/上游关联，取得需要新额度确认的实时报价。尚未确认积分或提交生成；待批准后先验720p动作和三个循环接点，保留无自动付费重试、视觉通过后才超分4K及未集成主应用边界。（two-state-single-master-draft-and-live-quote-awaiting-new-cap）；[docs/development/two-state-app-integration-2026-10-27.md](two-state-app-integration-2026-10-27.md) — 2026-10-27：实现四段双解码循环/转身、女生动态开关、保图与显式重试，沿用人物声线事务和单一环境音。实际Electron测试视频回归通过，验证工作/用户循环、对话双向切换、暂停、404后重试、听写静音、朗读降音和男女切换；原静态、界面和遥控焦点离线验证通过。双轴审核发现并修复暂停/定位竞态、重载版本残留及重复媒体响应，复审Standards/Spec均0项。最终全量409项离线及构建通过，原界面、遥控焦点和视觉布局检查通过。新增付费母片未提交，四段正式媒体、4K接缝、包装及安装验收未完成；没有宣称用户美术、账户、硬件或发布验收。（main-app-motion-code-and-two-axis-review-with-media-still-pending）；[docs/development/two-state-app-integration-2026-10-27.md](two-state-app-integration-2026-10-27.md) — 2026-10-27：补齐正式/测试/便携构建遗漏的动态资源收集，创建包前验证4视频2回退图及锁定大小/哈希，只复制六文件与规范化运行清单，复制后复核且清单最后写入；包检查比对当前源码运行资源。四项封装测试及20项定向通过，发行增量双轴复审0项，最终全项目413项离线通过。实际测试包入口因正式素材缺失按预期停止且没有写出不完整包。付费母片仍未提交，正式剪辑、4K、美术、安装和发布验收仍待完成。（motion-release-input-gate-and-copy-validation）；[docs/development/release-0.6.1-review.md](release-0.6.1-review.md) — 2026-10-28：用户测试ok，双轴复核无未解决阻断。0.6.1源码本机458项、GitHub公开451项、构建及539文件双重扫描通过；fc27bdf已推送原开发分支，PR #2的两路CI通过。正式包8308文件、97项源码、6媒体和77项既有资源核对；隔离新装、升级、注册卸载、模拟数据保留及旧版便携文件回装通过。版本标签、附件SHA-256及限定范围见发布记录，不冒领硬件或真实账户矩阵。（final-review-ci-and-isolated-installer-validation）
+证据：[docs/development/release-0.6.0-readiness.md](release-0.6.0-readiness.md) — 2026-10-27：仅生成获批的一条15秒720p连续母片，361帧免费统一超分并切为四段4K视频，三个闭合接点未检出整体突跳。正式媒体生产页面和真实桌面重启通过，保留静态及原语音/对话/工作台/遥控通道。最终419项离线测试、双轴复审0项；0.6.0成品8305文件通过、40项既有美术和CPU组件未变。隔离新装、升级、注册、卸载、0.5.0便携文件回装通过。本地候选已准备，未公开发布；实际显示尺寸小于4K，用户美术接受度和真实语音/设备/多CLI验收未冒领。（two-state-formal-media-main-app-and-local-release-candidate-verified）；[docs/development/two-state-continuous-master-2026-10-27.md](two-state-continuous-master-2026-10-27.md) — 2026-10-27：用户明确同意新增最多255积分、仅一条后，复核相同报价并仅提交一次；同一任务成功，下载原片10950001字节，SHA-256核对通过。实际1280×720、361帧、视频15.016667秒。剔除首帧及末端强制参考帧变化，按26/71/144/226/318帧剪四段，交付时不增减帧统一24fps。工作/用户循环和返回工作接点未触发整体突跳诊断，头部、手部和眨眼候选已查看；本地免费4K处理中，尚不代表正式媒体验收或可发布。（single-approved-master-generated-and-cut）；[docs/development/video-upscale-trial-2026-10-24.md](video-upscale-trial-2026-10-24.md) — 2026-10-24：按明确积分上限仅提交一条4秒720p双图转场，任务成功且原片下载哈希核对通过。97帧使用已有x4plus统一分块超分至3840×2160，原片/4K/并排均完整解码、逐帧时间戳完全一致；浏览器三模式加载、并排与4K播放及暂停位置切换通过，另交付同帧脸部对照。发丝/眼睛更清楚但皮肤更平滑，转头集中在前约1秒；用户美术验收仍开放，无额外付费生成或主应用替换。（approved-single-video-generation-local-upscale-and-preview）；[docs/development/dreamina-three-state-plan-2026-10-24.md](dreamina-three-state-plan-2026-10-24.md) — 2026-10-24：核查Real-ESRGAN、Video2X、SeedVR2官方资料。现有ncnn程序及x4plus两模型文件哈希匹配历史加工记录，帮助可调用，FFmpeg/FFprobe为8.1.1；Dreamina upscale帮助仅列image。建议先复用免费逐帧工具验证4秒样片，明确闪烁、分块边界和原片几何限制；SeedVR2需要另行部署且可能过锐。没有下载安装、GPU推理、视频转换、收费调用、主应用变更或实机/美术验收。（free-upscale-research-and-existing-tool-inventory）；[docs/development/dreamina-three-state-plan-2026-10-24.md](dreamina-three-state-plan-2026-10-24.md) — 2026-10-24：按用户720p超分4K提问核查Topaz官方模型、硬件和价格资料；建议将直接4K首轮改为1条4秒720p原片先验几何，再保守超分，清晰度不足才对照1080p。明确超分不能修扶手/脸型漂移、不能宣称原生4K；新增软件费用可能抵消六段短片的生成节省。仅调研及更新方案，未下载安装、付费、生成、超分或实机性能/美术验收。（topaz-upscale-feasibility-and-revised-proposal-only）；[docs/development/dreamina-three-state-plan-2026-10-24.md](dreamina-three-state-plan-2026-10-24.md) — 2026-10-24：读取CLI 1.1.1 schema及实时模型规格，确认三模型双图首尾帧、4秒可用；2.0列4K、2.5最高1080p、Mini为720p，均未列16:10且分辨率有会员标记。形成统一画幅、两段4秒先行、验片后扩六段的方案；报价必须基于保存节点，本轮未执行。专用sample文档与当前schema存在差异，不纳入主流程。未创建画布、上传、保存、生成或扣生成积分。（live-cli-capability-inspection-and-plan-only）；[docs/development/dreamina-cli-setup-2026-10-24.md](dreamina-cli-setup-2026-10-24.md) — 2026-10-24：按用户提供的官方PowerShell命令安装Dreamina Canvas CLI 1.1.1及Skill；version/schema通过，用户完成浏览器授权，同一等待流程返回logged_in并使用系统keyring。已验证服务端账户和三种视频模型目录可读；受限沙箱不能读凭据，在获准环境中同profile验证成功，未重置或导出凭据。未生成素材、消耗生成积分或改变主应用。（user-requested-cli-install-and-authentication-verified）；[docs/development/three-state-video-kit-2026-10-24.md](three-state-video-kit-2026-10-24.md) — 2026-10-24：用户选择工作、望窗、看向用户三态，明确稍后提供工具、先准备素材。逐张检查旧写实候选后，独立整理三张原图、六条完整提示词、首尾映射和静帧预览；原图哈希/1586×992尺寸及六个有向配对核对通过。没有新图或视频生成、模型下载、收费调用、主应用修改或用户美术验收。（three-state-materials-prepared-no-video-generation）；[docs/development/static-wallpaper-plan.md](static-wallpaper-plan.md) — 2026-10-22：核对原女生两张4K图、模型容器/雨滴/姿态状态、声线提交及语音采集边界；形成六常驻+两过渡、相邻切换、环境音让位和定向退出视频的方案。未生成新图/音源，未实现新功能，待施工。（design-only-and-source-inspection）；[docs/development/static-wallpaper-preview.md](static-wallpaper-preview.md) — 2026-10-22：用户授权实施后，主应用恢复原画，移除视频产品入口并保留人物/声线就绪提交及遥控焦点修复；旧视频设置保留自定义声线和草稿。独立预览提供原图、可选轻抬头、暂停/重试和细雨/键盘试听。完整离线344项、构建、Electron界面与遥控焦点合成检查通过；内置浏览器检查切换及控件，控制台无警告/错误。生成候选仅1586×992且背景有差异，未通过正式4K美术，未替换原图；环境音未接入真实麦克风/TTS，无硬件/账户/安装验收。（source-rollback-and-independent-audition）；[docs/development/static-wallpaper-preview.md](static-wallpaper-preview.md) — 2026-10-22：用户否定中间图与厚重合成音。取消过渡候选入口/资源及叠化，保留原4K图直接切换；改用CC0小雨与笔记本键盘实录，处理低频、尖锐高频和突兀峰值，60秒雨声环接、短句轻敲与长停顿，默认12%/8%且关闭。12项专项测试及构建通过，浏览器成功加载声音和直切，控制台无错误。保留旧失败候选证据，听感及真实采音/硬件未验收。（user-feedback-direct-cuts-and-recorded-ambience）；[docs/development/static-wallpaper-integration.md](static-wallpaper-integration.md) — 2026-10-22：新增四个女生姿态并与原两姿态接入主应用；以原4K场景绘制头部局部，明确新增源图1586×992。直接切换、随机闲置、成功回复微笑、单一环境音、电脑/遥控器开麦静音回执及真实朗读降音已实现。全量356项离线测试、构建、静态集成和原界面/遥控焦点检查通过；已从当前源码启动并确认桌面挂载和静态渲染。艺术质量、听感、真实设备及安装验收未完成，未提交或发布。（main-application-integration-and-offline-regression）；[docs/development/project-review-2026-10-22.md](project-review-2026-10-22.md) — 2026-10-22：356项离线测试及构建通过；全项目审查额外复现人物显示/设置写盘失败失配、旧朗读超时覆盖新状态和壁纸renderer退出后语音门禁不可恢复。已登记FIX-14/15/16，均未修复，不以测试通过代替失败路径验收。（whole-project-review）；[docs/development/five-fixes-review-2026-10-22.md](five-fixes-review-2026-10-22.md) — 2026-10-22：人物持久化/暂停一致性、朗读请求归属及 renderer 退出后的语音门禁恢复已修复；376项离线测试、静态 Electron/原界面/遥控焦点检查及双轴复审通过。ART-09 仍施工中，艺术与实机验收未完成。（dependency-fixes-and-regression）；[docs/development/visual-final-check-2026-10-22.md](visual-final-check-2026-10-22.md) — 2026-10-22：检查女生六姿态、男生两姿态与3840×2400输出，比例与背景衔接无明显异常；新增头部细节较原图柔和，1586×992素材不能据截图或布局测试视为原生4K美术通过。保持施工中。（visual-review-with-art-acceptance-open）；[docs/development/still-state-diagnosis-2026-10-23.md](still-state-diagnosis-2026-10-23.md) — 2026-10-23：用户反馈仅见同动作不同面部。核对六资源尺寸/哈希、头部局部合成、随机停留与暂停门槛及实际日志；当前自动模式，早期错误后已恢复空闲，无图像加载失败证据。20项离线专项通过，但工作/阅读动作辨识度和画风一致性未达体验要求，保持施工中。本轮没有修改运行设置或美术。（user-feedback-and-read-only-diagnosis）；[docs/development/still-set-v2-proposal.md](still-set-v2-proposal.md) — 2026-10-23：针对同动作不同脸反馈提出共同母版/人物参考、固定背景、三图先行、六图整套返修与完整帧切换方案；强调实际分辨率验收、生成不保证一致性及日常状态可观察性。本轮仅方案，没有生成、替换或改变运行逻辑。（proposal-only）；[docs/development/still-set-v2-implementation.md](still-set-v2-implementation.md) — 2026-10-23：用户删除读书并授权施工。内置image_gen完成同源五张完整动作，主应用整帧直切、五图预览/状态、每轮覆盖休息姿态及旧设置迁移已接入；381项离线、构建、16项桌面、44张视觉与28项焦点检查通过，启动检查另复跑14项通过。源图1586×992，不声称原生4K或用户美术/实机验收，未发布。（generated-art-and-offline-renderer-regression）；[docs/development/still-set-v2-implementation.md](still-set-v2-implementation.md) — 2026-10-23：用户确认按五姿态继续施工。通过应用原有正常退出/重启流程将当前源码载入同一数据目录的壁纸模式，核对设置与草稿保持一致。一次锁定人物/构图的高清试验仍输出1586×992并重绘雨滴纹理，因此不采用，五张正式试用图保持原哈希。未声称4K美术、真实语音/遥控或发布验收。（user-direction-confirmed-and-source-activation）；[docs/development/still-set-v2-implementation.md](still-set-v2-implementation.md) — 2026-10-23：用户提醒核对旧流程；确认此前两张女生壁纸也是Real-ESRGAN静态超分。原工具目录缺失，恢复官方同版45MB便携包并核对历史SHA-256；按原65%超分/35%原图混合参数处理五张完整姿态，实际3840×2400，原图与旧素材未覆盖。已检查脸/手和首图雨窗对比，SSIM 0.983619–0.984489仅作整体辅助证据。窄窗口预览改为完整横图与下方控制区；381项离线、构建、16项桌面、44张视觉截图/4项检查及启动检查再次通过。主应用正常重启至壁纸模式，工作区配置和草稿一致，浏览器确认3840×2400源图；用户美术/设备验收仍开放。（prior-approved-upscale-recipe-reused）；[docs/development/still-set-v2-review-2026-10-23.md](still-set-v2-review-2026-10-23.md) — 2026-10-23：Standards 0项，Spec 1项P2（FIX-17）；381项离线、构建、16项静态桌面、12项界面与28项遥控焦点检查通过。额外坏姿态→有效姿态恢复复现失败：实际看雨而工作台仍为工作/error；显式重试可恢复且自定义声线保留。未修复或声称实机验收。（two-axis-review-and-pose-recovery-reproduction）；[docs/development/still-scene-consistency-2026-10-23.md](still-scene-consistency-2026-10-23.md) — 2026-10-23：确认原图包含额外高扶手及背景重绘，不能由超分修复。内置image_gen修正托腮支撑并制作空房间底图；淘汰重绘纹理和改变比例的候选。独立五姿态预览共用固定场景、保留原坐标人物轮廓，隔离Electron验证9处固定区域像素一致。原尺寸检查后调整轮廓柔化；383项测试、构建、项目与工作区公共审计通过。仍是1586×992结构小样，边缘精修、4K、主应用替换和实机验收未完成。（user-art-rejection-and-fixed-scene-preview）；[docs/development/still-scene-consistency-2026-10-23.md](still-scene-consistency-2026-10-23.md) — 2026-10-23：用户再次否定小样扶手与靠背稳定性。检查五张实际合成图、底图和绘制实现，确认粗人物蒙版、扩边模糊及缺失遮挡分层仍会混入旧家具；9处抽样不能证明整条轮廓一致。制定唯一家具母版、精确人物透明层/孔洞、前景遮挡、固定坐姿接触及统一4K合成的返工方案，先验工作/捧杯两态。本轮仅诊断与方案，未生成/替换素材，未宣称问题解决。（second-art-rejection-and-layered-rework-plan）；[docs/development/five-pose-continuity-plan-2026-10-23.md](five-pose-continuity-plan-2026-10-23.md) — 2026-10-23：用户确认仍保留全部五姿态，开放视频等路线并以一致性/自然衔接为准。核查H3首尾模式、Runway官方模型目录/SDK、现有本地播放器及三维/视频抠像一手资料；提出简化家具构图、固定场景、同一最终时间线导出静帧和短动作，先试拿杯/放杯闭环再扩五态。明确抠像不修复人体错误，生成试验失败则停止扩量并评估三维同资产路线。Runway可添加但未安装/连接；本轮只交付方案与来源，未付费生成、下载模型、替换主应用或宣称画质通过。（five-poses-retained-and-video-reopened-plan-only）；[docs/development/three-state-transition-production-2026-10-27.md](three-state-transition-production-2026-10-27.md) — 2026-10-27：用户认可首条并明确授权新增五条有上限生成，五条均仅提交一次成功，原片哈希保留。六条总计582帧，均3840×2160超分、每条4.016667秒，时间戳与原片一致；原片/4K完整解码及各12种接缝对照完成，抽帧未见严重脸手家具变形但仍有细微纹理差异。两个独立预览已启动，6条4K范围读取通过；新增11项及旧播放器10项测试、构建和项目检查通过。浏览器工具初始化失败，整套视觉、主应用集成与实机验收仍开放。（approved-generation-and-offline-transition-preview）；[docs/development/three-state-continuous-demo-2026-10-27.md](three-state-continuous-demo-2026-10-27.md) — 2026-10-27：按用户要求，用既有工作→望窗、望窗→用户、用户→工作三条成片及各4秒真实端点停留制作28.05秒连续样片。3840×2160和1920×1080均1683帧，完整解码及60Hz时间点核对通过；查看全片联系表与两处实际接缝帧，仍有画面细节差异，未宣称修复。新命令帮助无副作用纳入11项测试，无新增生成费用，主应用未改。（continuous-local-demo-and-seam-review）；[docs/development/three-state-continuous-demo-2026-10-27.md](three-state-continuous-demo-2026-10-27.md) — 2026-10-27：按用户建议检查三条720p及4K全帧，确认原片约0.05秒及3.88–3.92秒存在片内突变；原末帧/首帧是扫描范围内最佳静态配对，裁剪旨在去掉边界突变而非声称切口更一致。已制作25.80秒、1548帧的纯裁剪4K/1080p完整样片，重选停留帧，保留原片；完整解码/时序及11项离线测试通过。三个边界变化峰值辅助指标约下降37%/41%/53%，局部细节差异及用户连续播放验收仍开放。无新增付费生成，主应用未改。（temporal-boundary-diagnosis-and-trim-only-comparison）；[docs/development/three-state-continuous-demo-2026-10-27.md](three-state-continuous-demo-2026-10-27.md) — 2026-10-27：用户指出同状态应循环播放视频，确认现有六条均为双向转场，未生成任何同状态循环；播放器结束暂停、完整样片每态4秒冻结与反馈吻合。记录三种循环加六种转场的最低素材结构及三类衔接验收，先验工作循环。仅库存/实现核对和需求记录，未新增生成、收费、播放器改动或主应用集成，不排除另有解码性能问题。（dynamic-idle-loop-requirement-and-existing-six-clip-inventory）；[docs/development/work-idle-loop-pilot-2026-10-27.md](work-idle-loop-pilot-2026-10-27.md) — 2026-10-27：经上传及新增单条积分上限两次明确授权，仅生成一条6秒720p工作循环，原片1280×720、145帧、6.016667秒，下载哈希核对通过。已有x4plus免费超分3840×2160，145帧时间戳保留；原片/4K/并排完整解码。生成构图略有放大及纹理重绘，统一裁剪旧转场后仍有差异。顺向保留5.45秒循环，导出39.55秒4K/1080p往返样片各2373帧及54.50秒十遍循环3270帧，尺寸、全帧时序、完整解码通过，查看动作联系表、同帧脸部及四类实际接缝；连续视觉验收仍开放。11项离线测试通过，无第二次收费提交，无另外两种循环或主应用替换。（single-approved-work-loop-local-upscale-and-continuous-comparison）；[docs/development/work-idle-loop-pilot-2026-10-27.md](work-idle-loop-pilot-2026-10-27.md) — 2026-10-27：用户指出约23秒整幅跳动，确认23.20秒第1391→1392帧为返回工作原片第88帧切入新循环第1帧。成品及两秒最小复现均触发固定窗景/窗框/灯/沙发突变，帧间隔1/60秒正常。同帧整帧差异720p未裁剪14.82、裁剪8.64、4K裁剪8.34、最终成品8.38，证明主要差异已存在原始生成素材；取消裁剪更差，额外全局配准不能同时改善整幅画面。原因已定位但接点未修复，保留失败复现与原片，无新增生成或主应用替换。（reported-23-second-whole-frame-jump-reproduced-and-isolated）；[docs/development/work-idle-loop-pilot-2026-10-27.md](work-idle-loop-pilot-2026-10-27.md) — 2026-10-27：复核首尾有序引用、同图资源和上传验证均正确，但新循环实际第0帧及片内帧仍偏离参考图。梳理独立六转场后补循环的边界不统一问题，提出先对23秒附近2–3秒做固定场景、精确视频人物选区和局部接头小样；明确沿用旧粗轮廓会带入旧家具，分割不等于发丝透明抠像，单帧替换/整幅渐变/统一缩放不保证连续。只读核查Dreamina可调用视频参考及首尾图模式，保留先验循环后围绕实际端点制作必要转场的后备方案；尚未施工、安装模型、上传或新增生成，原跳动仍未修复。（continuity-pipeline-reassessment-and-unexecuted-local-repair-plan）；[docs/development/two-state-continuous-master-2026-10-27.md](two-state-continuous-master-2026-10-27.md) — 2026-10-27：用户将状态减少为工作/看向用户并要求开始，将一条连续母片切为四段。已只读核查CLI1.1.1、账户权限及模型能力，复用原画布已有同图首尾节点，无新上传；保存单条15秒720p、16:9、单输出草稿并读回核对提示词/参数/引用顺序/上游关联，取得需要新额度确认的实时报价。尚未确认积分或提交生成；待批准后先验720p动作和三个循环接点，保留无自动付费重试、视觉通过后才超分4K及未集成主应用边界。（two-state-single-master-draft-and-live-quote-awaiting-new-cap）；[docs/development/two-state-app-integration-2026-10-27.md](two-state-app-integration-2026-10-27.md) — 2026-10-27：实现四段双解码循环/转身、女生动态开关、保图与显式重试，沿用人物声线事务和单一环境音。实际Electron测试视频回归通过，验证工作/用户循环、对话双向切换、暂停、404后重试、听写静音、朗读降音和男女切换；原静态、界面和遥控焦点离线验证通过。双轴审核发现并修复暂停/定位竞态、重载版本残留及重复媒体响应，复审Standards/Spec均0项。最终全量409项离线及构建通过，原界面、遥控焦点和视觉布局检查通过。新增付费母片未提交，四段正式媒体、4K接缝、包装及安装验收未完成；没有宣称用户美术、账户、硬件或发布验收。（main-app-motion-code-and-two-axis-review-with-media-still-pending）；[docs/development/two-state-app-integration-2026-10-27.md](two-state-app-integration-2026-10-27.md) — 2026-10-27：补齐正式/测试/便携构建遗漏的动态资源收集，创建包前验证4视频2回退图及锁定大小/哈希，只复制六文件与规范化运行清单，复制后复核且清单最后写入；包检查比对当前源码运行资源。四项封装测试及20项定向通过，发行增量双轴复审0项，最终全项目413项离线通过。实际测试包入口因正式素材缺失按预期停止且没有写出不完整包。付费母片仍未提交，正式剪辑、4K、美术、安装和发布验收仍待完成。（motion-release-input-gate-and-copy-validation）；[docs/development/release-0.6.1-review.md](release-0.6.1-review.md) — 2026-10-28：用户测试ok，双轴复核无未解决阻断。0.6.1源码本机458项、GitHub公开451项、构建及539文件双重扫描通过；fc27bdf已推送原开发分支，PR #2的两路CI通过。正式包8308文件、97项源码、6媒体和77项既有资源核对；隔离新装、升级、注册卸载、模拟数据保留及旧版便携文件回装通过。版本标签、附件SHA-256及限定范围见发布记录，不冒领硬件或真实账户矩阵。（final-review-ci-and-isolated-installer-validation）；[docs/development/wallpaper-styles-2026-11-01.md](wallpaper-styles-2026-11-01.md) — 2026-11-01按用户新目标仅保留动漫静态与真人动态，男士壁纸退役；保留旧证据，不反向宣称历史版本无男士。当前数据/声线、5组风格恢复、15组静态、7组正式动态与界面检查通过。（wallpaper-style-scope-update）
 
 ## TOOL-04 QA 帮助参数在目录与 Electron 副作用前返回
 
@@ -1379,3 +1386,125 @@
 下一动作：保持预览错误路径回归；不扩大静态服务器可访问文件范围。
 
 证据：[docs/development/project-audit-2026-10-28.md](project-audit-2026-10-28.md) — 2026-10-28：修复try之外URL解析异常和HEAD整图读取；预览/退役入口7项回归通过，最终全量458项通过。（preview-service-regression）
+
+## ORG-06 当前完整源码、目标进度与质量复核
+
+状态：已验证限定范围；阶段：organization；责任角色：项目维护/质量审查。
+
+实现位置：[docs/development/source-review-2026-10-28.md](source-review-2026-10-28.md)、[docs/development/backlog.json](backlog.json)。
+
+依赖：ORG-04。原编号：新增工作。
+
+验收条件：
+
+- 逐文件检查当前公共自有源码与测试，交叉核对产品目标、真实验收、发布和依赖；明确范围、问题与限制。
+- 运行项目检查、全量离线测试、frontend 构建和公共扫描，补充必要的隔离桌面验证；新问题独立登记，不将报告完成当作缺陷修复或硬件/账户验收。
+
+下一动作：审查发现的TOOL-05/06、DOC-02及独立PRIVATE-02均已修复并完成限定验证；继续Codex真实数据恢复、RC003、新后端账户和系统安装矩阵。
+
+证据：[docs/development/source-review-2026-10-28.md](source-review-2026-10-28.md) — 2026-10-28：公共269个自有代码文件20,118行完整审阅；本机458项、构建、6项退出、12项界面、正式4K媒体7组及无设备遥控组件验证通过，根/应用官方npm审计0项。确认Standards两项P2工具契约漂移、Spec一项P3模式说明，均登记待办。远端main与907bfc0一致，0.6.1发布及同提交CI核对通过；未改业务代码或冒领真实验收。（full-source-review-and-bounded-runtime-validation）
+
+## TOOL-05 Claude 维护探针与应用认证契约一致
+
+状态：已验证限定范围；阶段：organization；责任角色：开发工具/Agent验收。
+
+实现位置：[tools/probes/cli-agents/claude-probe.mjs](../../tools/probes/cli-agents/claude-probe.mjs)、[prototypes/live2d-codex/backend/claude-agent.mjs](../../prototypes/live2d-codex/backend/claude-agent.mjs)、[tools/probes/cli-agents/README.md](../../tools/probes/cli-agents/README.md)、[tests/project-catalog.test.mjs](../../tests/project-catalog.test.mjs)、[prototypes/live2d-codex/backend/claude-auth.mjs](../../prototypes/live2d-codex/backend/claude-auth.mjs)、[tests/claude-probe.test.mjs](../../tests/claude-probe.test.mjs)。
+
+依赖：AGT-02、TOOL-02。原编号：新增工作。
+
+验收条件：
+
+- 探针复用或等价验证当前应用的API/支持云API认证策略，在首次真实请求之前拒绝纯订阅认证；不改变用户计费来源。
+- API key、支持cloud、subscription-only三类离线契约通过；默认帮助保持无副作用，live调用继续要求显式--run和任务范围；说明同步。
+
+下一动作：认证契约修复已验证；后续真实探针继续要求明确范围和--run，AGT-03单独完成账户与主应用验收。
+
+证据：[docs/development/source-review-2026-10-28.md](source-review-2026-10-28.md) — STD-01：提取原始探针guard并调用实际应用认证函数，API/cloud分别为探针拒绝、应用接受；纯订阅为探针接受、应用拒绝。现有help回归未覆盖live策略。（offline-defect-reproduction）；[docs/development/source-review-fixes-2026-10-28.md](source-review-fixes-2026-10-28.md) — 2026-10-28：共享claude-auth规则，初始与恢复进程均先核对SDK解析的认证，拒绝后关闭且不发送。四类实际探针入口离线替身回归通过；完整主项目464项通过，未使用真实账户。（fix-and-bounded-regression）
+
+## TOOL-06 壁纸风格切换 GUI 故障注入适配当前资源
+
+状态：已验证限定范围；阶段：organization；责任角色：质量工具。
+
+实现位置：[tools/qa/gui/cases/character-switch.mjs](../../tools/qa/gui/cases/character-switch.mjs)、[tools/qa/gui/README.md](../../tools/qa/gui/README.md)、[prototypes/live2d-codex/renderer/still-wallpaper.js](../../prototypes/live2d-codex/renderer/still-wallpaper.js)、[tests/qa-tools.test.mjs](../../tests/qa-tools.test.mjs)、[tools/qa/still-desktop.mjs](../../tools/qa/still-desktop.mjs)、[tools/qa/still-fixture.cjs](../../tools/qa/still-fixture.cjs)、[tools/qa/character-asset-probe.mjs](../../tools/qa/character-asset-probe.mjs)、[tests/still-renderer.test.mjs](../../tests/still-renderer.test.mjs)。
+
+依赖：TOOL-02、ART-09。原编号：新增工作。
+
+验收条件：
+
+- 维护用例改为当前still/motion资源和壁纸提交事务，或明确退役并使所有维护说明指向现行QA；不保留声称可验收而实际等待旧模型资源的入口。
+- 离线契约确认故障注入命中当前renderer请求；选定维护GUI用例以隔离数据实际验证失败、重试、声线和重启，不访问真实账户或设备。
+
+下一动作：沿用qa:stills -- --character-switch兼容命令维护两种风格图片事务，动态用qa:motion；实际安装包另按REL-01/03验证。
+
+证据：[docs/development/source-review-2026-10-28.md](source-review-2026-10-28.md) — STD-02：当前still renderer与原始intercept在隔离VM中组合运行，新PNG请求命中0/held0且男性已ready；旧model3 URL正控制命中1/held1。说明故障注入已脱离当前资源，未执行旧GUI全流程；当前人物功能另由stills/motion验证。（offline-defect-reproduction）；[docs/development/source-review-fixes-2026-10-28.md](source-review-fixes-2026-10-28.md) — 2026-10-28：旧入口转发当前隔离生产renderer/存储用例，PNG请求注入契约纳入普通测试；兼容命令实跑5组通过，含暂挂/失败/重复重试/快速切换/声线及独立新Electron进程恢复。旧package参数在副作用前拒绝，安装包验收保持独立。（fix-and-bounded-regression）；[docs/development/wallpaper-styles-2026-11-01.md](wallpaper-styles-2026-11-01.md) — 2026-11-01按用户新目标仅保留动漫静态与真人动态，男士壁纸退役；保留旧证据，不反向宣称历史版本无男士。当前数据/声线、5组风格恢复、15组静态、7组正式动态与界面检查通过。（wallpaper-style-scope-update）
+
+## DOC-02 壁纸自动姿态说明随静态与动态模式切换
+
+状态：已验证限定范围；阶段：organization；责任角色：界面/项目维护。
+
+实现位置：[prototypes/live2d-codex/renderer/workbench.html](../../prototypes/live2d-codex/renderer/workbench.html)、[prototypes/live2d-codex/renderer/workbench.js](../../prototypes/live2d-codex/renderer/workbench.js)、[tools/qa/still-fixture.cjs](../../tools/qa/still-fixture.cjs)。
+
+依赖：ART-09。原编号：新增工作。
+
+验收条件：
+
+- 真人动态仅说明工作/看向用户两态及转场；动漫静态展示五姿态轮换说明，男士入口及其说明按ART-10移除。
+- 风格切换后的实际提示与可用选项一致，保留独立声线和播放行为。
+
+下一动作：后续改动壁纸风格或动态状态时同步说明与生产页面验证；当前两种风格限定范围已通过。
+
+证据：[docs/development/source-review-2026-10-28.md](source-review-2026-10-28.md) — S-01：workbench.html固定自动说明仍称穿插捧杯/托腮/看雨；workbench.js已经正确禁用动态模式的这些选项。确认P3说明错误，未发现其破坏两态播放。（source-confirmed-ui-copy-mismatch）；[docs/development/source-review-fixes-2026-10-28.md](source-review-fixes-2026-10-28.md) — 2026-10-28：still-help随女生动态、女生静态和男生静态切换；正式媒体7组、静态15组与界面12项通过，生产页面核对三种提示与选项对应，未改变声线或播放策略。（fix-and-bounded-regression）；[docs/development/wallpaper-styles-2026-11-01.md](wallpaper-styles-2026-11-01.md) — 2026-11-01按用户新目标仅保留动漫静态与真人动态，男士壁纸退役；保留旧证据，不反向宣称历史版本无男士。当前数据/声线、5组风格恢复、15组静态、7组正式动态与界面检查通过。（wallpaper-style-scope-update）
+
+## PRIVATE-02 本机可选扩展的锁定依赖更新与回归
+
+状态：已验证限定范围；阶段：stability；责任角色：私人扩展。
+
+实现位置：[docs/development/source-review-fixes-2026-10-28.md](source-review-fixes-2026-10-28.md)、[docs/development/repository-map.md](repository-map.md)。
+
+依赖：PRIVATE-01。原编号：新增工作。
+
+验收条件：
+
+- 只在本机扩展范围更新受影响的间接依赖并保留兼容性，重新审计锁文件；不把私人源码、凭据、运行数据或依赖纳入公共仓库和安装包。
+- 既有离线协议、认证边界、进程与启动器回归通过；记录生产导入可达性和局限，不用静态未加载结论代替修复。
+
+下一动作：保持本机锁依赖审计和离线回归；真实私人通道验收独立处理，不将更新范围扩大到公共包。
+
+证据：[docs/development/source-review-2026-10-28.md](source-review-2026-10-28.md) — 2026-10-28：可选本地扩展27项离线测试通过，但独立官方npm审计仍有两个受影响依赖节点，上游最高评级分别为high和moderate。当前生产入口未加载二者，不能据此断言远程可利用或免除更新；公共根目录/主应用锁依赖审计均0项。（optional-local-dependency-audit-summary）；[docs/development/source-review-fixes-2026-10-28.md](source-review-fixes-2026-10-28.md) — 2026-10-28：本机锁文件仅两个受影响间接依赖节点更新，直接依赖清单字节不变；官方npm复审0项已知告警，27项离线协议/认证/临时加密数据/进程回归通过。私人源码和依赖继续不进入公共仓库、安装包。（fix-and-bounded-regression）
+
+## ART-10 壁纸收敛为动漫静态与真人动态，移除男士资源
+
+状态：已验证限定范围；阶段：baseline；责任角色：桌面/界面/质量。
+
+实现位置：[prototypes/live2d-codex/backend/character-profiles.cjs](../../prototypes/live2d-codex/backend/character-profiles.cjs)、[prototypes/live2d-codex/backend/workspace-store.mjs](../../prototypes/live2d-codex/backend/workspace-store.mjs)、[prototypes/live2d-codex/backend/wallpaper-choice.cjs](../../prototypes/live2d-codex/backend/wallpaper-choice.cjs)、[prototypes/live2d-codex/main.cjs](../../prototypes/live2d-codex/main.cjs)、[prototypes/live2d-codex/renderer/still-wallpaper.js](../../prototypes/live2d-codex/renderer/still-wallpaper.js)、[prototypes/live2d-codex/renderer/workbench.html](../../prototypes/live2d-codex/renderer/workbench.html)、[prototypes/live2d-codex/renderer/workbench.js](../../prototypes/live2d-codex/renderer/workbench.js)、[prototypes/live2d-codex/scripts/package-portable.mjs](../../prototypes/live2d-codex/scripts/package-portable.mjs)、[tools/release/resource-assets.mjs](../../tools/release/resource-assets.mjs)、[tools/qa/still-fixture.cjs](../../tools/qa/still-fixture.cjs)、[tools/qa/release-package.mjs](../../tools/qa/release-package.mjs)、[prototypes/live2d-codex/assets/stills/manifest.json](../../prototypes/live2d-codex/assets/stills/manifest.json)、[tools/release/installer.iss](../../tools/release/installer.iss)、[tools/qa/installer-check.ps1](../../tools/qa/installer-check.ps1)、[tools/qa/interface-fixture.cjs](../../tools/qa/interface-fixture.cjs)、[tools/qa/visual-cases.cjs](../../tools/qa/visual-cases.cjs)、[prototypes/live2d-codex/tests/character-profiles.test.mjs](../../prototypes/live2d-codex/tests/character-profiles.test.mjs)、[tests/resource-assets.test.mjs](../../tests/resource-assets.test.mjs)。
+
+依赖：ART-09、TOOL-06、DOC-02。原编号：新增工作。
+
+验收条件：
+
+- 当前应用只有动漫静态与真人视频动态两种壁纸，删除男士原画、模型、预览和运行资源，启动、资源恢复及打包不会重新引入。
+- 旧男士设置迁移到动漫静态，保留有效自选声线、项目、草稿及其他设置；新风格切换失败、取消或保存失败不破坏最后成功状态。
+- 保留五静态姿态、两态循环/双向转身、暂停、声音优先与独立男女声线；隔离桌面验证重试、快速切换和新进程恢复。
+- 按用户指定顺序进行 code-review 双轴审核、impeccable 实际界面审查，修复发现后复查；全量离线、构建、项目/公共检查和实际候选包内容验证通过。
+
+下一动作：维护两种风格、迁移及男士资源排除回归；候选包已验证、尚未公开发布，真实账户/硬件/全安装矩阵继续由原任务独立验收。
+
+证据：[docs/development/wallpaper-styles-2026-11-01.md](wallpaper-styles-2026-11-01.md) — 2026-11-01：466项本机离线测试、构建与项目/公共检查通过；静态15组、风格故障/独立进程恢复5组、正式4K动态7组、界面12组和焦点15组通过。code-review Standards/Spec各2项发现修复后均0未关闭；impeccable两轮44状态检查和对比度复核无新增阻断。候选8322文件/100源码/6媒体核验，67保留资产与旧版相同，中文路径新装与旧0.6.1便携覆盖升级通过，8个男士素材均不存在。未提交/推送/公开发布，未启动真实账户或执行RC003及注册卸载验收。（implementation-and-release-review）
+
+## REL-05 0.6.2两风格与修复版本提交、同步和发布
+
+状态：施工中；阶段：release；责任角色：构建发布。
+
+实现位置：[package.json](../../package.json)、[prototypes/live2d-codex/package.json](../../prototypes/live2d-codex/package.json)、[tools/release/resource-manifest.json](../../tools/release/resource-manifest.json)、[docs/development/release-0.6.2-review.md](release-0.6.2-review.md)。
+
+依赖：ART-10、REL-02、REL-04。原编号：新增工作。
+
+验收条件：
+
+- 根目录、应用及锁文件版本一致；正式安装器使用新目录，源文件、媒体、退役素材排除和保留资源哈希通过核查。
+- 在隔离路径验证新装、旧0.6.1覆盖升级与允许范围内的安装生命周期；不操作日用数据，不冒领完整账户/硬件/系统矩阵。
+- 实际暂存区公开扫描与必要检查通过；源码提交原开发分支，经PR和CI合入main，标签与公开Release安装器大小和SHA-256对应；旧发布保留。
+
+下一动作：正式包与隔离安装已通过；审计实际暂存区，提交原开发分支，经PR和CI合入后发布并核对远端安装器。
+
+证据：[docs/development/release-0.6.2-review.md](release-0.6.2-review.md) — 2026-11-02：0.6.2正式包8301文件/100源码/6媒体通过，67保留美术及CPU语音文件匹配0.6.1，男士素材排除；本机466项离线测试、构建和官方依赖审计通过。隔离中文路径新装、0.6.1覆盖升级、注册快捷方式、卸载、外部模拟数据保留及旧版便携文件回装通过；未启动真实账户/硬件或操作日用数据。源码同步与公开发布继续由REL-05记录。（formal-package-and-isolated-installer-validation）

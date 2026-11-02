@@ -27,26 +27,26 @@ async function characterFixture(t) {
   } });
   await store.load(); await store.updateSettings({ qwenVoice: 'Vivian', voice: 48 });
   const context = vm.createContext({ store, isCharacter: characters.isCharacter, isWallpaperKind: choices.isWallpaperKind,
-    wallpaperStatus: { phase: 'loading', character: 'male', wallpaperKind: 'artwork', requestId: 1 }, appliedWallpaperRequest: -1, wallpaperCommit: null,
+    wallpaperStatus: { phase: 'loading', character: 'female', wallpaperMotion: true, wallpaperKind: 'artwork', requestId: 1 }, appliedWallpaperRequest: -1, wallpaperCommit: null,
     setTimeout, clearTimeout, presentation: () => ({ paused: false }), stopSpeech() {}, notifyWorkspace() {}, console: { error() {} } });
   vm.runInContext(confirmSource, context);
   t.after(async () => { context.cancelWallpaperCommit(); await store.queue.catch(() => {}); });
-  const info = id => ({ ready: true, character: context.wallpaperStatus.character, wallpaperKind: 'artwork', requestId: id });
+  const info = id => ({ ready: true, character: context.wallpaperStatus.character, wallpaperKind: 'artwork', wallpaperMotion: context.wallpaperStatus.wallpaperMotion === true, requestId: id });
   const apply = async value => await context.confirmWallpaper(value) && context.finishWallpaper(value, true);
   return { store, context, info, apply, fail: value => fail = value, hold: () => pending = deferred(), writes: () => writes };
 }
 
-test('decoded character is not accepted on disk failure; explicit retry commits both default voices', async t => {
+test('decoded style is not accepted on disk failure; explicit retry preserves both custom voices', async t => {
   const h = await characterFixture(t), previous = h.store.snapshot(); h.fail(true);
   assert.equal(await h.apply(h.info(1)), false);
   assert.deepEqual(h.store.snapshot(), previous); assert.equal(h.context.wallpaperStatus.phase, 'error');
   assert.equal(h.context.appliedWallpaperRequest, -1);
   h.fail(false); h.context.wallpaperStatus = { ...h.context.wallpaperStatus, phase: 'loading', requestId: 2 };
   assert.equal(await h.apply(h.info(2)), true);
-  assert.equal(h.store.data.settings.character, 'male'); assert.equal(h.store.data.settings.qwenVoice, 'Dylan'); assert.equal(h.store.data.settings.voice, 58);
+  assert.equal(h.store.data.settings.wallpaperMotion, true); assert.equal(h.store.data.settings.qwenVoice, 'Vivian'); assert.equal(h.store.data.settings.voice, 48);
   assert.deepEqual(JSON.parse(await fs.readFile(h.store.file, 'utf8')).settings, h.store.data.settings);
   const reload = new WorkspaceStore(join(h.store.file, '..')); await reload.load();
-  for (const key of ['character', 'wallpaperKind', 'qwenVoice', 'voice']) assert.equal(reload.data.settings[key], h.store.data.settings[key]);
+  for (const key of ['character', 'wallpaperKind', 'wallpaperMotion', 'qwenVoice', 'voice']) assert.equal(reload.data.settings[key], h.store.data.settings[key]);
 });
 
 test('pending preparations coalesce; a newer selection cancels an unpainted character without changing custom voices', async t => {
@@ -67,7 +67,7 @@ test('pause cancels prepared bytes; queued custom edits and a failed later choic
   assert.equal(await fs.readFile(h.store.file, 'utf8'), original); assert.equal(h.store.data.settings.character, 'female');
   const edit = h.store.updateSettings({ qwenVoice: 'Serena', voice: 48, speed: 1.1 });
   assert.equal(h.context.finishWallpaper(info, false), false); await edit;
-  h.context.wallpaperStatus = { phase: 'loading', character: 'male', wallpaperKind: 'artwork', requestId: 2 }; h.fail(true);
+  h.context.wallpaperStatus = { phase: 'loading', character: 'female', wallpaperMotion: true, wallpaperKind: 'artwork', requestId: 2 }; h.fail(true);
   assert.equal(await h.apply(h.info(2)), false);
   const saved = JSON.parse(await fs.readFile(h.store.file, 'utf8')).settings;
   assert.equal(saved.character, 'female'); assert.equal(saved.qwenVoice, 'Serena'); assert.equal(saved.speed, 1.1);
@@ -81,23 +81,19 @@ test('renderer exit and preparation expiry release the store queue without accep
   const old = h.info(1); await h.context.confirmWallpaper(old);
   h.context.cancelWallpaperCommit(); await h.store.updateSettings({ speed: 1.1 });
   assert.equal(h.context.finishWallpaper(old, true), false); assert.equal(h.store.data.settings.character, 'female');
-  h.context.wallpaperStatus = { phase: 'loading', character: 'male', requestId: 2 };
+  h.context.wallpaperStatus = { phase: 'loading', character: 'female', wallpaperMotion: true, requestId: 2 };
   const newer = h.info(2); await h.context.confirmWallpaper(newer); timers.values().next().value();
   await h.store.queue; assert.equal(h.context.wallpaperStatus.phase, 'error'); assert.equal(h.context.finishWallpaper(newer, true), false);
   assert.equal(h.store.data.settings.character, 'female'); assert.equal(timers.size, 0);
 });
 
-test('speech cleanup failure cannot publish settings, and post-commit notification failure cannot reject an accepted frame', async t => {
-  const h = await characterFixture(t), original = await fs.readFile(h.store.file, 'utf8');
-  h.context.stopSpeech = () => { throw new Error('chat disposed'); };
-  assert.equal(await h.apply(h.info(1)), false); await h.store.queue;
-  assert.equal(await fs.readFile(h.store.file, 'utf8'), original); assert.equal(h.store.data.settings.character, 'female');
-  h.context.stopSpeech = () => {};
-  h.context.wallpaperStatus = { phase: 'loading', character: 'male', requestId: 2 };
-  const info = h.info(2); assert.equal(await h.context.confirmWallpaper(info), true);
-  h.context.notifyWorkspace = () => { throw new Error('notification disposed'); };
-  assert.equal(h.context.finishWallpaper(info, true), true);
-  assert.equal(h.store.data.settings.character, 'male'); assert.equal(h.store.data.settings.qwenVoice, 'Dylan');
+test('style changes do not interrupt narration and post-commit notification failure cannot reject an accepted frame', async t => {
+  const h=await characterFixture(t);
+  h.context.stopSpeech=()=>{throw new Error('style changes must not stop speech');};
+  const info=h.info(1);assert.equal(await h.context.confirmWallpaper(info),true);
+  h.context.notifyWorkspace=()=>{throw new Error('notification disposed');};
+  assert.equal(h.context.finishWallpaper(info,true),true);
+  assert.equal(h.store.data.settings.wallpaperMotion,true);assert.equal(h.store.data.settings.qwenVoice,'Vivian');
 });
 
 function playbackFixture() {

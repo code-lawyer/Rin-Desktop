@@ -69,7 +69,6 @@ export function inspectLaunch(plan, { platform = process.platform, nodeVersion =
   if (plan.mode === 'avatar') resources.push('assets/hiyori/Hiyori.model3.json');
   else {
     for (const pose of stills.POSES) resources.push(`assets/stills/female-v2-4k/${pose}.png`);
-    for (const pose of ['work','attention']) resources.push(`assets/stills/male/${pose}.png`);
     resources.push('assets/ambience/light-rain.ogg', 'assets/ambience/soft-keyboard.ogg');
   }
   const missing = resources.filter(name => !existsSync(join(plan.appRoot, name)));

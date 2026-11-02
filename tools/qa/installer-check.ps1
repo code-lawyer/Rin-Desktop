@@ -1,12 +1,15 @@
-param([switch]$Run, [string]$PreviousSetup, [switch]$Lifecycle)
+param([switch]$Run, [string]$Setup, [string]$PreviousSetup, [switch]$Lifecycle)
 $ErrorActionPreference = 'Stop'
 if (-not $Run) {
-  Write-Output 'Default: help only. Use -Run [-PreviousSetup <old installer>] for isolated portable extraction. Optional -Lifecycle tests registration/uninstall only if the normal AppId and default shortcut group are absent; installs under work/qa. No application startup, accounts or hardware.'
+  Write-Output 'Default: help only. Use -Run [-Setup <candidate installer>] [-PreviousSetup <old installer>] for isolated portable extraction. Optional -Lifecycle tests the normal release registration/uninstall only if its AppId and default shortcut group are absent; installs under work/qa. No application startup, accounts or hardware.'
   exit 0
 }
 $repoRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 $version = (Get-Content -LiteralPath (Join-Path $repoRoot 'package.json') -Raw | ConvertFrom-Json).version
-$setup = Join-Path $repoRoot "release/v$version/Rin-Desktop-$version-Setup.exe"
+if ($Setup) {
+  if ($Lifecycle) { throw 'Custom candidate installers support portable extraction only; use the default release for lifecycle checks.' }
+  $setup = (Resolve-Path -LiteralPath $Setup).Path
+} else { $setup = Join-Path $repoRoot "release/v$version/Rin-Desktop-$version-Setup.exe" }
 if (-not (Test-Path -LiteralPath $setup -PathType Leaf)) { throw 'Build the installer first.' }
 if ($PreviousSetup) { $PreviousSetup = (Resolve-Path -LiteralPath $PreviousSetup).Path }
 $qaRoot = Join-Path $repoRoot 'work/qa'

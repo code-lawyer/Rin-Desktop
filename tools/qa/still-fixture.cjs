@@ -9,17 +9,20 @@ const assert=require('node:assert/strict');
 const root=resolve(__dirname,'../..'),application=join(root,'prototypes/live2d-codex'),output=process.argv[2];
 if(!output || !resolve(output).startsWith(join(root,'work','qa')+sep))throw new Error('Use an output beneath work/qa.');
 const actualMotion=process.argv.includes('--actual-motion');
+const characterRestore=process.argv.includes('--character-restore');
 mkdirSync(output,{recursive:true});app.setPath('userData',join(output,'profile'));if(!actualMotion)app.disableHardwareAcceleration();
 const waitAttempts=actualMotion?600:120;
 protocol.registerSchemesAsPrivileged([{scheme:'app',privileges:{standard:true,secure:true,supportFetchAPI:true,stream:true}}]);
 let windows=[],wallpaper,chat,workbench,version=0,store,ambient={phase:'off'},blocked='',expectedFailure=false,persistFault=false,prepareGate;
 const errors=[],checks=[],acknowledgements=[];
+let characterFault;
+const characterRequests=[];
 const present={mode:'wallpaper',wallpaperKind:'artwork',character:'female',characterRequest:0,chatVisible:false,paused:false,stills:{stillPose:'auto',ambienceEnabled:false},capturing:false,speaking:false,ambientRevision:0,ambientRetry:0};
 let wallpaperStatus={phase:'loading',character:'female',requestId:0};
 const state={provider:'codex',connection:'ready',status:'idle',cwd:output,projectName:'Example',threadId:'fixture-thread',threadName:'本地验证',models:[],messages:[{role:'assistant',text:'这是离线验证的完整回复。',complete:true}],approvals:[],activity:''};
 const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 const js=(win,code)=>win.webContents.executeJavaScript(code);
-const sendPresentation=()=>{present.stills=store.data.settings;if(wallpaper&&!wallpaper.isDestroyed()&&!wallpaper.webContents.isCrashed())wallpaper.webContents.send('companion:presentation',present);};
+const sendPresentation=()=>{present.stills={...store.data.settings,wallpaperMotion:wallpaperStatus.wallpaperMotion ?? store.data.settings.wallpaperMotion===true};if(wallpaper&&!wallpaper.isDestroyed()&&!wallpaper.webContents.isCrashed())wallpaper.webContents.send('companion:presentation',present);};
 let remote;
 const snapshot=()=>({...store.snapshot(),version,speech:{phase:'ready',asr:true,engine:'qwen',engines:{qwen:true,kokoro:true}},remote,wallpaper:wallpaperStatus,ambience:ambient,wallpaperPaused:present.paused,resources:{phase:'idle',packs:[]},shortcutErrors:[]});
 const notify=()=>{version++;sendPresentation();for(const w of [chat,workbench])if(w&&!w.isDestroyed())w.webContents.send('workbench:state',snapshot());};
@@ -35,7 +38,10 @@ app.whenReady().then(async()=>{
   const {WorkspaceStore}=await import(pathToFileURL(join(application,'backend/workspace-store.mjs')).href);
   const {remoteSettings}=await import(pathToFileURL(join(application,'backend/remote-config.mjs')).href);
   remote={phase:'disconnected',audio:'idle',config:remoteSettings(),devices:[],keysAvailable:false};
-  store=new WorkspaceStore(join(output,'data'),{io:{...fs,open:async(path,...args)=>{if(prepareGate&&path.endsWith('workspaces.json.tmp'))await prepareGate;return fs.open(path,...args);},renameSync:(from,to)=>{if(persistFault&&to.endsWith('workspaces.json'))throw Object.assign(new Error('fixture disk full'),{code:'ENOSPC'});renameSync(from,to);},rename:async(from,to)=>{if(persistFault&&to.endsWith('workspaces.json'))throw Object.assign(new Error('fixture disk full'),{code:'ENOSPC'});return fs.rename(from,to);}}});await store.load();await store.add(output);await store.updateSettings({ttsResident:true,ttsEngine:'qwen',qwenVoice:'Vivian',voice:48,playbackVolume:.8});
+  store=new WorkspaceStore(join(output,'data'),{io:{...fs,open:async(path,...args)=>{if(prepareGate&&path.endsWith('workspaces.json.tmp'))await prepareGate;return fs.open(path,...args);},renameSync:(from,to)=>{if(persistFault&&to.endsWith('workspaces.json'))throw Object.assign(new Error('fixture disk full'),{code:'ENOSPC'});renameSync(from,to);},rename:async(from,to)=>{if(persistFault&&to.endsWith('workspaces.json'))throw Object.assign(new Error('fixture disk full'),{code:'ENOSPC'});return fs.rename(from,to);}}});await store.load();
+  if(!characterRestore) { await store.add(output);await store.updateSettings({ttsResident:true,ttsEngine:'qwen',qwenVoice:'Vivian',voice:48,playbackVolume:.8}); }
+  present.character=store.data.settings.character;present.stills=store.data.settings;
+  wallpaperStatus={phase:'loading',character:present.character,wallpaperMotion:store.data.settings.wallpaperMotion===true,requestId:0};
   const mainSource=readFileSync(join(application,'main.cjs'),'utf8');
   const commitContext=vm.createContext({store,appliedWallpaperRequest:-1,wallpaperCommit:null,setTimeout,clearTimeout,presentation:()=>present,
     isCharacter:require(join(application,'backend/character-profiles.cjs')).isCharacter,
@@ -47,7 +53,20 @@ app.whenReady().then(async()=>{
   const barrier=new AmbientBarrier({publish(revision){present.ambientRevision=revision;sendPresentation();}});
   const {createMotionMedia}=await import(pathToFileURL(join(application,'backend/motion-media.mjs')).href);
   const motionMedia=await createMotionMedia(join(output,'media'));
-  protocol.handle('app',request=>{const path=decodeURIComponent(new URL(request.url).pathname);if(blocked&&path.includes(blocked))return new Response('',{status:404});if(process.argv.includes('--motion')&&path.startsWith('/assets/motion/'))return motionMedia.respond(request);const file=resolve(application,'.'+path);if(!file.startsWith(application+sep))return new Response('',{status:403});return net.fetch(pathToFileURL(file).href);});
+  const {isCharacterImageRequest}=await import(pathToFileURL(join(__dirname,'character-asset-probe.mjs')).href);
+  protocol.handle('app',async request=>{
+    const path=decodeURIComponent(new URL(request.url).pathname);
+    if(characterFault && isCharacterImageRequest(request.url,characterFault.character)) {
+      const fault=characterFault;characterRequests.push({character:fault.character,path});
+      fault.hits++;
+      if(fault.hold)await new Promise(resolve=>fault.releases.push(resolve));
+      return new Response('',{status:404});
+    }
+    if(blocked&&path.includes(blocked))return new Response('',{status:404});
+    if(process.argv.includes('--motion')&&path.startsWith('/assets/motion/'))return motionMedia.respond(request);
+    const file=resolve(application,'.'+path);if(!file.startsWith(application+sep))return new Response('',{status:403});
+    return net.fetch(pathToFileURL(file).href);
+  });
   handler('companion:snapshot',()=>state);handler('companion:appearance',()=>({scale:1,mode:'wallpaper'}));handler('companion:presentation',()=>present);handler('workbench:snapshot',snapshot);
   handler('remote:command',()=>remote);handler('workbench:list',()=>({data:[],nextCursor:null}));handler('workbench:draft',()=>({text:''}));handler('workbench:learn-key',()=>{});
   handler('speech:stop',()=>{});handler('speech:volume',async(_e,value)=>{await store.updateSettings({playbackVolume:value});notify();return snapshot();});
@@ -59,7 +78,8 @@ app.whenReady().then(async()=>{
   handler('wallpaper:commit',(_e,info)=>commitContext.confirmWallpaper(info));
   ipcMain.on('wallpaper:finish',(event,info,accept)=>{event.returnValue={ok:true,value:commitContext.finishWallpaper(info,accept)};});
   handler('workbench:settings',async(_e,patch)=>{
-    if(patch.character){commitContext.cancelWallpaperCommit();present.character=patch.character;present.characterRequest++;wallpaperStatus={phase:'loading',character:patch.character,requestId:present.characterRequest};patch={...patch};delete patch.character;}
+    const choice=require(join(application,'backend/wallpaper-choice.cjs')).wallpaperChoice(patch,store.data.settings);
+    if(choice){commitContext.cancelWallpaperCommit();present.character=choice.character;present.characterRequest++;wallpaperStatus={phase:'loading',...choice,requestId:present.characterRequest};patch={...patch};delete patch.character;delete patch.wallpaperKind;delete patch.wallpaperMotion;}
     if(Object.keys(patch).length)await store.updateSettings(patch);notify();return snapshot();
   });
   ipcMain.on('wallpaper:ambient-applied',(_e,revision)=>{acknowledgements.push(revision);barrier.acknowledge(revision);});
@@ -78,9 +98,71 @@ app.whenReady().then(async()=>{
   vm.runInContext(mainSource.slice(mainSource.indexOf('function recoverWallpaperRenderer('),mainSource.indexOf('function switchAllowed()')),commitContext);
   const host="document.getElementById('wallpaper-view')";
   await until(wallpaper,host+".dataset.ready==='true'");
+  const assertCharacter=async(character,qwenVoice,voice)=>{
+    await until(workbench,`document.getElementById('qwen-voice').value===${JSON.stringify(qwenVoice)} && document.getElementById('voice').value===${JSON.stringify(String(voice))}`);
+    await store.queue;
+    for(const settings of [store.data.settings,JSON.parse(await fs.readFile(store.file,'utf8')).settings]) {
+      assert.equal(settings.character,character);assert.equal(settings.qwenVoice,qwenVoice);assert.equal(settings.voice,voice);
+    }
+    assert.equal(await js(wallpaper,host+'.dataset.character'),character);
+  };
+  const finishCharacter=(name,details={})=>{
+    assert.deepEqual(errors,[]);
+    writeFileSync(join(output,name+'.json'),JSON.stringify({checks,errors,...details,accounts:false,hardware:false},null,2),{flag:'wx'});
+    barrier.close();for(const win of windows)win.destroy();app.exit(0);
+  };
+  if(characterRestore) {
+    const expected=JSON.parse(await fs.readFile(join(output,'character-before-restart.json'),'utf8'));
+    await assertCharacter('female','Uncle_Fu',59);
+    assert.equal(store.data.settings.wallpaperMotion,true);
+    // Loading can materialize default fields absent from the saved object;
+    // every value that was actually persisted must still survive the restart.
+    for(const [key,value] of Object.entries(expected.settings))assert.deepEqual(store.data.settings[key],value,key);
+    assert.equal(wallpaperStatus.phase,'ready');
+    assert.equal(await js(workbench,"document.getElementById('retry-character').hidden"),true);
+    checks.push('fresh Electron process restores the last successful character and custom voices after a failed replacement');
+    finishCharacter('character-restore');return;
+  }
+  if(process.argv.includes('--character-switch')) {
+    const pick=style=>js(workbench,`document.querySelector('[name="wallpaper-style"][value="${style}"]').click()`);
+    const retry=()=>js(workbench,"document.getElementById('retry-character').click()");
+    const waitError=()=>until(workbench,"!document.getElementById('retry-character').hidden");
+    const waitHeld=async()=>{for(let i=0;i<120;i++){if(characterFault.releases.length)return;await delay(50);}throw new Error('No held wallpaper image request: '+JSON.stringify(characterRequests));};
+    const arm=(character,hold=false)=>{expectedFailure=true;characterFault={character,hold,hits:0,releases:[]};return characterFault;};
+    await js(workbench,"document.getElementById('settings-tab').click()");
+    assert.deepEqual(await js(workbench,"[...document.querySelectorAll('[name=wallpaper-style]')].map(r=>r.value)"),['anime','realistic']);
+    const pixels=await js(wallpaper,"document.querySelector('.wallpaper-still').toDataURL()");
+    const fault=arm('realistic',true);
+    await pick('realistic');await waitHeld();await assertCharacter('female','Vivian',48);
+    assert.equal(wallpaperStatus.phase,'loading');assert.equal(store.data.settings.wallpaperMotion===true,false);
+    await js(wallpaper,`companion.renderReady({ready:true,character:'female',wallpaperMotion:true,requestId:${present.characterRequest-1}})`);
+    assert.equal(store.data.settings.wallpaperMotion===true,false);
+    fault.hold=false;for(const release of fault.releases.splice(0))release();await waitError();
+    assert.equal(await js(wallpaper,"document.querySelector('.wallpaper-still').toDataURL()"),pixels);
+    checks.push('held and failed realistic poster retains anime canvas, saved style and custom voices; stale ready is ignored');
+    const hits=fault.hits;await retry();await waitError();assert.ok(fault.hits>hits);
+    characterFault=null;await retry();await until(wallpaper,host+".dataset.rig==='motion'");
+    await assertCharacter('female','Vivian',48);assert.equal(store.data.settings.wallpaperMotion,true);
+    checks.push('repeated image failure remains explicit and successful retry persists realistic style without resetting voices');
+    await js(workbench,"companion.saveSettings({qwenVoice:'Uncle_Fu',voice:59})");
+    await wallpaper.webContents.session.clearCache();await wallpaper.loadURL('app://local/renderer/index.html?view=wallpaper');
+    await until(wallpaper,host+".dataset.ready==='true'");
+    const older=arm('anime',true);await pick('anime');await waitHeld();await pick('realistic');
+    characterFault=null;for(const release of older.releases.splice(0))release();
+    await until(wallpaper,host+".dataset.rig==='motion'");await delay(200);
+    await assertCharacter('female','Uncle_Fu',59);assert.equal(store.data.settings.wallpaperMotion,true);assert.equal(wallpaperStatus.phase,'ready');
+    checks.push('rapid return to realistic style discards the older failed anime request and preserves custom voices');
+    const final=arm('anime');await pick('anime');await waitError();assert.ok(final.hits);
+    assert.equal(store.data.settings.wallpaperMotion,true);await assertCharacter('female','Uncle_Fu',59);
+    writeFileSync(join(output,'character-before-restart.json'),JSON.stringify({settings:store.data.settings},null,2),{flag:'wx'});
+    checks.push('a failed anime replacement does not persist before process exit');
+    finishCharacter('character-switch',{requests:characterRequests});return;
+  }
   if(process.argv.includes('--motion')) {
-    await js(workbench,"document.getElementById('wallpaper-motion').click()");
+    await js(workbench,"document.querySelector('[name=wallpaper-style][value=realistic]').click()");
     await until(wallpaper,host+".dataset.motionClip==='work-loop' && Number("+host+".dataset.motionPlayCount)>=3");
+    assert.match(await js(workbench,"document.getElementById('still-help').textContent"),/工作与看向你.*循环播放/);
+    assert.doesNotMatch(await js(workbench,"document.getElementById('still-help').textContent"),/捧杯|托腮|看雨/);
     const mediaPlayback=await js(wallpaper,"[...document.querySelectorAll('.wallpaper-motion')].map(video=>({width:video.videoWidth,height:video.videoHeight,readyState:video.readyState,quality:video.getVideoPlaybackQuality().toJSON?.()||{totalVideoFrames:video.getVideoPlaybackQuality().totalVideoFrames,droppedVideoFrames:video.getVideoPlaybackQuality().droppedVideoFrames}}))");
     let steadyPlayback;
     if(actualMotion){
@@ -134,17 +216,12 @@ app.whenReady().then(async()=>{
     await until(wallpaper,host+".dataset.motionClip==='work-loop' && "+host+".dataset.motionPhase==='loop'");
     await until(workbench,"document.getElementById('retry-character').hidden"); expectedFailure=false;
     checks.push('unavailable video retains a decoded poster and voices; explicit retry recovers playback and status');
-    await js(workbench,"companion.saveSettings({character:'male'})");
-    await until(wallpaper,host+".dataset.character==='male'");
-    assert.equal(await js(wallpaper,"document.querySelectorAll('.wallpaper-motion').length"),0);
-    assert.equal(store.data.settings.qwenVoice,'Dylan'); assert.equal(store.data.settings.voice,58);
-    await js(workbench,"companion.saveSettings({character:'female'})");
-    await until(wallpaper,host+".dataset.motionPhase==='loop'");
-    assert.equal(store.data.settings.qwenVoice,'Serena');
-    await js(workbench,"document.getElementById('wallpaper-motion').click()");
+    await js(workbench,"document.querySelector('[name=wallpaper-style][value=anime]').click()");
     await until(wallpaper,host+".dataset.rig==='static'");
     assert.equal(await js(wallpaper,"document.querySelectorAll('.wallpaper-motion').length"),0);
-    checks.push('male static mode, default voice transaction and return to five static poses remain available');
+    assert.equal(store.data.settings.qwenVoice,'Vivian');assert.equal(store.data.settings.voice,48);
+    assert.match(await js(workbench,"document.getElementById('still-help').textContent"),/捧杯.*托腮.*看雨/);
+    checks.push('anime still mode restores all five poses, removes video decoders and preserves custom voices');
     await capture(workbench,'motion-workbench');
     writeFileSync(join(output,'report.json'),JSON.stringify({checks,errors,syntheticMedia:!actualMotion,mediaPlayback,steadyPlayback,gpuFeatureStatus:actualMotion?app.getGPUFeatureStatus():null,accounts:false,hardware:false},null,2));
     assert.deepEqual(errors,[]); barrier.close(); for(const win of windows)win.destroy(); app.exit(0); return;
@@ -197,23 +274,23 @@ app.whenReady().then(async()=>{
   await js(workbench,"companion.wallpaperControl('pause',true)");await until(wallpaper,host+".dataset.paused==='true'");
   await js(workbench,"companion.saveSettings({stillPose:'window'})");await delay(150);assert.equal(await js(wallpaper,host+'.dataset.pose'),'work');assert.deepEqual(await levels(),[0,0]);
   await js(workbench,"companion.wallpaperControl('pause',false)");await until(wallpaper,host+".dataset.pose==='window'");assert.equal((await levels())[1],0);checks.push('pause freezes current image and mutes; resume applies latest selection');
-  // Fresh male images have not been cached: exercise a genuine HTTP image failure.
-  expectedFailure=true;blocked='/stills/male/';
-  await js(workbench,"companion.saveSettings({character:'male'})");await until(workbench,"!document.getElementById('retry-character').hidden && !document.getElementById('retry-character').disabled");
-  assert.equal(await js(wallpaper,host+'.dataset.character'),'female');assert.equal(store.data.settings.qwenVoice,'Vivian');
-  blocked='';expectedFailure=false;await js(workbench,"document.getElementById('retry-character').click()");await until(wallpaper,host+".dataset.character==='male'");
-  await until(workbench,"document.getElementById('qwen-voice').value==='Dylan'");assert.equal(store.data.settings.qwenVoice,'Dylan');checks.push('failed character load holds picture and voice; retry commits male with matching default');
+  // Realistic poster has not been cached: exercise a genuine HTTP image failure.
+  expectedFailure=true;blocked='/motion/female/work.png';
+  await js(workbench,"companion.saveSettings({wallpaperMotion:true})");await until(workbench,"!document.getElementById('retry-character').hidden");
+  assert.equal(await js(wallpaper,host+'.dataset.rig'),'static');assert.equal(store.data.settings.qwenVoice,'Vivian');
+  blocked='';expectedFailure=false;await js(workbench,"document.getElementById('retry-character').click()");await until(wallpaper,host+".dataset.rig==='motion'");
+  assert.equal(store.data.settings.qwenVoice,'Vivian');checks.push('failed style load retains canvas and voices; retry commits realistic wallpaper');
   const originalCanvas=await js(wallpaper,"document.querySelector('.wallpaper-still').toDataURL()");
   persistFault=true;
-  await js(workbench,"companion.saveSettings({character:'female'})");await until(workbench,"!document.getElementById('retry-character').hidden && !document.getElementById('retry-character').disabled");
+  await js(workbench,"companion.saveSettings({wallpaperMotion:false})");await until(workbench,"!document.getElementById('retry-character').hidden && !document.getElementById('retry-character').disabled");
   assert.equal(await js(wallpaper,"document.querySelector('.wallpaper-still').toDataURL()"),originalCanvas);
-  assert.equal(await js(wallpaper,host+'.dataset.character'),'male');assert.equal(store.data.settings.character,'male');assert.equal(store.data.settings.qwenVoice,'Dylan');
+  assert.equal(await js(wallpaper,host+'.dataset.rig'),'motion');assert.equal(store.data.settings.wallpaperMotion,true);assert.equal(store.data.settings.qwenVoice,'Vivian');
   checks.push('real main commit disk failure leaves the original canvas and both character settings intact');
-  persistFault=false;await js(workbench,"document.getElementById('retry-character').click()");await until(wallpaper,host+".dataset.character==='female'");
-  assert.equal(store.data.settings.qwenVoice,'Serena');assert.equal(store.data.settings.voice,3);checks.push('disk failure retry displays the replacement only after its default voices commit');
+  persistFault=false;await js(workbench,"document.getElementById('retry-character').click()");await until(wallpaper,host+".dataset.rig==='static'");
+  assert.equal(store.data.settings.qwenVoice,'Vivian');assert.equal(store.data.settings.voice,48);checks.push('disk failure retry displays the replacement only after its style settings commit');
   let releasePreparation;prepareGate=new Promise(resolve=>{releasePreparation=resolve;});
   const originalSettings=JSON.stringify(store.data.settings),originalPixels=await js(wallpaper,"document.querySelector('.wallpaper-still').toDataURL()");
-  await js(workbench,"companion.saveSettings({character:'male'})");
+  await js(workbench,"companion.saveSettings({wallpaperMotion:true})");
   for(let i=0;i<120&&!commitContext.wallpaperCommit;i++)await delay(20);
   assert.ok(commitContext.wallpaperCommit,'character preparation started');
   const preparing=commitContext.wallpaperCommit.promise;
@@ -223,9 +300,9 @@ app.whenReady().then(async()=>{
   assert.equal(await js(wallpaper,"document.querySelector('.wallpaper-still').toDataURL()"),originalPixels);
   assert.equal(JSON.stringify(JSON.parse(await fs.readFile(store.file,'utf8')).settings),originalSettings);
   await js(workbench,"companion.saveSettings({stillPose:'attention'})");await js(workbench,"companion.wallpaperControl('pause',false)");
-  await until(wallpaper,host+".dataset.character==='male' && "+host+".dataset.pose==='attention'");
-  assert.equal(store.data.settings.qwenVoice,'Dylan');checks.push('pause during disk preparation keeps canvas, saved character and voices; resume commits latest pose');
-  await js(workbench,"companion.saveSettings({character:'female',stillPose:'auto'})");await until(wallpaper,host+".dataset.character==='female'");
+  await until(wallpaper,host+".dataset.rig==='motion' && "+host+".dataset.pose==='attention'");
+  assert.equal(store.data.settings.qwenVoice,'Vivian');checks.push('pause during disk preparation keeps canvas, saved style and voices; resume commits latest pose');
+  await js(workbench,"companion.saveSettings({wallpaperMotion:false,stillPose:'auto'})");await until(wallpaper,host+".dataset.rig==='static'");
   await js(chat,"companion.windowAction('show-chat')");await until(wallpaper,host+".dataset.pose==='attention'");checks.push('chat opens and automatic character attention remains connected');
   workbench.show();await js(workbench,"document.getElementById('settings-tab').click()");await delay(150);await capture(workbench,'wallpaper-settings');
   await js(workbench,"document.getElementById('ambience-settings').scrollIntoView({block:'start'})");await delay(100);await capture(workbench,'ambience-settings');

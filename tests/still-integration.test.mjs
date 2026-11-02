@@ -29,7 +29,7 @@ test('latest applied audio revision releases coalesced requests without acceptin
   const gate=new AmbientBarrier({publish:()=>{}}); const first=gate.wait(),second=gate.wait();
   gate.acknowledge(2); await Promise.all([first,second]); assert.equal(gate.pending.size,0);
 });
-test('automatic poses preserve task attention and manual auditions; male never loads a nonexistent female pose', () => {
+test('automatic poses preserve task attention and manual auditions', () => {
   const idle={connection:'ready',status:'idle'}, female={character:'female',stills:{stillPose:'auto'}};
   assert.equal(stillPose(idle,female,'window'),'window');
   for(const property of ['capturing','speaking','chatVisible']) assert.equal(stillPose(idle,{...female,[property]:true},'cup'),'attention');
@@ -39,7 +39,6 @@ test('automatic poses preserve task attention and manual auditions; male never l
   assert.equal(stillPose(idle,{...female,chatVisible:true}),'attention');
   assert.equal(stillPose({status:'error',connection:'error'},female,'window'),'window');
   for(const pose of settings.POSES) assert.equal(stillPose(idle,{...female,stills:{stillPose:pose}}),pose);
-  for(const pose of settings.POSES) assert.ok(['work','attention'].includes(stillPose(idle,{character:'male',stills:{stillPose:pose}})));
   for(const pose of IDLE_POSES) assert.ok(idleDuration(pose,()=>0)>=40000);
   assert.ok(idleDuration('work',()=>0)>idleDuration('cup',()=>1));
 });

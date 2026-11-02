@@ -3,6 +3,7 @@ import { spawn, execFileSync } from 'node:child_process';
 import { mkdir, writeFile, readFile, stat } from 'node:fs/promises';
 import { resolve, join, relative, isAbsolute } from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { claudeAuthentication } from '../../../prototypes/live2d-codex/backend/claude-auth.mjs';
 requireLiveRun('node tools/probes/cli-agents/claude-probe.mjs --run');
 const { query, listSessions, getSessionMessages } = await appDependency('@anthropic-ai/claude-agent-sdk');
 
@@ -74,7 +75,20 @@ async function open(resume) {
       log('result',summary);const run=active;active=null;run?.resolve(summary);
     }
   }}catch(e){readerError=safeError(e);if(active){active.reject(e);active=null;}log('reader-ended',{error:readerError});}})();
-  return {q,input,read,get pid(){return pid;},async close(){input.close();q.close();await timed(read,8000,'reader shutdown').catch(e=>log('shutdown-error',{error:safeError(e)}));}};
+  const connection = {q,input,read,get pid(){return pid;},async close(){input.close();q.close();await timed(read,8000,'reader shutdown').catch(e=>log('shutdown-error',{error:safeError(e)}));}};
+  try {
+    // Check every process, including resume, before returning a client that
+    // turn() can enqueue a prompt on. No CLI-login heuristic or auth fallback.
+    const account = await timed(q.accountInfo(),30000,'accountInfo');
+    const authentication = claudeAuthentication(account);
+    report.sdkAccount = {subscriptionType:account.subscriptionType,tokenSource:account.tokenSource,apiKeySource:account.apiKeySource,apiProvider:account.apiProvider};
+    log('account',{...report.sdkAccount,authentication,resume:!!resume});
+    return connection;
+  } catch (error) {
+    await connection.close();
+    if(error.code === -32000) { error.blocked = true; report.blockedReason = 'unsupported-authentication'; }
+    throw error;
+  }
 }
 function turn(text,name,mode='deny') { if(active)throw new Error('Turn already active');stage=name;policy=mode;const promise=new Promise((resolve,reject)=>{active={resolve,reject,deltas:0};});client.input.push({type:'user',message:{role:'user',content:text},parent_tool_use_id:null,uuid:randomUUID()});return timed(promise,100000,name); }
 async function until(test,label,limit=20000){const started=Date.now();while(Date.now()-started<limit){if(await test())return;await pause(100);}throw new Error(`${label} not observed`);}
@@ -83,12 +97,7 @@ async function test(name,fn){try{await fn();}catch(e){check(name,e.blocked?null:
 await mkdir(cwd,{recursive:true});await mkdir(resolve(root,'evidence'),{recursive:true});
 try{
   report.cliVersion=execFileSync(binary,['--version'],{encoding:'utf8',windowsHide:true,timeout:10000}).trim();
-  const auth=JSON.parse(execFileSync(binary,['auth','status','--json'],{encoding:'utf8',windowsHide:true,timeout:20000}));
-  report.authStatus={loggedIn:auth.loggedIn,authMethod:auth.authMethod,apiProvider:auth.apiProvider,subscriptionType:auth.subscriptionType};
-  if(!auth.loggedIn||auth.authMethod!=='claude.ai'||auth.apiProvider!=='firstParty')throw new Error('Expected an existing first-party Claude subscription login; no fallback attempted.');
   client=await open();
-  const account=await timed(client.q.accountInfo(),30000,'accountInfo');
-  report.sdkAccount={subscriptionType:account.subscriptionType,tokenSource:account.tokenSource,apiKeySource:account.apiKeySource,apiProvider:account.apiProvider};log('account',report.sdkAccount);
   const models=await timed(client.q.supportedModels(),30000,'supportedModels');report.models=models.map(m=>({value:m.value,displayName:m.displayName}));
   const light=models.find(m=>/haiku/i.test(m.value));if(light){await client.q.setModel(light.value);report.selectedModel=light.value;}
   await test('existing-login-and-stream',async()=>{const r=await turn(`记住本次会话标记 ${nonce}。不要调用工具，用中文简短确认并原样重复标记。`,'login-stream');if(r.isError){report.blockedReason='existing-authentication';const error=new Error(r.text);error.blocked=true;throw error;}check('existing-login-and-stream',r.text.includes(nonce)&&r.deltas>0,{deltas:r.deltas});});
@@ -115,5 +124,5 @@ try{
   const sessions=await listSessions({dir:cwd});const history=await getSessionMessages(sessionId,{dir:cwd});
   check('history-after-process-exit',sessions.some(s=>s.sessionId===sessionId)&&history.length>0,{historyMessages:history.length,sessionListed:sessions.some(s=>s.sessionId===sessionId)});await save();
   await test('resume-after-process-exit',async()=>{client=await open(sessionId);const r=await turn('不要读任何文件，也不要调用工具。请原样输出这段会话第一轮让我记住的完整 RIN- 标记。','resume');check('resume-after-process-exit',r.sessionId===sessionId&&!r.isError&&r.text.includes(nonce),{sameSession:r.sessionId===sessionId});});
-}catch(e){report.fatalError=safeError(e);log('probe-failed',{error:report.fatalError});process.exitCode=1;}
+}catch(e){report.fatalError=safeError(e);log('probe-failed',{error:report.fatalError});process.exitCode=e.blocked?2:1;}
 finally{if(pendingHold)pendingHold.release();if(client)await client.close();if(ownedToolPid){try{process.kill(ownedToolPid,0);execFileSync('taskkill.exe',['/PID',String(ownedToolPid),'/T','/F'],{windowsHide:true,stdio:'ignore'});log('fixture-cleanup',{toolPid:ownedToolPid});}catch{}}await pause(500);report.finishedAt=new Date().toISOString();report.passed=report.tests.filter(t=>t.pass===true).length;report.failed=report.tests.filter(t=>t.pass===false).length;report.blocked=report.tests.filter(t=>t.pass===null).length;process.exitCode=report.failed?1:report.blocked?2:process.exitCode??0;await save();console.log(JSON.stringify({evidenceFile,passed:report.passed,failed:report.failed,blocked:report.blocked,fatalError:report.fatalError}));}

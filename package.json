@@ -1,6 +1,6 @@
 {
   "name": "vibe-voice",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "private": true,
   "type": "module",
   "description": "Windows 4K wallpaper companion for Codex with local voice",

@@ -95,7 +95,7 @@ module.exports=async function visualCases({open,evaluate,delay,output}) {
     await capture(workbench,group+'-standard',1120,760);
     await capture(workbench,group+'-compact',760,540);
   }
-  await evaluate(workbench,`document.querySelector('[data-setting-target="wallpaper-settings"]').click();document.querySelector('[name="wallpaper-character"]').focus();interfaceFixture.emit('remoteAction','down')`);
+  await evaluate(workbench,`document.querySelector('[data-setting-target="wallpaper-settings"]').click();document.querySelector('[name="wallpaper-style"]').focus();interfaceFixture.emit('remoteAction','down')`);
   await capture(workbench,'character-focus',1120,760);
   await evaluate(workbench,`document.getElementById('still-previews').scrollIntoView({block:'center'})`);
   await capture(workbench,'pose-previews-standard',1120,760);
@@ -118,11 +118,20 @@ module.exports=async function visualCases({open,evaluate,delay,output}) {
   }
   const density=await evaluate(wallpaper,'devicePixelRatio');
   await capture(wallpaper,'female-attention-4k',Math.round(3840/density),Math.round(2400/density));
-  await emit(wallpaper,'presentation',{character:'male',characterRequest:1,stills:{stillPose:'work',ambienceEnabled:false}});
-  await wait(wallpaper,`interfaceFixture.stats().renderInfo?.ready && interfaceFixture.stats().renderInfo.character==='male'`);
-  await capture(wallpaper,'male-work',1280,800);
-  await emit(wallpaper,'presentation',{chatVisible:true,stills:{stillPose:'auto',ambienceEnabled:false}});
-  await wait(wallpaper,`document.getElementById('wallpaper-view').dataset.pose==='attention'`);
-  await capture(wallpaper,'male-attention',1280,800);
-  return {captures,checks,failures,synthetic:true,accounts:false,hardware:false,pageZoomOnly:true};
+  await evaluate(workbench,`companion.saveSettings({wallpaperMotion:true});document.querySelector('.settings-scroll').scrollTop=0`);
+  await capture(workbench,'realistic-settings-standard',1120,760);
+  await capture(workbench,'realistic-settings-compact',760,540);
+  await reachable(workbench,'both realistic orientations remain reachable',['#still-previews button:first-child','#still-previews button:last-child','#still-pose']);
+  const wallpaperStyles=await evaluate(workbench,`(()=>{
+    const rgb=s=>(s.match(/[\\d.]+/g)||[]).map(Number);
+    const luminance=values=>values.slice(0,3).map(v=>{v/=255;return v<=.04045?v/12.92:((v+.055)/1.055)**2.4;}).reduce((a,v,i)=>a+v*[.2126,.7152,.0722][i],0);
+    return [...document.querySelectorAll('#wallpaper-heading,#character-help,#character-status,.character-caption strong,.character-caption > span')].map(el=>{
+      const style=getComputedStyle(el);let parent=el,background='rgb(255, 255, 255)';
+      while(parent){const color=getComputedStyle(parent).backgroundColor,parts=rgb(color);if(parts.length===3||parts[3]===1){background=color;break;}parent=parent.parentElement;}
+      const foreground=luminance(rgb(style.color)),back=luminance(rgb(background));
+      return {text:el.textContent.trim(),fontSize:style.fontSize,fontWeight:style.fontWeight,color:style.color,background,contrast:(Math.max(foreground,back)+.05)/(Math.min(foreground,back)+.05)};
+    });
+  })()`);
+  for(const entry of wallpaperStyles)if(entry.contrast<4.5)failures.push({name:'wallpaper text contrast',...entry});
+  return {captures,checks,failures,wallpaperStyles,synthetic:true,accounts:false,hardware:false,pageZoomOnly:true};
 };

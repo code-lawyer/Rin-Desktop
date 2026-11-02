@@ -42,7 +42,7 @@ test('remote approval requires two confirmations on the same focused action',t=>
   receive('confirm');assert.equal(clicked,0);focus();receive('confirm');assert.equal(clicked,0);receive('confirm');assert.equal(clicked,1);assert.equal(notices.length,2);
 });
 
-test('remote selection skips unavailable female poses when the male character is selected',t=>{
+test('remote selection skips static-only poses when realistic video is selected',t=>{
   const old=globalThis.document;t.after(()=>globalThis.document=old);let receive,changed=0;
   const select={tagName:'SELECT',selectedIndex:1,options:[{},{},{disabled:true},{disabled:true},{disabled:true},{}],closest:()=>null,getClientRects:()=>[{}],dispatchEvent:()=>changed++};
   globalThis.document={querySelectorAll:()=>[select],activeElement:select,addEventListener(){}};

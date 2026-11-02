@@ -2,7 +2,9 @@
 
 由原本放在临时工作目录的 Claude/ACP 探针迁入。复用主应用锁定的 SDK，不复制 CLI、账号或额外 node_modules。历史运行记录留在本机原目录；新运行写入 Git 忽略的 `work/qa/cli-agents`，每次创建独立 fixture 和报告。
 
-先执行根目录与主应用的 `npm ci`，并自行安装、登录需要验证的 Windows 原生 CLI。默认查找 `claude.exe`、`grok.exe`、`opencode.exe`；非 PATH 安装可设置 `PROBE_CLAUDE_BINARY`、`PROBE_GROK_BINARY`、`PROBE_OPENCODE_BINARY` 为绝对路径。
+先执行根目录与主应用的 `npm ci`，并自行安装、配置需要验证的 Windows 原生 CLI 认证。默认查找 `claude.exe`、`grok.exe`、`opencode.exe`；非 PATH 安装可设置 `PROBE_CLAUDE_BINARY`、`PROBE_GROK_BINARY`、`PROBE_OPENCODE_BINARY` 为绝对路径。
+
+Claude 与主应用共用 `claude-auth.mjs`：每次启动或恢复进程后，先读取 SDK 解析的 accountInfo，确认 API key 或受支持的云 API 认证，再发送第一条测试请求。纯订阅 OAuth 或未知来源返回条件阻塞，不尝试切换认证或计费来源。CLI 的登录状态不能替代这项检查；API/云 API 的费用由执行者自行承担。
 
 无 `--run` 时只显示帮助，不读取登录、不创建 fixture、不调用推理。普通 `npm test` 和 CI 不运行这些真实账户测试。
 

@@ -6,14 +6,15 @@ import { StillSequence } from '../prototypes/live2d-codex/renderer/still-sequenc
 import characters from '../prototypes/live2d-codex/backend/character-profiles.cjs';
 import stillSettings from '../prototypes/live2d-codex/backend/still-settings.cjs';
 import { stillPose, createIdleCycle, idleDuration, stillActivity } from '../prototypes/live2d-codex/renderer/still-policy.mjs';
+import { isCharacterImageRequest } from '../tools/qa/character-asset-probe.mjs';
 
 const source = (await readFile(new URL('../prototypes/live2d-codex/renderer/still-wallpaper.js', import.meta.url), 'utf8'))
   .replace(/^import .*;\r?\n/gm, '').replace('export async function', 'async function');
 const tick = () => new Promise(resolve => setImmediate(resolve));
 
-async function fixture(t, { switchMale = true, pose = 'work' } = {}) {
+async function fixture(t, { reload = true, pose = 'work' } = {}) {
   let receive, release, waiting = true;
-  const ready = [], reports = [], decisions = [], draws = [], events = new Map();
+  const ready = [], reports = [], decisions = [], draws = [], requests = [], events = new Map();
   const context = { drawImage(...args) { draws.push(args); }, createLinearGradient: () => ({ addColorStop() {} }), fillRect() {} };
   const host = { dataset: {}, clientWidth: 1280, clientHeight: 800, append() {} };
   const initial = { character: 'female', characterRequest: 0, paused: false, stills: { stillPose: pose, ambienceEnabled: false } };
@@ -26,7 +27,7 @@ async function fixture(t, { switchMale = true, pose = 'work' } = {}) {
   };
   const runtime = vm.createContext({ StillSequence, characters, stillSettings, stillPose, createIdleCycle, idleDuration, stillActivity, console, document,
     performance: { now: () => 0 }, setTimeout: () => 1, clearTimeout() {}, window: { devicePixelRatio: 1, addEventListener() {}, removeEventListener() {} },
-    Image: class { get naturalWidth() { return this.src.includes('female-v2-4k') ? 3840 : 1586; } get naturalHeight() { return this.src.includes('female-v2-4k') ? 2400 : 992; } decode() { return Promise.resolve(); } },
+    Image: class { get naturalWidth() { return this.src.includes('female-v2-4k') ? 3840 : 1586; } get naturalHeight() { return this.src.includes('female-v2-4k') ? 2400 : 992; } decode() { requests.push(this.src); return Promise.resolve(); } },
     ResizeObserver: class { observe() {} disconnect() {} },
     AmbientPreview: class { update() { return { rain: 0, keys: 0 }; } enable() { return Promise.resolve(true); } close() {} },
   });
@@ -34,12 +35,20 @@ async function fixture(t, { switchMale = true, pose = 'work' } = {}) {
   const app = await runtime.startStillWallpaper({ host, api }); t.after(() => app.destroy()); await tick();
   let current = initial;
   const present = patch => { current = { ...current, ...patch }; receive(current); };
-  if(switchMale) { present({ character: 'male', characterRequest: 1 }); await tick(); }
-  return { host, ready, reports, draws, decisions, present, app, release: () => release(), hide(value) { document.hidden = value; events.get('visibilitychange')(); } };
+  if(reload) { present({ character: 'female', characterRequest: 1 }); await tick(); }
+  return { host, ready, reports, draws, requests, decisions, present, app, release: () => release(), hide(value) { document.hidden = value; events.get('visibilitychange')(); } };
 }
 
+test('wallpaper fault injection matches actual anime requests and only approved realistic poster routes', async t => {
+  const h=await fixture(t);
+  assert.ok(h.requests.length);
+  for(const url of h.requests)assert.equal(isCharacterImageRequest(url,'anime'),true);
+  assert.equal(isCharacterImageRequest('app://local/assets/motion/female/work.png?attempt=1','realistic'),true);
+  for(const url of ['app://local/assets/stills/male/work.png','https://local/assets/stills/female-v2-4k/work.png','app://local/assets/ambience/rain.mp3'])for(const style of ['anime','realistic'])assert.equal(isCharacterImageRequest(url,style),false);
+});
+
 test('female frames preserve the entire new pose and report manual/pause state without loading the old work body', async t => {
-  const h=await fixture(t,{switchMale:false,pose:'cup'});
+  const h=await fixture(t,{reload:false,pose:'cup'});
   const imageDraws=h.draws.filter(args=>args[0]?.src);
   assert.equal(imageDraws.length,1);
   assert.match(imageDraws[0][0].src,/stills\/female-v2-4k\/cup\.png/);
@@ -56,20 +65,20 @@ for (const mode of ['paused', 'hidden']) test(`${mode} during preparation keeps 
   if (mode === 'paused') h.present({ paused: true }); else h.hide(true);
   h.release(); await tick();
   assert.equal(h.host.dataset.character, 'female'); assert.deepEqual(h.ready, [['female', 'work']]);
-  assert.deepEqual(h.decisions.at(-1), ['male', false]);
+  assert.deepEqual(h.decisions.at(-1), ['female', false]);
   h.present({ stills: { stillPose: 'attention', ambienceEnabled: false } });
   if (mode === 'paused') h.present({ paused: false }); else h.hide(false);
-  await tick(); assert.deepEqual(h.ready, [['female', 'work'], ['male', 'attention']]);
-  assert.deepEqual(h.decisions.at(-1), ['male', true]);
+  await tick(); assert.deepEqual(h.ready, [['female', 'work'], ['female', 'attention']]);
+  assert.deepEqual(h.decisions.at(-1), ['female', true]);
 });
 
 test('a newer pose during preparation never paints the obsolete pose', async t => {
   const h = await fixture(t); h.present({ stills: { stillPose: 'attention', ambienceEnabled: false } });
-  h.release(); await tick(); assert.deepEqual(h.ready, [['female', 'work'], ['male', 'attention']]);
-  assert.deepEqual(h.decisions.slice(1), [['male', false], ['male', true]]);
+  h.release(); await tick(); assert.deepEqual(h.ready, [['female', 'work'], ['female', 'attention']]);
+  assert.deepEqual(h.decisions.slice(1), [['female', false], ['female', true]]);
 });
 
 test('closing during preparation cancels without accepting or painting the replacement', async t => {
   const h = await fixture(t); h.app.destroy(); h.release(); await tick();
-  assert.deepEqual(h.ready, [['female', 'work']]); assert.deepEqual(h.decisions.at(-1), ['male', false]);
+  assert.deepEqual(h.ready, [['female', 'work']]); assert.deepEqual(h.decisions.at(-1), ['female', false]);
 });

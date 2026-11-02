@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-10-28",
-  "releaseBaseline": "0.6.1",
+  "updatedAt": "2026-11-02",
+  "releaseBaseline": "0.6.2",
   "statusMeaning": {
     "verified": "限定范围有证据，不代表关联模块没有独立缺陷",
     "implemented": "已有实现，完整验收未完成",
@@ -136,14 +136,19 @@
         "prototypes/live2d-codex/renderer/workbench.js"
       ],
       "acceptance": [
-        "已发布 0.4.0 的单屏壁纸、对话气泡、工作台与两人物选择保留。"
+        "已发布0.4.0的单屏壁纸、对话气泡与工作台基础保留；壁纸选择遵循ART-10最新目标：动漫静态与真人动态两种风格，男士壁纸退役并迁移旧设置。"
       ],
-      "nextAction": "涉及 UI 变更时运行人物恢复与布局验收。",
+      "nextAction": "涉及UI变更时运行风格恢复与布局验收，保留历史版本证据。",
       "evidence": [
         {
           "ref": "docs/release-audit.md",
           "summary": "0.4.0 源码及安装包人物失败恢复、切换、重启验收；不代表全部机器兼容。",
           "kind": "release"
+        },
+        {
+          "ref": "docs/development/wallpaper-styles-2026-11-01.md",
+          "kind": "wallpaper-style-scope-update",
+          "summary": "2026-11-01按用户新目标仅保留动漫静态与真人动态，男士壁纸退役；保留旧证据，不反向宣称历史版本无男士。当前数据/声线、5组风格恢复、15组静态、7组正式动态与界面检查通过。"
         }
       ]
     },
@@ -821,7 +826,8 @@
         "AGT-02",
         "DEC-01",
         "FIX-01",
-        "FIX-02"
+        "FIX-02",
+        "TOOL-05"
       ],
       "paths": [
         "prototypes/live2d-codex/backend/claude-agent.mjs",
@@ -830,8 +836,19 @@
       "acceptance": [
         "原有 CLI 登录、两轮任务、审批/拒绝、提问、运行工具取消、重启恢复、模型、草稿和朗读分别记录。"
       ],
-      "nextAction": "先用独立探针验证当前 CLI，再验证主应用完整路径。",
-      "evidence": []
+      "nextAction": "TOOL-05已完成，探针与应用认证策略一致；以符合现行产品约束的API/云API执行独立探针和主应用完整真实验收，当前仍未使用真实账户。",
+      "evidence": [
+        {
+          "ref": "docs/development/source-review-2026-10-28.md",
+          "kind": "new-verification-prerequisite",
+          "summary": "2026-10-28全源码审查确认维护探针与应用认证规则相反，已登记TOOL-05为真实验收前置；本轮未使用账户，AGT-03仍待施工。"
+        },
+        {
+          "ref": "docs/development/source-review-fixes-2026-10-28.md",
+          "kind": "verification-tool-prerequisite-fixed",
+          "summary": "TOOL-05认证前置已修复并通过离线契约；不是Claude真实账户/主应用验收，AGT-03仍待施工。"
+        }
+      ]
     },
     {
       "id": "AGT-04",
@@ -925,12 +942,13 @@
         "docs/build.md",
         "tools/release/test-build.mjs",
         "docs/development/test-acceptance.md",
-        "docs/development/release-0.6.1-review.md"
+        "docs/development/release-0.6.1-review.md",
+        "docs/development/release-0.6.2-review.md"
       ],
       "acceptance": [
         "新版本独立目录安装、升级/回滚、卸载、中文路径、缺 CLI/模型/无 GPU 均有证据；不复用旧 0.4 报告充当新结果。"
       ],
-      "nextAction": "0.6.1隔离新装、升级、注册卸载与旧版便携文件回装已验证；继续真实数据跨版本回退、缺CLI/模型/无GPU及全新Windows矩阵。",
+      "nextAction": "0.6.2隔离新装、0.6.1升级、注册卸载与旧版便携文件回装已验证；继续真实数据跨版本回退、缺CLI/模型/无GPU及全新Windows矩阵。",
       "evidence": [
         {
           "ref": "docs/development/data-agent-validation.md",
@@ -971,6 +989,11 @@
           "ref": "docs/development/release-0.6.1-review.md",
           "kind": "final-review-ci-and-isolated-installer-validation",
           "summary": "2026-10-28：用户测试ok，双轴复核无未解决阻断。0.6.1源码本机458项、GitHub公开451项、构建及539文件双重扫描通过；fc27bdf已推送原开发分支，PR #2的两路CI通过。正式包8308文件、97项源码、6媒体和77项既有资源核对；隔离新装、升级、注册卸载、模拟数据保留及旧版便携文件回装通过。版本标签、附件SHA-256及限定范围见发布记录，不冒领硬件或真实账户矩阵。"
+        },
+        {
+          "ref": "docs/development/release-0.6.2-review.md",
+          "kind": "formal-package-and-isolated-installer-validation",
+          "summary": "2026-11-02：0.6.2正式包8301文件/100源码/6媒体通过，67保留美术及CPU语音文件匹配0.6.1，男士素材排除；本机466项离线测试、构建和官方依赖审计通过。隔离中文路径新装、0.6.1覆盖升级、注册快捷方式、卸载、外部模拟数据保留及旧版便携文件回装通过；未启动真实账户/硬件或操作日用数据。源码同步与公开发布继续由REL-05记录。"
         }
       ]
     },
@@ -1023,12 +1046,13 @@
       "paths": [
         "tools/release/resource-manifest.json",
         "docs/release-audit.md",
-        "docs/development/release-0.6.1-review.md"
+        "docs/development/release-0.6.1-review.md",
+        "docs/development/release-0.6.2-review.md"
       ],
       "acceptance": [
         "稳定支持仅声明已验收范围；实验能力明确标识、默认由用户选择，不放宽审批/数据/凭据约束；版本、哈希、许可、指南与已知限制一致；完整矩阵另按依赖任务验收。"
       ],
-      "nextAction": "维护0.6.1发布的校验、来源与实验边界；继续完整硬件、真实账户和系统/数据回退矩阵，后续版本重新核对实际包与CI。",
+      "nextAction": "按0.6.2记录发布校验、来源与实验边界；继续完整硬件、真实账户和系统/数据回退矩阵，不把单版本发布计作全部完成。",
       "evidence": [
         {
           "ref": "docs/development/release-0.5.0-review.md",
@@ -1044,6 +1068,11 @@
           "ref": "docs/development/release-0.6.1-review.md",
           "kind": "final-review-ci-and-isolated-installer-validation",
           "summary": "2026-10-28：用户测试ok，双轴复核无未解决阻断。0.6.1源码本机458项、GitHub公开451项、构建及539文件双重扫描通过；fc27bdf已推送原开发分支，PR #2的两路CI通过。正式包8308文件、97项源码、6媒体和77项既有资源核对；隔离新装、升级、注册卸载、模拟数据保留及旧版便携文件回装通过。版本标签、附件SHA-256及限定范围见发布记录，不冒领硬件或真实账户矩阵。"
+        },
+        {
+          "ref": "docs/development/release-0.6.2-review.md",
+          "kind": "formal-package-and-isolated-installer-validation",
+          "summary": "2026-11-02：0.6.2正式包8301文件/100源码/6媒体通过，67保留美术及CPU语音文件匹配0.6.1，男士素材排除；本机466项离线测试、构建和官方依赖审计通过。隔离中文路径新装、0.6.1覆盖升级、注册快捷方式、卸载、外部模拟数据保留及旧版便携文件回装通过；未启动真实账户/硬件或操作日用数据。源码同步与公开发布继续由REL-05记录。"
         }
       ]
     },
@@ -1121,6 +1150,11 @@
           "ref": "docs/development/project-audit-2026-10-28.md",
           "kind": "locked-dependency-audit-and-security-patches",
           "summary": "2026-10-28：npm官方registry审计发现并修复body-parser/fast-uri/Electron/undici已知漏洞，实际Electron二进制44.9.1；根与应用含开发/可选依赖最终均0项。真实新增后端账户的数据流仍待验收，维持implemented。"
+        },
+        {
+          "ref": "docs/development/source-review-2026-10-28.md",
+          "kind": "scoped-npm-audit-and-static-dataflow-review",
+          "summary": "2026-10-28：根目录与主应用官方npm完整审计均0项已知告警；真实新增后端账户数据流仍未验收。本机可选扩展的独立依赖问题在PRIVATE-02跟踪，不混入公共包结论。"
         }
       ]
     },
@@ -1530,7 +1564,7 @@
       "acceptance": [
         "真实CLI/GUI工具默认帮助；15个旧check源码有带哈希归档，4个维护迁移、11个历史源码保留，人物切换一并统一；无执行逻辑的说明桩已由TOOL-03移出维护目录，avatar用例模式明确。"
       ],
-      "nextAction": "按具体 GUI/硬件/账户任务运行显式验收；本次默认帮助与静态迁移检查不冒充真实 GUI 通过。",
+      "nextAction": "历史迁移和默认帮助范围保持；TOOL-06已将人物入口迁到现行隔离图片事务验证，源码fixture与安装包/账户验收分别记录。",
       "status": "verified",
       "dependsOn": [
         "ORG-04"
@@ -1540,6 +1574,16 @@
           "ref": "docs/development/review-fixes.md",
           "summary": "对应审查 STD-TOOLS-02 及旧工具残留建议；16份原文（15旧check+人物切换）哈希保留，5个维护用例默认帮助回归通过。",
           "kind": "offline-regression"
+        },
+        {
+          "ref": "docs/development/source-review-2026-10-28.md",
+          "kind": "new-independent-verification-tool-defect",
+          "summary": "2026-10-28：STD-02发现人物切换用例仍拦截退役Live2D资源，新增TOOL-06；不撤销既有迁移/帮助验证，也不冒称旧用例已通过当前GUI。"
+        },
+        {
+          "ref": "docs/development/source-review-fixes-2026-10-28.md",
+          "kind": "maintained-character-check-migrated",
+          "summary": "TOOL-06已修复旧资源注入漂移；旧命令继续显式运行并转发当前用例，旧package参数明确拒绝，现行5组检查通过。"
         }
       ]
     },
@@ -2183,7 +2227,7 @@
         "新增生成仅在本次明确255积分上限内单次提交一条15秒720p母片，保留原始字节、哈希和操作记录，不自动付费重试；报价不冒充钱包实际结算。",
         "同一母片按实际动作切为工作循环、工作到用户、用户循环、用户到工作四段；两类停留均持续顺向播放。排除片内强制首尾参考图跳变，检查两个循环自接和返回工作接点，保留细微接缝差异与完整连续预览。",
         "使用已有免费工具统一超分3840×2160，记录生成与交付分辨率、帧数和时间戳，实际视频回退图与片段同源；不得将超分4K称原生4K、数值诊断称逐像素无缝、缩放屏幕测试称4K全屏性能验收。",
-        "四段直接接入主应用，静态选择、男生和原设置兼容保留。呼出/结束对话请求相应姿态，界面和采音即时响应，人物在片段边界跟随；快速请求保留最新目标，暂停和隐藏不串状态。",
+        "四段直接接入主应用，静态选择和原设置兼容保留；男士壁纸按2026-11-01的ART-10要求退役并迁移。呼出/结束对话请求相应姿态，界面和采音即时响应，人物在片段边界跟随；快速请求保留最新目标，暂停和隐藏不串状态。",
         "加载失败保留画面并有显式重试；文件修复后无需重启服务即可重试。统一人物声线事务不因姿态或动态开关而重置自定义声线，实际有效画面清除对应旧错误。",
         "小雨与轻敲由唯一环境音实例持有；键盘只随工作循环，采音静音、朗读降音。离线及真实生产页面回归覆盖对话、工作台、语音状态、播放和遥控焦点；真实听感、麦克风和物理遥控仍需对应实机验收。",
         "正式资源哈希封装，排除账户、母片、CLI和私人制作材料；保持既有美术及CPU语音组件。完成双轴代码复审、前端构建、项目/公开审计及隔离新装、升级、注册、卸载和旧版便携文件回装验证；不把文件回装当作旧版读取真实新数据兼容性。",
@@ -2365,6 +2409,11 @@
           "ref": "docs/development/release-0.6.1-review.md",
           "kind": "final-review-ci-and-isolated-installer-validation",
           "summary": "2026-10-28：用户测试ok，双轴复核无未解决阻断。0.6.1源码本机458项、GitHub公开451项、构建及539文件双重扫描通过；fc27bdf已推送原开发分支，PR #2的两路CI通过。正式包8308文件、97项源码、6媒体和77项既有资源核对；隔离新装、升级、注册卸载、模拟数据保留及旧版便携文件回装通过。版本标签、附件SHA-256及限定范围见发布记录，不冒领硬件或真实账户矩阵。"
+        },
+        {
+          "ref": "docs/development/wallpaper-styles-2026-11-01.md",
+          "kind": "wallpaper-style-scope-update",
+          "summary": "2026-11-01按用户新目标仅保留动漫静态与真人动态，男士壁纸退役；保留旧证据，不反向宣称历史版本无男士。当前数据/声线、5组风格恢复、15组静态、7组正式动态与界面检查通过。"
         }
       ]
     },
@@ -2775,6 +2824,263 @@
           "ref": "docs/development/project-audit-2026-10-28.md",
           "kind": "preview-service-regression",
           "summary": "2026-10-28：修复try之外URL解析异常和HEAD整图读取；预览/退役入口7项回归通过，最终全量458项通过。"
+        }
+      ]
+    },
+    {
+      "id": "ORG-06",
+      "title": "当前完整源码、目标进度与质量复核",
+      "phase": "organization",
+      "priority": "P1",
+      "status": "verified",
+      "owner": "项目维护/质量审查",
+      "dependsOn": [
+        "ORG-04"
+      ],
+      "paths": [
+        "docs/development/source-review-2026-10-28.md",
+        "docs/development/backlog.json"
+      ],
+      "acceptance": [
+        "逐文件检查当前公共自有源码与测试，交叉核对产品目标、真实验收、发布和依赖；明确范围、问题与限制。",
+        "运行项目检查、全量离线测试、frontend 构建和公共扫描，补充必要的隔离桌面验证；新问题独立登记，不将报告完成当作缺陷修复或硬件/账户验收。"
+      ],
+      "nextAction": "审查发现的TOOL-05/06、DOC-02及独立PRIVATE-02均已修复并完成限定验证；继续Codex真实数据恢复、RC003、新后端账户和系统安装矩阵。",
+      "evidence": [
+        {
+          "ref": "docs/development/source-review-2026-10-28.md",
+          "kind": "full-source-review-and-bounded-runtime-validation",
+          "summary": "2026-10-28：公共269个自有代码文件20,118行完整审阅；本机458项、构建、6项退出、12项界面、正式4K媒体7组及无设备遥控组件验证通过，根/应用官方npm审计0项。确认Standards两项P2工具契约漂移、Spec一项P3模式说明，均登记待办。远端main与907bfc0一致，0.6.1发布及同提交CI核对通过；未改业务代码或冒领真实验收。"
+        }
+      ]
+    },
+    {
+      "id": "TOOL-05",
+      "title": "Claude 维护探针与应用认证契约一致",
+      "phase": "organization",
+      "priority": "P2",
+      "status": "verified",
+      "owner": "开发工具/Agent验收",
+      "dependsOn": [
+        "AGT-02",
+        "TOOL-02"
+      ],
+      "paths": [
+        "tools/probes/cli-agents/claude-probe.mjs",
+        "prototypes/live2d-codex/backend/claude-agent.mjs",
+        "tools/probes/cli-agents/README.md",
+        "tests/project-catalog.test.mjs",
+        "prototypes/live2d-codex/backend/claude-auth.mjs",
+        "tests/claude-probe.test.mjs"
+      ],
+      "acceptance": [
+        "探针复用或等价验证当前应用的API/支持云API认证策略，在首次真实请求之前拒绝纯订阅认证；不改变用户计费来源。",
+        "API key、支持cloud、subscription-only三类离线契约通过；默认帮助保持无副作用，live调用继续要求显式--run和任务范围；说明同步。"
+      ],
+      "nextAction": "认证契约修复已验证；后续真实探针继续要求明确范围和--run，AGT-03单独完成账户与主应用验收。",
+      "evidence": [
+        {
+          "ref": "docs/development/source-review-2026-10-28.md",
+          "kind": "offline-defect-reproduction",
+          "summary": "STD-01：提取原始探针guard并调用实际应用认证函数，API/cloud分别为探针拒绝、应用接受；纯订阅为探针接受、应用拒绝。现有help回归未覆盖live策略。"
+        },
+        {
+          "ref": "docs/development/source-review-fixes-2026-10-28.md",
+          "kind": "fix-and-bounded-regression",
+          "summary": "2026-10-28：共享claude-auth规则，初始与恢复进程均先核对SDK解析的认证，拒绝后关闭且不发送。四类实际探针入口离线替身回归通过；完整主项目464项通过，未使用真实账户。"
+        }
+      ]
+    },
+    {
+      "id": "TOOL-06",
+      "title": "壁纸风格切换 GUI 故障注入适配当前资源",
+      "phase": "organization",
+      "priority": "P2",
+      "status": "verified",
+      "owner": "质量工具",
+      "dependsOn": [
+        "TOOL-02",
+        "ART-09"
+      ],
+      "paths": [
+        "tools/qa/gui/cases/character-switch.mjs",
+        "tools/qa/gui/README.md",
+        "prototypes/live2d-codex/renderer/still-wallpaper.js",
+        "tests/qa-tools.test.mjs",
+        "tools/qa/still-desktop.mjs",
+        "tools/qa/still-fixture.cjs",
+        "tools/qa/character-asset-probe.mjs",
+        "tests/still-renderer.test.mjs"
+      ],
+      "acceptance": [
+        "维护用例改为当前still/motion资源和壁纸提交事务，或明确退役并使所有维护说明指向现行QA；不保留声称可验收而实际等待旧模型资源的入口。",
+        "离线契约确认故障注入命中当前renderer请求；选定维护GUI用例以隔离数据实际验证失败、重试、声线和重启，不访问真实账户或设备。"
+      ],
+      "nextAction": "沿用qa:stills -- --character-switch兼容命令维护两种风格图片事务，动态用qa:motion；实际安装包另按REL-01/03验证。",
+      "evidence": [
+        {
+          "ref": "docs/development/source-review-2026-10-28.md",
+          "kind": "offline-defect-reproduction",
+          "summary": "STD-02：当前still renderer与原始intercept在隔离VM中组合运行，新PNG请求命中0/held0且男性已ready；旧model3 URL正控制命中1/held1。说明故障注入已脱离当前资源，未执行旧GUI全流程；当前人物功能另由stills/motion验证。"
+        },
+        {
+          "ref": "docs/development/source-review-fixes-2026-10-28.md",
+          "kind": "fix-and-bounded-regression",
+          "summary": "2026-10-28：旧入口转发当前隔离生产renderer/存储用例，PNG请求注入契约纳入普通测试；兼容命令实跑5组通过，含暂挂/失败/重复重试/快速切换/声线及独立新Electron进程恢复。旧package参数在副作用前拒绝，安装包验收保持独立。"
+        },
+        {
+          "ref": "docs/development/wallpaper-styles-2026-11-01.md",
+          "kind": "wallpaper-style-scope-update",
+          "summary": "2026-11-01按用户新目标仅保留动漫静态与真人动态，男士壁纸退役；保留旧证据，不反向宣称历史版本无男士。当前数据/声线、5组风格恢复、15组静态、7组正式动态与界面检查通过。"
+        }
+      ]
+    },
+    {
+      "id": "DOC-02",
+      "title": "壁纸自动姿态说明随静态与动态模式切换",
+      "phase": "organization",
+      "priority": "P3",
+      "status": "verified",
+      "owner": "界面/项目维护",
+      "dependsOn": [
+        "ART-09"
+      ],
+      "paths": [
+        "prototypes/live2d-codex/renderer/workbench.html",
+        "prototypes/live2d-codex/renderer/workbench.js",
+        "tools/qa/still-fixture.cjs"
+      ],
+      "acceptance": [
+        "真人动态仅说明工作/看向用户两态及转场；动漫静态展示五姿态轮换说明，男士入口及其说明按ART-10移除。",
+        "风格切换后的实际提示与可用选项一致，保留独立声线和播放行为。"
+      ],
+      "nextAction": "后续改动壁纸风格或动态状态时同步说明与生产页面验证；当前两种风格限定范围已通过。",
+      "evidence": [
+        {
+          "ref": "docs/development/source-review-2026-10-28.md",
+          "kind": "source-confirmed-ui-copy-mismatch",
+          "summary": "S-01：workbench.html固定自动说明仍称穿插捧杯/托腮/看雨；workbench.js已经正确禁用动态模式的这些选项。确认P3说明错误，未发现其破坏两态播放。"
+        },
+        {
+          "ref": "docs/development/source-review-fixes-2026-10-28.md",
+          "kind": "fix-and-bounded-regression",
+          "summary": "2026-10-28：still-help随女生动态、女生静态和男生静态切换；正式媒体7组、静态15组与界面12项通过，生产页面核对三种提示与选项对应，未改变声线或播放策略。"
+        },
+        {
+          "ref": "docs/development/wallpaper-styles-2026-11-01.md",
+          "kind": "wallpaper-style-scope-update",
+          "summary": "2026-11-01按用户新目标仅保留动漫静态与真人动态，男士壁纸退役；保留旧证据，不反向宣称历史版本无男士。当前数据/声线、5组风格恢复、15组静态、7组正式动态与界面检查通过。"
+        }
+      ]
+    },
+    {
+      "id": "PRIVATE-02",
+      "title": "本机可选扩展的锁定依赖更新与回归",
+      "phase": "stability",
+      "priority": "P2",
+      "status": "verified",
+      "owner": "私人扩展",
+      "dependsOn": [
+        "PRIVATE-01"
+      ],
+      "paths": [
+        "docs/development/source-review-fixes-2026-10-28.md",
+        "docs/development/repository-map.md"
+      ],
+      "acceptance": [
+        "只在本机扩展范围更新受影响的间接依赖并保留兼容性，重新审计锁文件；不把私人源码、凭据、运行数据或依赖纳入公共仓库和安装包。",
+        "既有离线协议、认证边界、进程与启动器回归通过；记录生产导入可达性和局限，不用静态未加载结论代替修复。"
+      ],
+      "nextAction": "保持本机锁依赖审计和离线回归；真实私人通道验收独立处理，不将更新范围扩大到公共包。",
+      "evidence": [
+        {
+          "ref": "docs/development/source-review-2026-10-28.md",
+          "kind": "optional-local-dependency-audit-summary",
+          "summary": "2026-10-28：可选本地扩展27项离线测试通过，但独立官方npm审计仍有两个受影响依赖节点，上游最高评级分别为high和moderate。当前生产入口未加载二者，不能据此断言远程可利用或免除更新；公共根目录/主应用锁依赖审计均0项。"
+        },
+        {
+          "ref": "docs/development/source-review-fixes-2026-10-28.md",
+          "kind": "fix-and-bounded-regression",
+          "summary": "2026-10-28：本机锁文件仅两个受影响间接依赖节点更新，直接依赖清单字节不变；官方npm复审0项已知告警，27项离线协议/认证/临时加密数据/进程回归通过。私人源码和依赖继续不进入公共仓库、安装包。"
+        }
+      ]
+    },
+    {
+      "id": "ART-10",
+      "title": "壁纸收敛为动漫静态与真人动态，移除男士资源",
+      "phase": "baseline",
+      "priority": "P1",
+      "status": "verified",
+      "owner": "桌面/界面/质量",
+      "dependsOn": [
+        "ART-09",
+        "TOOL-06",
+        "DOC-02"
+      ],
+      "paths": [
+        "prototypes/live2d-codex/backend/character-profiles.cjs",
+        "prototypes/live2d-codex/backend/workspace-store.mjs",
+        "prototypes/live2d-codex/backend/wallpaper-choice.cjs",
+        "prototypes/live2d-codex/main.cjs",
+        "prototypes/live2d-codex/renderer/still-wallpaper.js",
+        "prototypes/live2d-codex/renderer/workbench.html",
+        "prototypes/live2d-codex/renderer/workbench.js",
+        "prototypes/live2d-codex/scripts/package-portable.mjs",
+        "tools/release/resource-assets.mjs",
+        "tools/qa/still-fixture.cjs",
+        "tools/qa/release-package.mjs",
+        "prototypes/live2d-codex/assets/stills/manifest.json",
+        "tools/release/installer.iss",
+        "tools/qa/installer-check.ps1",
+        "tools/qa/interface-fixture.cjs",
+        "tools/qa/visual-cases.cjs",
+        "prototypes/live2d-codex/tests/character-profiles.test.mjs",
+        "tests/resource-assets.test.mjs"
+      ],
+      "acceptance": [
+        "当前应用只有动漫静态与真人视频动态两种壁纸，删除男士原画、模型、预览和运行资源，启动、资源恢复及打包不会重新引入。",
+        "旧男士设置迁移到动漫静态，保留有效自选声线、项目、草稿及其他设置；新风格切换失败、取消或保存失败不破坏最后成功状态。",
+        "保留五静态姿态、两态循环/双向转身、暂停、声音优先与独立男女声线；隔离桌面验证重试、快速切换和新进程恢复。",
+        "按用户指定顺序进行 code-review 双轴审核、impeccable 实际界面审查，修复发现后复查；全量离线、构建、项目/公共检查和实际候选包内容验证通过。"
+      ],
+      "nextAction": "维护两种风格、迁移及男士资源排除回归；候选包已验证、尚未公开发布，真实账户/硬件/全安装矩阵继续由原任务独立验收。",
+      "evidence": [
+        {
+          "ref": "docs/development/wallpaper-styles-2026-11-01.md",
+          "kind": "implementation-and-release-review",
+          "summary": "2026-11-01：466项本机离线测试、构建与项目/公共检查通过；静态15组、风格故障/独立进程恢复5组、正式4K动态7组、界面12组和焦点15组通过。code-review Standards/Spec各2项发现修复后均0未关闭；impeccable两轮44状态检查和对比度复核无新增阻断。候选8322文件/100源码/6媒体核验，67保留资产与旧版相同，中文路径新装与旧0.6.1便携覆盖升级通过，8个男士素材均不存在。未提交/推送/公开发布，未启动真实账户或执行RC003及注册卸载验收。"
+        }
+      ]
+    },
+    {
+      "id": "REL-05",
+      "title": "0.6.2两风格与修复版本提交、同步和发布",
+      "phase": "release",
+      "priority": "P1",
+      "status": "in_progress",
+      "owner": "构建发布",
+      "dependsOn": [
+        "ART-10",
+        "REL-02",
+        "REL-04"
+      ],
+      "paths": [
+        "package.json",
+        "prototypes/live2d-codex/package.json",
+        "tools/release/resource-manifest.json",
+        "docs/development/release-0.6.2-review.md"
+      ],
+      "acceptance": [
+        "根目录、应用及锁文件版本一致；正式安装器使用新目录，源文件、媒体、退役素材排除和保留资源哈希通过核查。",
+        "在隔离路径验证新装、旧0.6.1覆盖升级与允许范围内的安装生命周期；不操作日用数据，不冒领完整账户/硬件/系统矩阵。",
+        "实际暂存区公开扫描与必要检查通过；源码提交原开发分支，经PR和CI合入main，标签与公开Release安装器大小和SHA-256对应；旧发布保留。"
+      ],
+      "nextAction": "正式包与隔离安装已通过；审计实际暂存区，提交原开发分支，经PR和CI合入后发布并核对远端安装器。",
+      "evidence": [
+        {
+          "ref": "docs/development/release-0.6.2-review.md",
+          "kind": "formal-package-and-isolated-installer-validation",
+          "summary": "2026-11-02：0.6.2正式包8301文件/100源码/6媒体通过，67保留美术及CPU语音文件匹配0.6.1，男士素材排除；本机466项离线测试、构建和官方依赖审计通过。隔离中文路径新装、0.6.1覆盖升级、注册快捷方式、卸载、外部模拟数据保留及旧版便携文件回装通过；未启动真实账户/硬件或操作日用数据。源码同步与公开发布继续由REL-05记录。"
         }
       ]
     }

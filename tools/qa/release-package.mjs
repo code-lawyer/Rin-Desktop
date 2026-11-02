@@ -6,6 +6,7 @@ import { readFile, readdir, stat } from 'node:fs/promises';
 import { join, resolve, relative, isAbsolute } from 'node:path';
 import { createRunDirectory, writeRunReport } from './run-output.mjs';
 import { inspectMotionAssets } from '../release/motion-assets.mjs';
+import { retiredWallpaperAsset } from '../release/resource-assets.mjs';
 
 const option = key => process.argv.find(arg => arg.startsWith(`--${key}=`))?.slice(key.length + 3);
 if (!option('package') || process.argv.includes('--help')) {
@@ -24,6 +25,10 @@ assert.equal(manifest.version, (await json(join(root, 'package.json'))).version)
 assert.equal(manifest.version, (await json(join(directory, 'resources/app/package.json'))).version);
 assert.equal(manifest.version, (await json(join(directory, 'resources/app/portable.json'))).version);
 const names = new Set(), forbidden = /\.(onnx|safetensors|wav|pcm)$|(^|\/)(codex|claude|grok|opencode)\.exe$|^resources\/app\/(models|runtime\/qwen|agents)\/|(^|\/)(workspaces|session|auth|provider|appearance)\.json$/i;
+// These two source-owned descriptions intentionally changed when male assets
+// retired. Verify them against current source; compare all other assets to the
+// previous package byte-for-byte.
+const revisedAssetMetadata = new Set(['assets/stills/manifest.json', 'assets/stills/README.md']);
 let bytes = 0, sourceMatches = 0;
 for (const entry of manifest.files) {
   const file = resolve(directory, entry.file), inside = relative(directory, file);
@@ -34,7 +39,8 @@ for (const entry of manifest.files) {
   assert.equal(await hash(file), entry.sha256, entry.file);
   bytes += entry.bytes;
   const local = entry.file.replace(/^resources\/app\//, '');
-  if (entry.file !== local && /^(main\.cjs|preload\.cjs|voice-resources\.json|backend\/|renderer\/|dist\/)/.test(local)) {
+  assert.ok(!retiredWallpaperAsset(local.replace(/^assets\//, '')), 'Retired wallpaper in package: ' + entry.file);
+  if (entry.file !== local && (/^(main\.cjs|preload\.cjs|voice-resources\.json|backend\/|renderer\/|dist\/)/.test(local) || revisedAssetMetadata.has(local))) {
     assert.equal(await hash(join(root, 'prototypes/live2d-codex', local)), entry.sha256, 'Source mismatch: ' + local);
     sourceMatches++;
   }
@@ -52,7 +58,9 @@ await checkExtra(directory);
 let preserved = 0;
 if (option('baseline')) {
   const previous = await json(join(resolve(option('baseline')), 'manifest.json'));
-  for (const entry of previous.files.filter(item => /^resources\/app\/(assets\/|node_modules\/sherpa-onnx|backend\/speech-worker\.cjs$)/.test(item.file))) {
+  for (const entry of previous.files.filter(item => /^resources\/app\/(assets\/|node_modules\/sherpa-onnx|backend\/speech-worker\.cjs$)/.test(item.file)
+    && !retiredWallpaperAsset(item.file.replace(/^resources\/app\/assets\//, ''))
+    && !revisedAssetMetadata.has(item.file.replace(/^resources\/app\//, '')))) {
     assert.equal(await hash(join(directory,entry.file)), entry.sha256, 'Changed artwork or CPU speech component: ' + entry.file);
     preserved++;
   }

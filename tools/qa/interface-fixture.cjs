@@ -117,7 +117,7 @@ if(process.argv.includes('--video') || process.argv.includes('--fixture-video'))
           assert.equal(await evaluate(workbench,`Boolean(document.activeElement.closest('details:not([open])'))`),false,'collapsed fields cannot trap remote navigation');
         }
       }
-      await evaluate(workbench,`document.querySelector('[data-setting-target="wallpaper-settings"]').click();document.querySelector('[name="wallpaper-character"]').focus();interfaceFixture.emit('remoteAction','down')`);
+      await evaluate(workbench,`document.querySelector('[data-setting-target="wallpaper-settings"]').click();document.querySelector('[name="wallpaper-style"]').focus();interfaceFixture.emit('remoteAction','down')`);
       await capture(workbench,'character-card-focus',1120,760);
       await evaluate(workbench,`document.querySelector('[data-setting-target="playback-settings"]').focus();interfaceFixture.emit('remoteAction','confirm')`);
       await capture(workbench,'category-focus',1120,760);

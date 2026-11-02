@@ -45,6 +45,12 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "desktopicon"; Description: "Create a desktop shortcut"; Flags: checkedonce
 [Files]
 Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+[InstallDelete]
+; Remove only the three retired application-owned artwork paths on upgrade.
+; User workspaces, models and other compatibility assets remain outside this list.
+Type: filesandordirs; Name: "{app}\resources\app\assets\rainy-window-male"
+Type: filesandordirs; Name: "{app}\resources\app\assets\stills\male"
+Type: files; Name: "{app}\resources\app\assets\character-previews\male.png"
 [Icons]
 #ifdef TestBuild
 Name: "{group}\Rin Desktop Test"; Filename: "{app}\VibeVoice.exe"; Check: not IsPortableMode
