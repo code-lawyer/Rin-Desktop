@@ -1034,6 +1034,11 @@
           "ref": "docs/development/release-0.6.2-review.md",
           "kind": "source-push-upstream-and-public-ci",
           "summary": "2026-11-02：实际暂存区与工作区各538公共文件扫描通过；源码a3a075a推送原origin/codex/public-release，同名upstream保留。push CI在干净Windows通过459项公开测试、构建、台账及双重扫描；PR #3与最终发布继续单独核对。"
+        },
+        {
+          "ref": "docs/development/release-0.6.2-review.md",
+          "kind": "published-release-tag-ci-and-asset-verification",
+          "summary": "2026-11-02：PR #3最终提交097dd1e的push/PR CI通过并合入main；v0.6.2指向3f867fe，main和标签CI同样通过。Release于10:22:54 UTC公开并设为Latest；唯一Setup为405164922字节，远端SHA-256与锁定清单及本地安装器一致，匿名下载HTTP 200。旧版发布保留；发布后文档补记不改变标签或安装器，不冒领真实账户/硬件/完整系统与数据回退矩阵。"
         }
       ]
     },
@@ -1079,6 +1084,11 @@
           "ref": "docs/development/release-0.6.2-review.md",
           "kind": "formal-package-and-isolated-installer-validation",
           "summary": "2026-11-02：0.6.2正式包8301文件/100源码/6媒体通过，67保留美术及CPU语音文件匹配0.6.1，男士素材排除；本机466项离线测试、构建和官方依赖审计通过。隔离中文路径新装、0.6.1覆盖升级、注册快捷方式、卸载、外部模拟数据保留及旧版便携文件回装通过；未启动真实账户/硬件或操作日用数据。源码同步与公开发布继续由REL-05记录。"
+        },
+        {
+          "ref": "docs/development/release-0.6.2-review.md",
+          "kind": "published-release-tag-ci-and-asset-verification",
+          "summary": "2026-11-02：PR #3最终提交097dd1e的push/PR CI通过并合入main；v0.6.2指向3f867fe，main和标签CI同样通过。Release于10:22:54 UTC公开并设为Latest；唯一Setup为405164922字节，远端SHA-256与锁定清单及本地安装器一致，匿名下载HTTP 200。旧版发布保留；发布后文档补记不改变标签或安装器，不冒领真实账户/硬件/完整系统与数据回退矩阵。"
         }
       ]
     },
@@ -3041,7 +3051,8 @@
         "tools/qa/interface-fixture.cjs",
         "tools/qa/visual-cases.cjs",
         "prototypes/live2d-codex/tests/character-profiles.test.mjs",
-        "tests/resource-assets.test.mjs"
+        "tests/resource-assets.test.mjs",
+        "docs/development/release-0.6.2-review.md"
       ],
       "acceptance": [
         "当前应用只有动漫静态与真人视频动态两种壁纸，删除男士原画、模型、预览和运行资源，启动、资源恢复及打包不会重新引入。",
@@ -3049,12 +3060,17 @@
         "保留五静态姿态、两态循环/双向转身、暂停、声音优先与独立男女声线；隔离桌面验证重试、快速切换和新进程恢复。",
         "按用户指定顺序进行 code-review 双轴审核、impeccable 实际界面审查，修复发现后复查；全量离线、构建、项目/公共检查和实际候选包内容验证通过。"
       ],
-      "nextAction": "维护两种风格、迁移及男士资源排除回归；候选包已验证、尚未公开发布，真实账户/硬件/全安装矩阵继续由原任务独立验收。",
+      "nextAction": "两种风格与迁移已随0.6.2公开发布；维护退役素材排除回归，真实账户/硬件/完整安装矩阵继续由原任务独立验收。",
       "evidence": [
         {
           "ref": "docs/development/wallpaper-styles-2026-11-01.md",
           "kind": "implementation-and-release-review",
           "summary": "2026-11-01：466项本机离线测试、构建与项目/公共检查通过；静态15组、风格故障/独立进程恢复5组、正式4K动态7组、界面12组和焦点15组通过。code-review Standards/Spec各2项发现修复后均0未关闭；impeccable两轮44状态检查和对比度复核无新增阻断。候选8322文件/100源码/6媒体核验，67保留资产与旧版相同，中文路径新装与旧0.6.1便携覆盖升级通过，8个男士素材均不存在。未提交/推送/公开发布，未启动真实账户或执行RC003及注册卸载验收。"
+        },
+        {
+          "ref": "docs/development/release-0.6.2-review.md",
+          "kind": "published-release-tag-ci-and-asset-verification",
+          "summary": "2026-11-02：PR #3最终提交097dd1e的push/PR CI通过并合入main；v0.6.2指向3f867fe，main和标签CI同样通过。Release于10:22:54 UTC公开并设为Latest；唯一Setup为405164922字节，远端SHA-256与锁定清单及本地安装器一致，匿名下载HTTP 200。旧版发布保留；发布后文档补记不改变标签或安装器，不冒领真实账户/硬件/完整系统与数据回退矩阵。"
         }
       ]
     },
@@ -3063,7 +3079,7 @@
       "title": "0.6.2两风格与修复版本提交、同步和发布",
       "phase": "release",
       "priority": "P1",
-      "status": "in_progress",
+      "status": "verified",
       "owner": "构建发布",
       "dependsOn": [
         "ART-10",
@@ -3081,7 +3097,7 @@
         "在隔离路径验证新装、旧0.6.1覆盖升级与允许范围内的安装生命周期；不操作日用数据，不冒领完整账户/硬件/系统矩阵。",
         "实际暂存区公开扫描与必要检查通过；源码提交原开发分支，经PR和CI合入main，标签与公开Release安装器大小和SHA-256对应；旧发布保留。"
       ],
-      "nextAction": "源码已提交同步且push CI通过，等待PR最终检查与合入后发布0.6.2，并核对远端标签和安装器。",
+      "nextAction": "0.6.2已发布，保留对应标签、哈希、CI与安装证据；后续变更另建版本，完整矩阵继续按REL-01/03、REM与AGT任务验收。",
       "evidence": [
         {
           "ref": "docs/development/release-0.6.2-review.md",
@@ -3092,6 +3108,11 @@
           "ref": "docs/development/release-0.6.2-review.md",
           "kind": "source-push-upstream-and-public-ci",
           "summary": "2026-11-02：实际暂存区与工作区各538公共文件扫描通过；源码a3a075a推送原origin/codex/public-release，同名upstream保留。push CI在干净Windows通过459项公开测试、构建、台账及双重扫描；PR #3与最终发布继续单独核对。"
+        },
+        {
+          "ref": "docs/development/release-0.6.2-review.md",
+          "kind": "published-release-tag-ci-and-asset-verification",
+          "summary": "2026-11-02：PR #3最终提交097dd1e的push/PR CI通过并合入main；v0.6.2指向3f867fe，main和标签CI同样通过。Release于10:22:54 UTC公开并设为Latest；唯一Setup为405164922字节，远端SHA-256与锁定清单及本地安装器一致，匿名下载HTTP 200。旧版发布保留；发布后文档补记不改变标签或安装器，不冒领真实账户/硬件/完整系统与数据回退矩阵。"
         }
       ]
     }

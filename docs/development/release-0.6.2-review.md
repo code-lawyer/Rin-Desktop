@@ -20,7 +20,15 @@
 - 台账85项、127历史项、72文档检查通过；公共工作区与实际暂存区各538文件扫描无问题，暂存差异格式检查通过。
 - 源码提交 `a3a075ad553e69bb5c987351a7ef532d1799b2e7` 已推送原仓库的 `codex/public-release`，同名upstream保留。[push CI](https://github.com/code-lawyer/Rin-Desktop/actions/runs/41427096101)通过：干净Windows环境459项公开测试（应用298、根目录161）、构建、台账及538文件双重扫描。合入检查统一见[PR #3](https://github.com/code-lawyer/Rin-Desktop/pull/3/checks)；后续证据补充不改动已核验的应用与安装器。
 
-正式包和源码同步已完成，Release将以 `v0.6.2` 标签和[0.6.2发布页](https://github.com/code-lawyer/Rin-Desktop/releases/tag/v0.6.2)为准；本次证据更新时仍待PR最终检查、合入和公开发布。
+## 发布结果
+
+2026-11-02 10:22:54 UTC，[0.6.2 Release](https://github.com/code-lawyer/Rin-Desktop/releases/tag/v0.6.2)已公开发布并设为最新应用版本，非草稿、非预发布。原仓库历史与旧版Release保留。
+
+- PR #3的最终提交 `097dd1e8b4afff1fe0dbef55a24549f785a6986a` 的[push检查](https://github.com/code-lawyer/Rin-Desktop/actions/runs/41427551729)与[PR检查](https://github.com/code-lawyer/Rin-Desktop/actions/runs/41427557779)均通过，随后正常合入main。
+- `v0.6.2` 指向合并提交 `3f867fe96b678a9b224ab0ab0aa7742fe6beaaa9`，其文件树与通过检查的PR提交一致；[main检查](https://github.com/code-lawyer/Rin-Desktop/actions/runs/41427873518)及[标签检查](https://github.com/code-lawyer/Rin-Desktop/actions/runs/41427927138)也均通过。
+- Release只包含下述正式安装器。GitHub返回的附件大小、SHA-256与本地已验证文件及锁定清单一致，上传状态为uploaded；最新发布接口指向v0.6.2，匿名访问下载链接返回HTTP 200。
+
+发布后补记本页与台账的实际结果，不改动已发布标签、应用实现或安装器。REL-05仅标记上述提交、同步和限定发布范围已验证，完整矩阵仍由原任务管理。
 
 ## 分发与验收边界
 
