@@ -5,6 +5,7 @@ import { execFileSync } from 'node:child_process';
 import { writeManifest } from '../../../tools/release/manifest.mjs';
 import { releaseVersion, requireFreshDirectory } from '../../../tools/release/release-inputs.mjs';
 import { inspectMotionAssets, copyMotionAssets } from '../../../tools/release/motion-assets.mjs';
+import { retiredWallpaperAsset } from '../../../tools/release/resource-assets.mjs';
 import { copyAgentDependencies } from './copy-agent-dependencies.mjs';
 import catalog from '../backend/agent-catalog.cjs';
 import { buildRemoteHelper } from '../backend/remote-native.mjs';
@@ -31,7 +32,9 @@ await mkdir(join(appDir,'runtime'),{recursive:true});
 await cp(await buildRemoteHelper(join(root,'native/rc003-helper.cs'),join(workspace,'work/build/remote')),join(appDir,'runtime/rc003-helper.exe'));
 await cp(join(resources,'runtime/node.exe'),join(appDir,'runtime/node.exe'));
 for (const name of ['rainy-window-v2-4k']) await cp(join(resources,'assets',name),join(appDir,'assets',name),{recursive:true});
-for (const name of ['rainy-window-male','character-previews','stills','ambience']) await cp(join(root,'assets',name),join(appDir,'assets',name),{recursive:true});
+for (const name of ['character-previews','stills','ambience']) await cp(join(root,'assets',name),join(appDir,'assets',name),{
+  recursive:true, filter:source=>!retiredWallpaperAsset(relative(join(root,'assets'),source)),
+});
 await copyMotionAssets(motionDirectory, join(appDir, 'assets/motion/female'));
 await mkdir(join(appDir,'scripts'),{recursive:true});
 await cp(join(root,'scripts/wallpaper-host.ps1'),join(appDir,'scripts/wallpaper-host.ps1'));

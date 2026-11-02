@@ -40,3 +40,15 @@ test('restore rejects linked archive directories instead of copying unrelated co
   await assert.rejects(fillMissingAssets(source,destination),/ordinary files/);
   await assert.rejects(access(join(destination,'linked')),{code:'ENOENT'});
 });
+
+test('restoring an old installer excludes retired male artwork and retains both current styles',async t=>{
+  const {source,destination}=await fixture(t);
+  const retired=['rainy-window-male/texture.png','stills/male/work.png','character-previews/male.png'];
+  const current=['stills/female-v2-4k/work.png','motion/female/work-loop.mp4'];
+  for(const name of [...retired,...current]) {
+    await mkdir(join(source,name,'..'),{recursive:true});await writeFile(join(source,name),'fixture');
+  }
+  await fillMissingAssets(source,destination);
+  for(const name of retired)await assert.rejects(access(join(destination,name)),{code:'ENOENT'});
+  for(const name of current)assert.equal(await readFile(join(destination,name),'utf8'),'fixture');
+});

@@ -23,20 +23,18 @@
       <nav class="settings-nav" aria-label="设置分类"><button type="button" data-setting-target="wallpaper-settings" aria-pressed="true">壁纸</button><button type="button" data-setting-target="remote-settings" aria-pressed="false">遥控器</button><button type="button" data-setting-target="playback-settings" aria-pressed="false">声音与听写</button><button type="button" data-setting-target="conversation-settings" aria-pressed="false">对话</button><button type="button" data-setting-target="shortcut-settings" aria-pressed="false">键盘</button><button type="button" data-setting-target="data-settings" aria-pressed="false">数据</button></nav>
       <div class="settings-scroll">
       <section class="setting-section" id="wallpaper-settings" data-settings-group="wallpaper" aria-labelledby="wallpaper-heading">
-        <h3 id="wallpaper-heading">壁纸人物</h3>
-        <div class="character-options" role="radiogroup" aria-label="壁纸人物" aria-describedby="character-help">
-          <label class="character-option"><input type="radio" name="wallpaper-character" value="female" checked><span class="character-card"><img src="app://local/assets/stills/female-v2/work.png" alt="雨夜窗前，穿红衬衫的黑发女生在小桌前使用笔记本电脑"><span class="character-caption"><strong>默认女生</strong><span>红衬衫 · Serena 女声</span></span></span></label>
-          <label class="character-option"><input type="radio" name="wallpaper-character" value="male"><span class="character-card"><img src="app://local/assets/character-previews/male.png" alt="雨夜窗前，戴金丝眼镜的黑色短发男青年，穿黑衬衫和西裤使用笔记本电脑"><span class="character-caption"><strong>黑衫男生</strong><span>金丝眼镜 · Dylan 男声</span></span></span></label>
+        <h3 id="wallpaper-heading">壁纸风格</h3>
+        <div class="character-options" role="radiogroup" aria-label="壁纸风格" aria-describedby="character-help">
+          <label class="character-option"><input type="radio" name="wallpaper-style" value="anime" checked><span class="character-card"><img src="app://local/assets/stills/female-v2/work.png" alt="动漫画风，红衬衫女生在雨夜窗前工作"><span class="character-caption"><strong>动漫静态</strong><span>五种静止姿态 · 自动轮换</span></span></span></label>
+          <label class="character-option"><input type="radio" name="wallpaper-style" value="realistic"><span class="character-card"><img src="app://local/assets/motion/female/work.png" alt="真人画风，红衬衫女生在雨夜窗前工作"><span class="character-caption"><strong>真人动态</strong><span>视频循环 · 工作与看向你</span></span></span></label>
         </div>
-        <p id="character-help" class="hint">选择后自动保存，同时切换默认声线。加载失败会保留原人物。</p>
+        <p id="character-help" class="hint">选择后自动保存，保留你的朗读声线。暂停可停住画面并关闭环境音。</p>
         <p id="character-status" class="hint" role="status" aria-live="polite"></p>
         <button id="retry-character" aria-describedby="character-status" hidden>重试加载</button>
-        <label class="check"><input id="wallpaper-motion" type="checkbox">女生动态壁纸 · 工作与看向你</label>
-        <p id="motion-hint" class="hint">工作与陪伴各自循环播放，对话时在动作接点转向你。关闭后使用静态姿态。</p>
         <div class="field-grid still-controls"><label>人物姿态<select id="still-pose"><option value="auto">自动 · 随工作与对话切换</option><option value="work">伏案工作</option><option value="cup">捧杯休息</option><option value="thinking">托腮思考</option><option value="window">侧身看雨</option><option value="attention">转身陪伴</option></select></label><button id="pause-stills" aria-pressed="false">暂停壁纸与环境音</button></div>
         <p id="still-status" class="hint" role="status" aria-live="polite"></p>
         <div id="still-previews" class="still-previews" role="group" aria-label="预览人物姿态"></div>
-        <p class="hint">点击小图可固定查看；选择“自动”恢复轮换。女生以工作为主，每轮穿插捧杯、托腮和看雨；对话时转身陪伴。男生保留工作与回应。</p>
+        <p id="still-help" class="hint">点击小图可固定查看；选择“自动”随工作与对话切换。</p>
       </section>
       <section class="setting-section" id="ambience-settings" data-settings-group="wallpaper" aria-labelledby="ambience-heading">
         <h3 id="ambience-heading">窗边环境音</h3>

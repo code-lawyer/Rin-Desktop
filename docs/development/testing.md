@@ -30,7 +30,7 @@ npm run check:public
 | `node --test tests/remote-buttons.test.mjs` | 设备按键归一化 | 无设备 |
 | `work/runtime/rc003-probe/Scripts/python.exe tests/remote-atvv-test.py` | ATVV 解码逻辑 | 已准备的独立 Python；无设备、无采音 |
 | `npm run remote:diagnose` | RC003 原始按键/音频诊断 | 真实设备、BLE 环境、已下载 ASR；会采集固定测试短语 |
-| `node tools/qa/gui/run.mjs --case=character-switch --run` | 人物资源失败恢复与切换 | Playwright、视觉资源、真实 Electron；不发送 Agent 任务 |
+| `npm run qa:stills -- --character-switch` | 当前图片失败/重试、快速切换、声线及新进程恢复 | 构建与视觉资源、隔离 Electron/真实存储/合成后端；无 Playwright、CLI 或账户；旧入口带 --run 转发，--package 退役 |
 | `tools/probes/cli-agents` 的 `--run` 命令 | SDK/ACP 账户与协议检查 | 原生 CLI、账户和额度；会发固定任务及执行受限 fixture 操作 |
 
 准备方法分别见[构建](../build.md)、[设备诊断](../../tools/remote-diagnostics/README.md)、[CLI 探针](../../tools/probes/cli-agents/README.md)和[质量工具](../../tools/qa/README.md)。旧check工具已经分流为维护入口或归档说明，详见[GUI工具清单](../../tools/qa/gui/README.md)。默认帮助不会启动真实CLI/GUI；显式运行的报告均使用新的work/qa目录。归档原文仍可能包含真实任务或旧固定端口，不应批量运行。

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdir, mkdtemp, readFile, writeFile, rm, access } from 'node:fs/promises';
-import { resolve, join, sep, isAbsolute } from 'node:path';
+import { resolve, join, sep } from 'node:path';
 import { WorkspaceStore } from '../backend/workspace-store.mjs';
 import { QwenSpeech } from '../backend/qwen-speech.mjs';
 import { speechProfile } from '../backend/speech-plan.mjs';
@@ -17,44 +17,58 @@ async function fixture(t) {
   return { store, dir };
 }
 
-test('character changes persist both engine voices without enabling playback or changing engine and speed', async t => {
-  const { store, dir } = await fixture(t);
-  assert.equal(store.data.settings.character, 'female');
-  await store.updateSettings({ ttsEngine: 'kokoro', speed: .9, qwenVoice: 'Vivian' });
-  const previous = { ...store.data.settings };
-  await store.updateSettings({ character: 'male' });
-  const next = store.data.settings;
-  assert.equal(next.qwenVoice, 'Dylan'); assert.equal(next.voice, 58);
-  for (const key of ['ttsEngine', 'speed', 'ttsResident', 'autoSpeak', 'prepareSpeech']) assert.equal(next[key], previous[key]);
-  for (const ttsEngine of ['qwen', 'kokoro']) assert.notEqual(speechProfile({ ...previous, ttsEngine }), speechProfile({ ...next, ttsEngine }), 'Old audio cannot match the new voice');
-  const reloaded = new WorkspaceStore(dir); await reloaded.load();
-  assert.equal(reloaded.data.settings.character, 'male'); assert.equal(reloaded.data.settings.qwenVoice, 'Dylan'); assert.equal(reloaded.data.settings.voice, 58);
-  await reloaded.updateSettings({ qwenVoice: 'Uncle_Fu', voice: 102 });
-  await reloaded.updateSettings({ character: 'male' });
-  assert.equal(reloaded.data.settings.qwenVoice, 'Uncle_Fu'); assert.equal(reloaded.data.settings.voice, 102, 'Reselecting the same character preserves manual choices');
-  await reloaded.updateSettings({ character: 'female' });
-  assert.equal(reloaded.data.settings.qwenVoice, 'Serena'); assert.equal(reloaded.data.settings.voice, 3);
+test('wallpaper styles preserve independent voices and playback preferences across restart', async t => {
+  const {store,dir}=await fixture(t);
+  await store.updateSettings({ttsEngine:'kokoro',speed:.9,qwenVoice:'Dylan',voice:59});
+  for(const wallpaperMotion of [true,false,true]) {
+    const before=speechProfile(store.data.settings);
+    await store.updateSettings({wallpaperMotion});
+    assert.equal(speechProfile(store.data.settings),before);
+    const reload=new WorkspaceStore(dir);await reload.load();
+    for(const [key,value] of Object.entries({character:'female',wallpaperMotion,qwenVoice:'Dylan',voice:59,ttsEngine:'kokoro',speed:.9,ttsResident:false,autoSpeak:false}))assert.equal(reload.data.settings[key],value);
+  }
 });
 
-test('legacy workspaces keep their voices; missing male voices derive from the saved character', async t => {
+test('legacy workspaces migrate removed male artwork to anime stills and preserve valid custom voices', async t => {
   const { store } = await fixture(t);
   for (const [settings, expected] of [
     [{ qwenVoice: 'Vivian', voice: 46 }, ['female', 'Vivian', 46]],
-    [{ character: 'male' }, ['male', 'Dylan', 58]],
+    [{ character: 'male', wallpaperMotion: true }, ['female', 'Serena', 3]],
+    [{ character: 'male', wallpaperMotion: true, qwenVoice: 'Uncle_Fu', voice: 60 }, ['female', 'Uncle_Fu', 60]],
     [{ character: 'unknown', voice: -1, qwenVoice: 'constructor' }, ['female', 'Serena', 3]],
   ]) {
     await writeFile(store.file, JSON.stringify({ format: 1, projects: [], drafts: {}, settings }));
+    const original=await readFile(store.file,'utf8');
     await store.load();
+    assert.equal(await readFile(store.file,'utf8'),original);
+    if(settings.character==='male')assert.equal(store.data.settings.wallpaperMotion,false);
     assert.deepEqual([store.data.settings.character, store.data.settings.qwenVoice, store.data.settings.voice], expected);
   }
 });
 
 test('invalid character or voice patches are rejected atomically', async t => {
   const { store } = await fixture(t);
-  for (const patch of [{ character: 'unknown' }, { character: 'constructor' }, { character: 'male', voice: 103 }, { character: 'male', qwenVoice: 'toString' }, { voice: 2 }, { voice: 58.5 }]) {
+  for (const patch of [{ character: 'male' }, { character: 'unknown' }, { character: 'constructor' }, { character: 'male', voice: 103 }, { character: 'male', qwenVoice: 'toString' }, { voice: 2 }, { voice: 58.5 }]) {
     await assert.rejects(store.updateSettings(patch));
     assert.equal(store.data.settings.character, 'female'); assert.equal(store.data.settings.qwenVoice, 'Serena'); assert.equal(store.data.settings.voice, 3);
   }
+});
+
+test('male migration keeps projects, conversation pointers and drafts through the next durable save', async t => {
+  const {store,dir}=await fixture(t);
+  await store.add(dir);await store.remember({provider:'codex',cwd:dir,threadId:'kept-thread'});
+  const target={provider:'codex',cwd:dir,threadId:'kept-thread'};
+  await store.saveDraft(target,'保留未发送的中文草稿');
+  const legacy=JSON.parse(await readFile(store.file,'utf8'));
+  Object.assign(legacy.settings,{character:'male',wallpaperMotion:true,qwenVoice:'Dylan',voice:59,speed:1.1});
+  await writeFile(store.file,JSON.stringify(legacy));
+  await store.load();assert.deepEqual(store.data.projects,legacy.projects);assert.deepEqual(store.data.drafts,legacy.drafts);
+  assert.equal(store.data.settings.character,'female');assert.equal(store.data.settings.wallpaperMotion,false);
+  await store.updateSettings({completionSound:false});
+  const reload=new WorkspaceStore(dir);await reload.load();
+  assert.deepEqual(reload.data.projects,legacy.projects);assert.equal(reload.draft(target),'保留未发送的中文草稿');
+  assert.equal(reload.data.settings.qwenVoice,'Dylan');assert.equal(reload.data.settings.voice,59);assert.equal(reload.data.settings.speed,1.1);
+  assert.equal(reload.data.settings.character,'female');assert.equal(reload.data.settings.wallpaperMotion,false);
 });
 
 test('Qwen transmits the selected male speaker and matching style to the worker', async () => {
@@ -69,40 +83,42 @@ test('Qwen transmits the selected male speaker and matching style to the worker'
 const deferred = () => { let resolve, reject; const promise = new Promise((a, b) => { resolve = a; reject = b; }); return { promise, resolve, reject }; };
 test('rapid wallpaper choices keep the current scene visible and discard a superseded load', async () => {
   const pending = deferred(), shown = [], disposed = [];
-  const scenes = new WallpaperScenes({ load: id => id === 'female' ? { id } : pending.promise, show: scene => shown.push(scene.id), dispose: scene => disposed.push(scene.id) });
-  await scenes.select('female');
-  const switching = scenes.select('male');
-  assert.deepEqual(shown, ['female']); assert.deepEqual(disposed, []);
-  scenes.select('female'); pending.resolve({ id: 'male' }); await switching;
-  assert.deepEqual(shown, ['female']); assert.deepEqual(disposed, ['male']);
-  await scenes.select('male');
-  assert.deepEqual(shown, ['female', 'male']); assert.deepEqual(disposed, ['male', 'female']);
-  await scenes.close(); assert.deepEqual(disposed, ['male', 'female', 'male']);
+  const scenes = new WallpaperScenes({ load: id => id === 'anime' ? { id } : pending.promise, show: scene => shown.push(scene.id), dispose: scene => disposed.push(scene.id) });
+  await scenes.select('anime');
+  const switching = scenes.select('realistic');
+  assert.deepEqual(shown, ['anime']); assert.deepEqual(disposed, []);
+  scenes.select('anime'); pending.resolve({ id: 'realistic' }); await switching;
+  assert.deepEqual(shown, ['anime']); assert.deepEqual(disposed, ['realistic']);
+  await scenes.select('realistic');
+  assert.deepEqual(shown, ['anime', 'realistic']); assert.deepEqual(disposed, ['realistic', 'anime']);
+  await scenes.close(); assert.deepEqual(disposed, ['realistic', 'anime', 'realistic']);
 });
 
 test('wallpaper load failures preserve the working scene and can be retried', async () => {
   let fail = true; const shown = [], disposed = [];
-  const scenes = new WallpaperScenes({ load: async id => { if (id === 'male' && fail) throw new Error('missing texture'); return { id }; }, show: scene => shown.push(scene.id), dispose: scene => disposed.push(scene.id) });
-  await scenes.select('female'); await assert.rejects(scenes.select('male'), /missing texture/);
-  assert.equal(scenes.currentId, 'female'); assert.deepEqual(disposed, []);
-  fail = false; await scenes.select('male'); assert.deepEqual(shown, ['female', 'male']); assert.deepEqual(disposed, ['female']);
+  const scenes = new WallpaperScenes({ load: async id => { if (id === 'realistic' && fail) throw new Error('missing texture'); return { id }; }, show: scene => shown.push(scene.id), dispose: scene => disposed.push(scene.id) });
+  await scenes.select('anime'); await assert.rejects(scenes.select('realistic'), /missing texture/);
+  assert.equal(scenes.currentId, 'anime'); assert.deepEqual(disposed, []);
+  fail = false; await scenes.select('realistic'); assert.deepEqual(shown, ['anime', 'realistic']); assert.deepEqual(disposed, ['anime']);
   await scenes.close();
 });
 
 test('closing during a load disposes both active and late scenes without showing the late one', async () => {
   const pending = deferred(), shown = [], disposed = [];
-  const scenes = new WallpaperScenes({ load: id => id === 'male' ? pending.promise : { id }, show: scene => shown.push(scene.id), dispose: scene => disposed.push(scene.id) });
-  await scenes.select('female'); scenes.select('male'); const closing = scenes.close();
-  pending.resolve({ id: 'male' }); await closing;
-  assert.deepEqual(shown, ['female']); assert.deepEqual(disposed.sort(), ['female', 'male']);
-  await scenes.select('female'); assert.equal(scenes.current, null);
+  const scenes = new WallpaperScenes({ load: id => id === 'realistic' ? pending.promise : { id }, show: scene => shown.push(scene.id), dispose: scene => disposed.push(scene.id) });
+  await scenes.select('anime'); scenes.select('realistic'); const closing = scenes.close();
+  pending.resolve({ id: 'realistic' }); await closing;
+  assert.deepEqual(shown, ['anime']); assert.deepEqual(disposed.sort(), ['anime', 'realistic']);
+  await scenes.select('anime'); assert.equal(scenes.current, null);
 });
 
-test('shipped male model has all runtime resources and preview images', async () => {
-  const assets = resolve(import.meta.dirname, '../assets'), male = join(assets, 'rainy-window-male');
-  const model = JSON.parse(await readFile(join(male, 'Generated_artwork.model3.json'), 'utf8'));
-  for (const file of [model.FileReferences.Moc, model.FileReferences.DisplayInfo, ...model.FileReferences.Textures]) {
-    assert.ok(!isAbsolute(file) && !file.includes('..')); await access(join(male, file));
-  }
-  for (const id of ['female', 'male']) await access(join(assets, 'character-previews', `${id}.png`));
+test('removed male wallpaper assets cannot be selected or shipped from the checkout', async () => {
+  const assets = resolve(import.meta.dirname, '../assets');
+  for(const name of ['rainy-window-male','stills/male','character-previews/male.png'])await assert.rejects(access(join(assets,name)),{code:'ENOENT'});
+  const profiles=(await import('../backend/character-profiles.cjs')).default;
+  assert.deepEqual(Object.keys(profiles.CHARACTERS),['female']);
+  assert.equal(profiles.isCharacter('male'),false);
+  const manifest=JSON.parse(await readFile(join(assets,'stills/manifest.json'),'utf8'));
+  assert.deepEqual(Object.keys(manifest.active),['female']);
+  assert.ok(manifest.images.every(image=>!image.file.startsWith('male/')));
 });

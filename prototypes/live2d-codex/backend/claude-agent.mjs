@@ -4,6 +4,8 @@ import { NativeAgent, historyTurns, pathKey } from './native-agent.mjs';
 import { agentEnvironment, closeChild, deadline } from './agent-process.mjs';
 import { questionsView, questionAnswers } from './agent-questions.mjs';
 import { restoreHistory } from './reply-state.mjs';
+import { claudeAuthentication } from './claude-auth.mjs';
+export { claudeAuthentication } from './claude-auth.mjs';
 
 function inputChannel() {
   const queue = [], readers = []; let closed = false;
@@ -16,17 +18,6 @@ function inputChannel() {
 }
 const textOf = message => typeof message?.content === 'string' ? message.content : (message?.content ?? []).filter(p => p.type === 'text').map(p => p.text).join('\n');
 const messagesOf = rows => rows.filter(row => ['user', 'assistant'].includes(row.type) && !row.parent_tool_use_id).map(row => ({ id: row.uuid, role: row.type, text: textOf(row.message), complete: true })).filter(row => row.text);
-
-export function claudeAuthentication(account) {
-  // Use the CLI's resolved backend, not merely the presence of environment
-  // variables: an SDK integration must not silently consume subscription OAuth.
-  const provider = account?.apiProvider;
-  if (['bedrock', 'vertex', 'foundry', 'anthropicAws', 'anthropicGoogleCloud', 'mantle', 'gateway'].includes(provider)) return '云平台 API 认证（按提供商计费）';
-  if ((!provider || provider === 'firstParty') && ['ANTHROPIC_API_KEY', 'apiKeyHelper', '/login managed key'].includes(account?.apiKeySource)) return 'API 凭据（按量计费）';
-  const error = new Error('Claude 需要 API 凭据或官方支持的云平台 API 认证。Rin 不提供订阅登录或订阅额度；请自行配置认证后重新连接，现有会话和草稿已保留。');
-  error.code = -32000;
-  throw error;
-}
 
 export class ClaudeCompanion extends NativeAgent {
   constructor(options) { super({ ...options, provider: 'claude' }); }

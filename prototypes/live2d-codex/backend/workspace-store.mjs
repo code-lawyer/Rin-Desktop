@@ -68,9 +68,11 @@ export class WorkspaceStore {
       for (const submission of Object.values(this.data.submissions)) if (submission.status === 'pending') submission.status = 'unknown';
       const profile = characterProfile(saved.settings?.character);
       this.data.settings.character = profile.id;
-      // Retired video selections migrate without changing the person or custom voices.
+      // Removed male artwork migrates to anime stills. Keep valid custom voices,
+      // projects and drafts; loading alone never overwrites the original file.
       this.data.settings.wallpaperKind = 'artwork';
       Object.assign(this.data.settings, stills.stillSettings(saved.settings));
+      if (saved.settings?.character === 'male') this.data.settings.wallpaperMotion = false;
       this.data.settings.rc003 = remoteSettings(saved.settings?.rc003);
       if (!isQwenVoice(saved.settings?.qwenVoice)) this.data.settings.qwenVoice = profile.qwenVoice;
       if (!isChineseVoice(saved.settings?.voice)) this.data.settings.voice = profile.voice;

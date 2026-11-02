@@ -26,7 +26,7 @@
 
 `npm run qa:halfbody -- --run` 检查已启动的女生半身预览：243 组模型参数、转头/眨眼、真实本地样例音频驱动、停止竞态、坏音频恢复和模型失败重试。需要 `npm run preview:halfbody`、本机样例素材、Playwright 与 Edge；默认只显示帮助，不加载浏览器或声音。运行输出写入 `work/qa/live2d-halfbody`。范围和素材准备见[半身样例说明](../../docs/development/live2d-halfbody-preview.md)。
 
-`npm run qa:live2d-models -- --run` 离线读取已有 Cubism Core 与两个人物的 MOC3，在不同注意姿态下逐参数采样网格坐标和透明度变化。默认只显示帮助；不启动桌面、连接账户、录音、下载或修改素材。结果逐次保存于 `work/qa/live2d-models`，用于区分模型中的参数名称与实际绑定；不代表画质、所有组合参数或性能验收。见 [Live2D 可行性调研](../../docs/development/live2d-feasibility.md)。
+`npm run qa:live2d-models -- --run` 离线读取已有 Cubism Core 与现有女性人物的 MOC3，在不同注意姿态下逐参数采样网格坐标和透明度变化。默认只显示帮助；不启动桌面、连接账户、录音、下载或修改素材。结果逐次保存于 `work/qa/live2d-models`，用于区分模型中的参数名称与实际绑定；不代表画质、所有组合参数或性能验收。见 [Live2D 可行性调研](../../docs/development/live2d-feasibility.md)。
 
 `npm run qa:data-agent` 执行数据保护与 Agent 离线专项，报告按次写入 `work/qa/data-agent-release`。覆盖旧数据采用、写入失败、目录联接、草稿恢复、未知提交、审批/问题、流式/取消和退出；不运行真实 Agent、不使用账户或硬件。测试包内 `Run-Offline-Checks.cmd` 使用同一入口，报告存放于本机应用的 test-reports 目录。
 
@@ -48,7 +48,9 @@
 
 `npm run qa:character-video` 默认只显示帮助；增加 `-- --run --root="<本地参考壁纸目录>"` 后，将目录中的字面量素材清单与三档素材之一交给本机 FFprobe/FFmpeg 离线分析。工具不执行下载的 JavaScript，不联网、不修改素材；结果和四帧联系表写入独立的 `work/qa/character-video-analysis`。它测量循环边界及正反向时序差异，不判定画质、人物身份或生成模型优劣。`npm run test:character-video` 用合成像素检查测量与默认帮助契约，不需要 FFmpeg 或第三方素材。研究结论见[原角色视频制作路线](../../docs/development/character-video-reproduction.md)。
 
-`npm run qa:stills` 使用生产 HTML、构建和 preload 加隔离数据、合成后端，检查女生五张完整帧与目标图逐像素一致、缩略图选择与状态、失败保图/重试、人物声线提交、听写静音回执、真实朗读界面的降音及暂停/恢复。不会访问账户、麦克风或遥控器；结果和截图写入 `work/qa/still-desktop-*`。`npm start -- --background --show=wallpaper` 才启动真实主应用。见[第二版集成记录](../../docs/development/still-set-v2-implementation.md)。
+`npm run qa:stills` 使用生产 HTML、构建和 preload 加隔离数据、合成后端，检查女生五张完整帧与目标图逐像素一致、缩略图选择与状态、失败保图/重试、人物声线提交、听写静音回执、真实朗读界面的降音及暂停/恢复。不会访问账户、麦克风或遥控器；结果和截图写入新建的 `work/qa/still-desktop/<时间与随机后缀>/`，可用 `--output=work/qa/新的目录` 指定位置，拒绝覆盖旧报告。`npm start -- --background --show=wallpaper` 才启动真实主应用。见[第二版集成记录](../../docs/development/still-set-v2-implementation.md)。
+
+`npm run qa:stills -- --character-switch` 专门验证动漫静态/真人动态封面 PNG 故障注入、重复失败与重试、迟到报告、快速切换、自定义声线保持和新 Electron 进程恢复。它取代旧 Live2D 资源拦截用例，GUI 与 verify-character-switch 兼容入口带 `--run` 转发；不连接真实 CLI，旧 `--package` 明确拒绝。结果不能代替实际安装包验收。动漫静态/真人动态两种风格说明也由生产页面回归核对，动态播放见 `qa:motion`。
 
 `npm run qa:stills -- --pose-recovery` 单独检查同人物的某张姿态图失败后，选择另一张有效图时工作台能否恢复真实姿态和清除错误；同时验证保图、声线保持和显式重试。原[五姿态审查](../../docs/development/still-set-v2-review-2026-10-23.md)的失败复现已在[两态接入](../../docs/development/two-state-app-integration-2026-10-27.md)中修复并通过。
 

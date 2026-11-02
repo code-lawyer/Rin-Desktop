@@ -67,3 +67,11 @@ test('Windows preflight requires explicit Run before examining the host', { skip
   const { stdout } = await exec('pwsh.exe', ['-NoProfile', '-File', join(root, 'tools/probes/windows-preflight.ps1'), '-CodexPath', 'missing-cli-for-help-test'], { cwd: root, windowsHide: true, timeout: 15000 });
   assert.match(stdout, /Default: help only/);
 });
+
+test('character compatibility entry rejects retired package checks before any side effects', async () => {
+  const sentinel = `import fs from 'node:fs/promises'; import cp from 'node:child_process'; import {syncBuiltinESMExports} from 'node:module';
+    fs.mkdir=()=>{throw new Error('unexpected mkdir');};cp.spawn=()=>{throw new Error('unexpected spawn');};syncBuiltinESMExports();`;
+  await assert.rejects(exec(process.execPath, ['--import=data:text/javascript,' + encodeURIComponent(sentinel), join(root,'tools/qa/gui/run.mjs'), '--case=character-switch', '--run', '--package=unused'], {
+    cwd:root,env:{...process.env,VIBE_PLAYWRIGHT:'missing-playwright-for-test'},windowsHide:true,timeout:15000,
+  }), error => /legacy packaged Live2D test is retired/.test(error.stderr) && !/unexpected (mkdir|spawn)/.test(error.stderr));
+});

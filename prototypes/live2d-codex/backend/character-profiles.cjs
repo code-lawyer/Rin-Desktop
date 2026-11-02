@@ -2,12 +2,8 @@
 const DEFAULT_CHARACTER = 'female';
 const CHARACTERS = Object.freeze({
   female: Object.freeze({
-    id: 'female', label: '默认女生', model: 'rainy-window-v2-4k',
+    id: 'female', label: '窗边女生', model: 'rainy-window-v2-4k',
     sourceWidth: 3840, sourceHeight: 2400, qwenVoice: 'Serena', voice: 3,
-  }),
-  male: Object.freeze({
-    id: 'male', label: '黑衫男生', model: 'rainy-window-male',
-    sourceWidth: 1586, sourceHeight: 992, qwenVoice: 'Dylan', voice: 58,
   }),
 });
 const QWEN_VOICES = Object.freeze({

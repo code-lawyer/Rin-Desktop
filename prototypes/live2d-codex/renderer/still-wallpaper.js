@@ -16,36 +16,18 @@ export async function startStillWallpaper({ host, api }) {
   let idle = 'work', idleTimer, remaining = idleDuration('work'), began = 0, lastReport;
   let received = false, audioRevision = 0, committedRequest = -1;
   let motion, motionInfo;
-  function loadImage(character, pose, override) {
-    const url = override || `app://local/assets/stills/${character === 'female' ? 'female-v2-4k' : 'male'}/${pose}.png`;
+  function loadImage(pose, override) {
+    const url = override || `app://local/assets/stills/female-v2-4k/${pose}.png`;
     if (!cache.has(url)) {
       const promise = (async () => { const image = new Image(); image.src = `${url}?attempt=${++imageAttempt}`; await image.decode(); return image; })();
       cache.set(url, promise); promise.catch(() => cache.delete(url));
     }
     return cache.get(url);
   }
-  // Female v2 frames include the entire pose: never discard arms or shoulders.
-  // The existing male pair retains its original spatial composition.
-  function compose(base, pose, character) {
-    const frame = document.createElement('canvas'); frame.width = base.naturalWidth; frame.height = base.naturalHeight;
-    const ctx = frame.getContext('2d', { alpha: false }); ctx.drawImage(base, 0, 0);
-    if (character === 'male' && pose !== base) {
-      const scaleX = frame.width / 1586, scaleY = frame.height / 992;
-      const box = [1000, 38, 350, 340];
-      const [x, y, w, h] = box, patch = document.createElement('canvas');
-      patch.width = Math.round(w * scaleX); patch.height = Math.round(h * scaleY);
-      const p = patch.getContext('2d');
-      p.drawImage(pose, x / 1586 * pose.naturalWidth, y / 992 * pose.naturalHeight,
-        w / 1586 * pose.naturalWidth, h / 992 * pose.naturalHeight, 0, 0, patch.width, patch.height);
-      // A rectangular region includes the union of the original and new hair
-      // silhouettes, including the ribbons at the top corners.
-      p.globalCompositeOperation = 'destination-in';
-      for (const edge of [p.createLinearGradient(0, 0, patch.width, 0), p.createLinearGradient(0, 0, 0, patch.height)]) {
-        edge.addColorStop(0, 'transparent'); edge.addColorStop(.03, '#fff'); edge.addColorStop(.97, '#fff'); edge.addColorStop(1, 'transparent');
-        p.fillStyle = edge; p.fillRect(0, 0, patch.width, patch.height);
-      }
-      ctx.drawImage(patch, Math.round(x * scaleX), Math.round(y * scaleY));
-    }
+  // Anime stills contain the full pose; video uses its matching poster.
+  function compose(image) {
+    const frame = document.createElement('canvas'); frame.width = image.naturalWidth; frame.height = image.naturalHeight;
+    frame.getContext('2d', { alpha: false }).drawImage(image, 0, 0);
     return frame;
   }
   function fit() {
@@ -67,18 +49,16 @@ export async function startStillWallpaper({ host, api }) {
     async load(key) {
       const revision = frameRevision;
       const [requestId, character, pose, animated] = JSON.parse(key);
-      let catalog, motionError, image;
+      let catalog, image;
       if (animated) {
-        try { catalog = await loadMotionCatalog(); image = await loadImage(character, pose, catalog.posters.work); }
-        catch (error) { motionError = error.message; catalog = null; }
+        catalog = await loadMotionCatalog(); image = await loadImage(pose, catalog.posters.work);
       }
-      image ??= await loadImage(character, pose);
-      const base = character === 'female' ? image : await loadImage(character, 'work');
-      return { frame: compose(base, image, character), frameRevision: revision, requestId, character, pose, animated, catalog, motionError, sourceWidth: image.naturalWidth, sourceHeight: image.naturalHeight };
+      image ??= await loadImage(pose);
+      return { frame: compose(image), frameRevision: revision, requestId, character, pose, animated, catalog, sourceWidth: image.naturalWidth, sourceHeight: image.naturalHeight };
     },
     async show(frame, key) {
       if (frame.requestId !== committedRequest) {
-        const info = { ready: true, wallpaperKind: 'artwork', character: frame.character, requestId: frame.requestId, initial: !shown };
+        const info = { ready: true, wallpaperKind: 'artwork', character: frame.character, wallpaperMotion: frame.animated, requestId: frame.requestId, initial: !shown };
         let result = await api.commitWallpaper(info);
         if (closed || key !== desiredKey || (shown && (presentation.paused || document.hidden))) {
           api.finishWallpaper(info, false); return false;
@@ -114,16 +94,16 @@ export async function startStillWallpaper({ host, api }) {
       updateAudio();
     },
     failed(error, key) {
-      const [requestId, character] = JSON.parse(key);
+      const [requestId, character, , wallpaperMotion] = JSON.parse(key);
       host.dataset.loading = 'false'; host.dataset.error = '姿态图片未能载入，已保留当前画面。请在工作台重试加载。';
-      api.renderReady({ ready: false, kind: 'wallpaper', wallpaperKind: 'artwork', character, requestId, frameRevision, error: host.dataset.error });
+      api.renderReady({ ready: false, kind: 'wallpaper', wallpaperKind: 'artwork', character, wallpaperMotion, requestId, frameRevision, error: host.dataset.error });
       console.error('[wallpaper:still]', error.message);
     },
   });
   function report(painted = false) {
     if (!shown) return;
-    const error = shown.motionError || motionInfo?.error;
-    const info = { ready: true, kind: 'wallpaper', wallpaperKind: 'artwork', character: shown.character, requestId: shown.requestId,
+    const error = motionInfo?.error;
+    const info = { ready: true, kind: 'wallpaper', wallpaperKind: 'artwork', character: shown.character, wallpaperMotion: shown.animated, requestId: shown.requestId,
       pose: motionInfo?.state === 'user' ? 'attention' : shown.pose,
       activity: stillActivity(backend, presentation, document.hidden), model: shown.animated ? 'motion-clips' : 'static-stills',
       motionPhase: motionInfo?.phase || null, frameRevision: shown.frameRevision, painted, ...(error ? { ready: false, error } : {}),
@@ -167,7 +147,7 @@ export async function startStillWallpaper({ host, api }) {
     if (closed) return;
     updateAudio(); updateIdle();
     const character = characters.characterProfile(presentation.character).id;
-    const animated = character === 'female' && presentation.stills?.wallpaperMotion === true;
+    const animated = presentation.stills?.wallpaperMotion === true;
     const pose = animated ? 'work' : stillPose(backend, { ...presentation, character }, idle);
     const key = JSON.stringify([presentation.characterRequest ?? 0, character, pose, animated]);
     host.dataset.paused = String(!!presentation.paused); host.dataset.typing = String(shown?.animated ? !!motionInfo?.typing : shown?.pose === 'work');

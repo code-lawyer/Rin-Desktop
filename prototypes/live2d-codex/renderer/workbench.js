@@ -136,28 +136,16 @@ function fillVoices() {
   if (!$('voice').value) { const o = node('option',`${s.voice >= 58 ? '男声' : '女声'} · ${s.voice}`); o.value = s.voice; $('voice').append(o); $('voice').value = s.voice; }
 }
 function updateCharacterStatus() {
-  const profile = characters.characterProfile(workspace.settings.character), status = workspace.wallpaper;
-  const requested = characters.characterProfile(status?.character);
-  for (const radio of document.querySelectorAll('[name="wallpaper-character"]')) radio.checked = radio.value === (status?.phase === 'loading' ? requested.id : profile.id);
+  const status = workspace.wallpaper;
+  const animated = status?.phase === 'loading' ? status.wallpaperMotion : workspace.settings.wallpaperMotion;
+  for (const radio of document.querySelectorAll('[name="wallpaper-style"]')) radio.checked = radio.value === (animated ? 'realistic' : 'anime');
   $('character-status').dataset.phase = status?.phase || '';
-  $('character-status').textContent = status?.phase === 'error' ? status.error : status?.phase === 'loading' ? `正在载入${requested.label}…` : `当前人物：${profile.label}`;
+  $('character-status').textContent = status?.phase === 'error' ? status.error : status?.phase === 'loading' ? '正在载入壁纸…' : '当前风格：' + (animated ? '真人动态' : '动漫静态');
   $('retry-character').hidden = status?.phase !== 'error';
-  $('retry-character').textContent = `重试加载${requested.label}`;
 }
-async function saveCharacter(character) {
-  const radios = [...document.querySelectorAll('[name="wallpaper-character"]')];
-  for (const radio of radios) radio.disabled = true;
-  $('retry-character').disabled = true;
-  $('save-settings').disabled = true;
-  try {
-    acceptWorkspace(await run(api.saveSettings({ character, wallpaperKind: 'artwork' })));
-    fillVoices(); updateSpeechStatus();
-  } finally {
-    updateCharacterStatus();
-    for (const radio of radios) radio.disabled = false;
-    $('retry-character').disabled = false;
-    $('save-settings').disabled = false;
-  }
+async function saveWallpaperStyle(wallpaperMotion) {
+  try { acceptWorkspace(await run(api.saveSettings({ wallpaperMotion }))); }
+  finally { updateCharacterStatus(); fillStills(); }
 }
 function fillSettings() {
   // Replacing a focused input does not reliably emit blur. Preserve the key
@@ -255,29 +243,28 @@ $('refresh').onclick = act(() => refreshThreads()); $('more-threads').onclick = 
 $('search').oninput = () => { clearTimeout(searchTimer); searchTimer = setTimeout(() => refreshThreads(),250); };
 function showSettings() { $('settings').hidden = false; $('conversations').hidden = true; $('settings-tab').setAttribute('aria-pressed','true'); renderProjects(); if (!settingsDirty) fillSettings(); }
 $('settings-tab').onclick = showSettings;
-for (const radio of document.querySelectorAll('[name="wallpaper-character"]')) radio.onchange = act(() => saveCharacter(radio.value));
-$('retry-character').onclick = act(() => saveCharacter(workspace.wallpaper.character));
+for (const radio of document.querySelectorAll('[name="wallpaper-style"]')) radio.onchange = act(() => saveWallpaperStyle(radio.value === 'realistic'));
+$('retry-character').onclick = act(() => saveWallpaperStyle(workspace.wallpaper.wallpaperMotion === true));
 let stillSaving = 0;
 let previewCharacter;
 function fillStills() {
   if(stillSaving) return;
   const s=stills.stillSettings(workspace.settings);
-  const animated=workspace.settings.character==='female' && s.wallpaperMotion;
-  $('wallpaper-motion').checked=s.wallpaperMotion;
-  $('wallpaper-motion').disabled=workspace.settings.character!=='female';
-  $('motion-hint').textContent=workspace.settings.character==='male'?'男生使用静态壁纸。':'工作与陪伴各自循环播放，对话时在动作接点转向你。关闭后使用静态姿态。';
+  const animated=s.wallpaperMotion;
   $('still-pose').value=s.stillPose;
-  for(const option of $('still-pose').options) option.disabled=(workspace.settings.character==='male' || animated) && !['auto','work','attention'].includes(option.value);
+  for(const option of $('still-pose').options) option.disabled=animated && !['auto','work','attention'].includes(option.value);
   if(animated && !['auto','work','attention'].includes(s.stillPose)) $('still-pose').value='auto';
-  if(workspace.settings.character==='male' && !['auto','work','attention'].includes(s.stillPose)) $('still-pose').value='work';
-  const character=workspace.settings.character==='male'?'male':'female';
+  const character='female';
+  $('still-help').textContent=animated
+      ? '点击小图可固定朝向；选择“自动”随工作与对话切换。工作与看向你各自循环播放，在动作接点转身。'
+      : '点击小图可固定查看；选择“自动”恢复轮换。女生以工作为主，每轮穿插捧杯、托腮和看雨；对话时转身陪伴。';
   if(previewCharacter!==`${character}:${animated}`) {
     previewCharacter=`${character}:${animated}`;
     $('still-previews').replaceChildren();
-    for(const pose of character==='male'||animated?['work','attention']:stills.POSES) {
-      const label=character==='male'?(pose==='work'?'专注工作':'看向你'):stills.POSE_LABELS[pose];
+    for(const pose of animated?['work','attention']:stills.POSES) {
+      const label=animated?(pose==='work'?'专注工作':'看向你'):stills.POSE_LABELS[pose];
       const button=node('button'); button.type='button'; button.dataset.pose=pose; button.setAttribute('aria-label','固定查看：'+label);
-      const image=node('img'); image.alt=''; image.src=animated?`app://local/assets/motion/female/${pose==='work'?'work':'user'}.png`:`app://local/assets/stills/${character==='female'?'female-v2':'male'}/${pose}.png`;
+      const image=node('img'); image.alt=''; image.src=animated?`app://local/assets/motion/female/${pose==='work'?'work':'user'}.png`:`app://local/assets/stills/female-v2/${pose}.png`;
       button.append(image,node('span',label)); button.onclick=act(()=>saveStillSetting({stillPose:pose})); $('still-previews').append(button);
     }
   }
@@ -288,8 +275,8 @@ function fillStills() {
   updateAmbienceStatus();
 }
 function updateStillStatus() {
-  const character=workspace.settings.character==='male'?'male':'female', shown=workspace.wallpaper;
-  const poseLabel=character==='male'?(shown?.pose==='attention'?'看向你':'专注工作'):stills.POSE_LABELS[shown?.pose];
+  const character='female', shown=workspace.wallpaper;
+  const poseLabel=shown?.model==='motion-clips'?(shown?.pose==='attention'?'看向你':'专注工作'):stills.POSE_LABELS[shown?.pose];
   $('still-status').textContent=shown?.character===character && poseLabel && shown?.activity
     ? `当前画面：${poseLabel} · ${shown.motionPhase==='transition'?'正在转身':shown.model==='motion-clips' && shown.motionPhase==='loop'?'循环播放 · ':''}${shown.motionPhase==='transition'?'':stills.ACTIVITY_LABELS[shown.activity] || '等待状态更新'}` : '等待壁纸画面就绪…';
 }
@@ -306,7 +293,6 @@ async function saveStillSetting(patch) {
   finally { stillSaving--; fillStills(); }
 }
 $('still-pose').onchange=act(()=>saveStillSetting({stillPose:$('still-pose').value}));
-$('wallpaper-motion').onchange=act(()=>saveStillSetting({wallpaperMotion:$('wallpaper-motion').checked}));
 $('ambience-enabled').onchange=act(()=>saveStillSetting({ambienceEnabled:$('ambience-enabled').checked}));
 for(const [field,key] of [['rain-volume','rainVolume'],['key-volume','keyVolume']]) {
   $(field).oninput=()=>{ $(field+'-label').textContent=$(field).value+'%'; };
@@ -326,7 +312,7 @@ $('retry-tts').onclick = act(() => saveSpeechChoice({ttsResident:true}));
 $('choose-qwen').onclick = act(async () => { acceptWorkspace(await run(api.chooseQwen())); updateSpeechStatus(); });
 $('use-existing-data').onclick = act(() => run(api.useData()));
 $('save-settings').onclick = act(saveSettings); $('preview-voice').onclick = act(async () => { await saveSettings(); await run(api.previewVoice()); }); $('refresh-microphones').onclick = act(refreshDevices);
-$('settings').addEventListener('change',event => { if (!event.target.closest('#remote-settings,#ambience-settings') && event.target.name !== 'wallpaper-character' && !['wallpaper-motion','still-pose','model','effort','tts-resident','tts-engine','qwen-voice','auto-speak','prepare-speech','completion-sound'].includes(event.target.id)) settingsDirty = true; });
+$('settings').addEventListener('change',event => { if (!event.target.closest('#remote-settings,#ambience-settings') && event.target.name !== 'wallpaper-style' && !['still-pose','model','effort','tts-resident','tts-engine','qwen-voice','auto-speak','prepare-speech','completion-sound'].includes(event.target.id)) settingsDirty = true; });
 $('model').onchange = act(async () => { await run(api.chooseModel($('model').value)); }); $('effort').onchange = act(async () => { await run(api.chooseEffort($('effort').value)); });
 $('close').onclick = () => api.windowAction('hide-workbench'); $('back-chat').onclick = () => api.windowAction('show-chat');
 window.addEventListener('blur', () => { if (document.activeElement?.matches('#shortcuts input,#remote-keys input')) document.activeElement.blur(); });

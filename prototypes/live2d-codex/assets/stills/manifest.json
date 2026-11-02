@@ -1,6 +1,6 @@
 {
   "format": 2,
-  "composition": "female-v2-4k: complete super-resolved frame; male: original static head composition; direct replacement",
+  "composition": "female-v2-4k: complete super-resolved frame; direct replacement",
   "images": [
     {
       "file": "female/work.png",
@@ -43,20 +43,6 @@
       "height": 992,
       "bytes": 2147461,
       "sha256": "21aa778f5e7f159ca03fa2f9399465b5484b672d55f4c32c8699209dfffc65bd"
-    },
-    {
-      "file": "male/work.png",
-      "width": 1586,
-      "height": 992,
-      "bytes": 2108970,
-      "sha256": "eb8dd5f5f2ae252f8dd76937bbade26ebef775e8c5fc8b212339f4dd2aa7ae03"
-    },
-    {
-      "file": "male/attention.png",
-      "width": 1586,
-      "height": 992,
-      "bytes": 2092024,
-      "sha256": "0f0db410d78791f04fe2c3186e925fe6cd4fac4ead495de0b5d1ad39c724825a"
     },
     {
       "file": "female-v2/work.png",
@@ -130,8 +116,7 @@
     }
   ],
   "active": {
-    "female": "female-v2-4k",
-    "male": "male"
+    "female": "female-v2-4k"
   },
   "processing": "processing-v2-4k.json"
 }

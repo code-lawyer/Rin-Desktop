@@ -1,6 +1,10 @@
 import { readdir, lstat, mkdir, copyFile } from 'node:fs/promises';
 import { constants } from 'node:fs';
-import { join } from 'node:path';
+import { join, relative } from 'node:path';
+
+// Older locked installers still contain retired artwork. Never restore it into
+// the current checkout, even when the runtime archive itself is historical.
+export const retiredWallpaperAsset = path => /^(?:rainy-window-male(?:\/|$)|stills\/male(?:\/|$)|character-previews\/male\.png$)/i.test(path.replaceAll('\\', '/'));
 
 async function inspect(path) {
   try { return await lstat(path); }
@@ -12,6 +16,7 @@ async function inspect(path) {
 export async function fillMissingAssets(source, destination) {
   const result={copied:0,preserved:0,skippedLinks:0};
   async function visit(from,to){
+    if (retiredWallpaperAsset(relative(source, from))) return;
     const origin=await lstat(from), existing=await inspect(to);
     if(origin.isSymbolicLink())throw new Error('Resource archives must contain ordinary files and directories.');
     if(existing?.isSymbolicLink()){result.skippedLinks++;return;}
