@@ -4,6 +4,7 @@ import { mkdir, writeFile, readFile, stat } from 'node:fs/promises';
 import { resolve, join, relative, isAbsolute } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { claudeAuthentication } from '../../../prototypes/live2d-codex/backend/claude-auth.mjs';
+import { createSleeperFixture, waitForProbeSignal } from './fixture-control.mjs';
 requireLiveRun('node tools/probes/cli-agents/claude-probe.mjs --run');
 const { query, listSessions, getSessionMessages } = await appDependency('@anthropic-ai/claude-agent-sdk');
 
@@ -14,8 +15,7 @@ const evidenceFile = resolve(root, 'evidence', `claude-${runId}.json`);
 const binary = process.env.PROBE_CLAUDE_BINARY || 'claude.exe';
 const nonce = `RIN-${randomUUID()}`;
 const report = { runId, engine: 'claude-code', sdk: '0.3.240', cwd, isolation: { filesystemSettings: [], tools: ['Read','Write','Edit','Bash','AskUserQuestion'], externalMcp: false, guard: 'PreToolUse path/command allowlist; no OS sandbox claim' }, tests: [], events: [], processes: [] };
-let active, client, stage = 'setup', policy = 'deny', pendingHold, readerError, ownedToolPid;
-const sleepCommand = `node -e "require('fs').writeFileSync('slow-started.txt',String(process.pid));setTimeout(()=>require('fs').writeFileSync('slow-finished.txt','finished'),60000)"`;
+let active, client, stage = 'setup', policy = 'deny', pendingHold, readerError, sleeper, sleepCommand;
 const safeError = e => String(e?.message || e).replace(/(?:sk-ant-|xai-)[\w-]+/g, '[REDACTED]').replace(/Bearer\s+\S+/gi, 'Bearer [REDACTED]').slice(0,2000);
 const pause = ms => new Promise(r => setTimeout(r, ms));
 const exists = async file => { try { await stat(file); return true; } catch { return false; } };
@@ -91,7 +91,6 @@ async function open(resume) {
   }
 }
 function turn(text,name,mode='deny') { if(active)throw new Error('Turn already active');stage=name;policy=mode;const promise=new Promise((resolve,reject)=>{active={resolve,reject,deltas:0};});client.input.push({type:'user',message:{role:'user',content:text},parent_tool_use_id:null,uuid:randomUUID()});return timed(promise,100000,name); }
-async function until(test,label,limit=20000){const started=Date.now();while(Date.now()-started<limit){if(await test())return;await pause(100);}throw new Error(`${label} not observed`);}
 async function test(name,fn){try{await fn();}catch(e){check(name,e.blocked?null:false,{error:safeError(e)});await save();throw e;}await save();}
 
 await mkdir(cwd,{recursive:true});await mkdir(resolve(root,'evidence'),{recursive:true});
@@ -105,18 +104,19 @@ try{
   await test('deny-write',async()=>{const before=report.events.length;const file=join(cwd,'denied.txt');await turn(`请用 Write 工具在 ${file} 写入内容 MUST-NOT-EXIST。客户端会拒绝；收到拒绝后立即停止，不得换工具或路径。`,'deny-write','deny');check('deny-write',!(await exists(file))&&report.events.slice(before).some(e=>e.type==='permission-answer'&&e.decision==='deny'));});
   await test('question-roundtrip',async()=>{const before=report.events.length;const r=await turn('请调用 AskUserQuestion 工具问我本次测试应选择 BLUE 还是 GREEN，等待客户端回答，然后只输出收到的颜色。','question');check('question-roundtrip',r.text.includes('BLUE')&&report.events.slice(before).some(e=>e.type==='question-answer'));});
   await test('cancel-running-tool',async()=>{
-    const result=turn(`请使用 Bash 工具执行且只执行以下命令，不放到后台，不改变命令：\n${sleepCommand}\n这会在本目录记录启动 PID，等待一分钟再创建完成标记。`,'cancel-running-tool','allow');
-    await until(()=>exists(join(cwd,'slow-started.txt')),'slow tool start',60000);
-    const toolPid=Number((await readFile(join(cwd,'slow-started.txt'),'utf8')).trim());ownedToolPid=toolPid;const started=Date.now();const receipt=await timed(client.q.interrupt(),15000,'interrupt');
-    const r=await timed(result,20000,'interrupted turn result');await pause(1500);
-    let toolAlive=false;try{process.kill(toolPid,0);toolAlive=true;}catch(e){if(e.code!=='ESRCH')throw e;}
-    check('cancel-running-tool',!toolAlive&&!(await exists(join(cwd,'slow-finished.txt'))),{interruptMs:Date.now()-started,toolPid,toolAlive,stopReason:r.stopReason,receipt});
-    if(toolAlive){execFileSync('taskkill.exe',['/PID',String(toolPid),'/T','/F'],{windowsHide:true,stdio:'ignore'});log('fixture-cleanup',{toolPid,reason:'cancel left owned fixture sleeper alive'});}
-    ownedToolPid=undefined;
+    sleeper=await createSleeperFixture();sleepCommand=sleeper.command;
+    try {
+      const result=turn(`请使用 Bash 工具执行且只执行以下命令，不放到后台，不改变命令：\n${sleepCommand}\n这会连接测试控制管道，等待一分钟再创建完成标记。`,'cancel-running-tool','allow');
+      await waitForProbeSignal(()=>sleeper.started,'slow tool start',result,{timeout:60000});
+      const started=Date.now();const receipt=await timed(client.q.interrupt(),15000,'interrupt');
+      const r=await timed(result,20000,'interrupted turn result');await pause(1500);
+      const toolAlive=sleeper.running;
+      check('cancel-running-tool',!toolAlive&&!(await exists(join(cwd,'slow-finished.txt'))),{interruptMs:Date.now()-started,toolAlive,stopReason:r.stopReason,receipt});
+    } finally { await sleeper.close(); }
   });
   await test('cancel-pending-approval',async()=>{
     pendingHold=null;const file=join(cwd,'pending.txt');const result=turn(`请用 Write 工具在 ${file} 写入内容 MUST-NOT-EXIST。只尝试一次并等待审批。`,'cancel-pending-approval','hold');
-    await until(()=>!!pendingHold,'pending permission',60000);const started=Date.now();const interrupt=client.q.interrupt();await pause(300);
+    await waitForProbeSignal(()=>!!pendingHold,'pending permission',result,{timeout:60000});const started=Date.now();const interrupt=client.q.interrupt();interrupt.catch(()=>{});await pause(300);
     const signalAborted=pendingHold.signal.aborted;pendingHold.release();await timed(interrupt,15000,'permission interrupt');const r=await timed(result,20000,'permission cancel result');
     check('cancel-pending-approval',!(await exists(file)),{signalAborted,interruptMs:Date.now()-started,stopReason:r.stopReason});
   });
@@ -125,4 +125,4 @@ try{
   check('history-after-process-exit',sessions.some(s=>s.sessionId===sessionId)&&history.length>0,{historyMessages:history.length,sessionListed:sessions.some(s=>s.sessionId===sessionId)});await save();
   await test('resume-after-process-exit',async()=>{client=await open(sessionId);const r=await turn('不要读任何文件，也不要调用工具。请原样输出这段会话第一轮让我记住的完整 RIN- 标记。','resume');check('resume-after-process-exit',r.sessionId===sessionId&&!r.isError&&r.text.includes(nonce),{sameSession:r.sessionId===sessionId});});
 }catch(e){report.fatalError=safeError(e);log('probe-failed',{error:report.fatalError});process.exitCode=e.blocked?2:1;}
-finally{if(pendingHold)pendingHold.release();if(client)await client.close();if(ownedToolPid){try{process.kill(ownedToolPid,0);execFileSync('taskkill.exe',['/PID',String(ownedToolPid),'/T','/F'],{windowsHide:true,stdio:'ignore'});log('fixture-cleanup',{toolPid:ownedToolPid});}catch{}}await pause(500);report.finishedAt=new Date().toISOString();report.passed=report.tests.filter(t=>t.pass===true).length;report.failed=report.tests.filter(t=>t.pass===false).length;report.blocked=report.tests.filter(t=>t.pass===null).length;process.exitCode=report.failed?1:report.blocked?2:process.exitCode??0;await save();console.log(JSON.stringify({evidenceFile,passed:report.passed,failed:report.failed,blocked:report.blocked,fatalError:report.fatalError}));}
+finally{await sleeper?.close();if(pendingHold)pendingHold.release();if(client)await client.close();await pause(500);report.finishedAt=new Date().toISOString();report.passed=report.tests.filter(t=>t.pass===true).length;report.failed=report.tests.filter(t=>t.pass===false).length;report.blocked=report.tests.filter(t=>t.pass===null).length;process.exitCode=report.failed?1:report.blocked?2:process.exitCode??0;await save();console.log(JSON.stringify({evidenceFile,passed:report.passed,failed:report.failed,blocked:report.blocked,fatalError:report.fatalError}));}

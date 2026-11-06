@@ -6,7 +6,7 @@
 
 **[下载安装包](https://github.com/code-lawyer/Rin-Desktop/releases/latest)** · [快捷键](#快捷键) · [常见问题](#常见问题)
 
-维护与开发请先看 **[开发手册](docs/development/README.md)**、[当前状态](docs/project-status.md)和[统一施工清单](docs/development/progress.md)。在源码目录中统一使用根目录 `npm start` 或 `启动 Rin Desktop.cmd`；用 `npm run status` 查看源码、数据目录、待办与 GitHub 关系。源码和已发布安装包可能有不同功能，准备方法见[构建说明](docs/build.md)。
+维护请先看[贡献流程](CONTRIBUTING.md)和[当前状态](docs/project-status.md)。在源码目录中统一使用根目录 `npm start` 或 `启动 Rin Desktop.cmd`；用 `npm run status` 查看源码、数据目录与 GitHub 关系。源码和已发布安装包可能有不同功能，准备方法见[构建说明](docs/build.md)。
 
 首次使用按下面的 1–4 步操作。文字对话准备好后就能使用，语音功能可以稍后再开启。
 
@@ -176,7 +176,7 @@ CLI 已安装但尚未登录时，也可以点击气泡中的「在浏览器登�
 
 其他区域使用方向键选择操作，下拉菜单用左右键切换。权限请求需选中具体操作并再次确认，发送不会批准权限。音量加减控制应用朗读音量，界面音量条会同步；物理按键效果依设备而定，不承诺出现 Windows 系统音量提示。电源保持原设备行为。键鼠和「键盘 → 兼容其他按键设备」仍可使用。
 
-实现、组件构建和待测边界见 [RC003 接入说明](docs/development/remote-integration.md)。完整硬件稳定性矩阵仍待完成；当前版本的实际验证范围见[发布记录](docs/release-audit.md)。
+组件构建见[构建说明](docs/build.md)，支持边界见[项目状态](docs/project-status.md)。完整硬件稳定性矩阵仍待完成，实机步骤见[验收清单](tools/release/TEST-ACCEPTANCE.md)。
 
 ## 打开、退出、升级与数据
 
@@ -210,7 +210,7 @@ CLI 已安装但尚未登录时，也可以点击气泡中的「在浏览器登�
 - [项目文档索引](docs/README.md)
 - [隐私与数据](docs/privacy.md)
 - [许可与第三方分发](docs/licenses.md)
-- [发布审查与验证](docs/release-audit.md)
+- [支持范围与待验收项](docs/project-status.md)
 
 ### 获取第三方对应源码
 

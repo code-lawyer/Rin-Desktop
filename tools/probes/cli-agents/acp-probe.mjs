@@ -4,6 +4,7 @@ import { Readable, Writable } from 'node:stream';
 import { mkdir, writeFile, readFile, stat } from 'node:fs/promises';
 import { resolve, join, relative, isAbsolute } from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { createSleeperFixture, waitForProbeSignal } from './fixture-control.mjs';
 requireLiveRun('node tools/probes/cli-agents/acp-probe.mjs grok|opencode --run [--full] [--only=test-name]');
 const { ClientSideConnection, ndJsonStream } = await appDependency('@agentclientprotocol/sdk');
 
@@ -18,7 +19,7 @@ const binary=engine==='grok'?(process.env.PROBE_GROK_BINARY||'grok.exe'):(proces
 const evidenceFile=resolve(root,'evidence',`${engine}-${runId}.json`);
 const nonce=`RIN-${randomUUID()}`;
 const report={engine,runId,cwd,sdk:'@agentclientprotocol/sdk@1.9.0',full,only,tests:[],events:[],processes:[],isolation:{scope:'Dedicated fixture and native CLI account/session storage; not an OS sandbox',approval:'Scripted allow_once/reject_once only; no durable grants',credentials:'Native CLI only; no credential file reads or token capture'}};
-let client,stage='setup',policy='deny',active,inFlight,sessionId,pendingHold,ownedToolPid;
+let client,stage='setup',policy='deny',active,inFlight,sessionId,pendingHold,sleeper,sleepCommand;
 const pause=ms=>new Promise(r=>setTimeout(r,ms));
 const safeError=e=>String(e?.message??e).replace(/(?:sk-ant-|xai-)[\w-]+/g,'[REDACTED]').replace(/Bearer\s+\S+/gi,'Bearer [REDACTED]').slice(0,1500);
 const exists=async p=>{try{await stat(p);return true;}catch{return false;}};
@@ -28,7 +29,6 @@ function check(name,pass,details={}){const test={name,status:pass?'pass':'fail',
 function blocked(name,reason){const test={name,status:'blocked',reason};report.tests.push(test);console.log(JSON.stringify({test}));}
 async function timed(p,ms,label){let timer;try{return await Promise.race([p,new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error(`${label} timed out after ${ms}ms`)),ms);})]);}finally{clearTimeout(timer);}}
 function inside(path){if(typeof path!=='string')return false;const rel=relative(cwd,resolve(cwd,path));return !!rel&&!rel.startsWith('..')&&!isAbsolute(rel);}
-const sleepCommand=`node -e "require('fs').writeFileSync('slow-started.txt',String(process.pid));setTimeout(()=>require('fs').writeFileSync('slow-finished.txt','finished'),60000)"`;
 function guardCall(call){const input=call.rawInput??{};const command=input.command??input.cmd;const paths=(call.locations??[]).map(l=>l.path);for(const key of ['file_path','filePath','path'])if(typeof input[key]==='string')paths.push(input[key]);if(command){const dir=input.workdir??input.cwd??input.working_directory;return command===sleepCommand&&(!dir||resolve(dir)===cwd)&&input.is_background!==true&&input.run_in_background!==true;}if(paths.length)return paths.every(inside);return false;}
 const sessionMeta=engine==='grok'?{yoloMode:false,autoMode:false,'x.ai/hooks':{pre_tool_use:[{hookCallbackIds:['fixture-guard']}]}}:{};
 async function open(){
@@ -79,25 +79,23 @@ async function open(){
   return api;
 }
 async function turn(text,name,mode='deny'){if(inFlight)throw new Error('Previous prompt has not settled');stage=name;policy=mode;active={text:'',chunks:0};const collected=active;log('prompt-started',{name});inFlight=client.conn.prompt({sessionId,prompt:[{type:'text',text:'This is a new independent, explicitly authorized fixture test. Earlier denial/cancellation ended the previous task only; do not retry any denied operation.\n'+text}]});try{const response=await timed(inFlight,90000,name);const result={...response,text:collected.text,chunks:collected.chunks};log('prompt-result',result);return result;}catch(e){log('prompt-error',{message:safeError(e),code:e.code,data:e.data});throw e;}finally{active=null;inFlight=null;}}
-async function until(test,label,result,limit=45000){const started=Date.now();let ended=false;result?.then(()=>{ended=true;},()=>{ended=true;});while(Date.now()-started<limit){if(await test())return;if(ended)throw new Error(`Turn ended before ${label}`);await pause(100);}throw new Error(`${label} not observed`);}
 async function runCheck(name,fn){if(only&&!only.includes(name))return;try{await fn();}catch(e){check(name,false,{error:safeError(e)});await client.conn.cancel({sessionId}).catch(()=>{});pendingHold?.();if(inFlight)await timed(inFlight,15000,'settle cancelled prompt');}await save();}
-function alive(pid){try{process.kill(pid,0);return true;}catch(e){if(e.code==='ESRCH')return false;throw e;}}
-function cleanSleeper(){if(ownedToolPid&&alive(ownedToolPid)){execFileSync('taskkill.exe',['/PID',String(ownedToolPid),'/T','/F'],{windowsHide:true,stdio:'ignore'});log('fixture-cleanup',{pid:ownedToolPid});}ownedToolPid=undefined;}
 async function extended(){
   await runCheck('approve-write',async()=>{const before=report.events.length;const file=join(cwd,'allowed.txt');await turn(`Use the file write tool once to create ${file} with exactly APPROVED. Wait for client permission. Do not use shell or any other path.`,'approve-write','allow');check('approve-write',await exists(file)&&(await readFile(file,'utf8')).trim()==='APPROVED'&&report.events.slice(before).some(e=>e.type==='permission-answer'&&e.decision==='allow_once'));});
   await runCheck('deny-write',async()=>{const before=report.events.length;const file=join(cwd,'denied.txt');await turn(`Use the file write tool once to create ${file} with MUST-NOT-EXIST. The client will deny it. After denial, stop immediately. Do not retry or use another tool or path.`,'deny-write');check('deny-write',!await exists(file)&&report.events.slice(before).some(e=>e.type==='permission-answer'&&e.decision==='reject_once'));});
   await runCheck('question-roundtrip',async()=>{const before=report.events.length;const r=await turn('Use your question tool to ask the client to choose BLUE or GREEN. Wait for its answer, then repeat the chosen color. Do not just ask as chat text.','question');check('question-roundtrip',r.text.includes('BLUE')&&report.events.slice(before).some(e=>e.type==='question-form'||e.method==='x.ai/ask_user_question'));});
   await runCheck('cancel-running-tool',async()=>{
-    const result=turn(`Run exactly this one command with the shell/terminal tool in the current directory, do not change it, and keep it in foreground:\n${sleepCommand}\nIt records its PID, waits one minute and creates a completion marker. Wait for the tool; do nothing else.`,'cancel-running-tool','allow');result.catch(()=>{});
-    try{await until(()=>exists(join(cwd,'slow-started.txt')),'sleeper start',result);ownedToolPid=Number((await readFile(join(cwd,'slow-started.txt'),'utf8')).trim());const started=Date.now();await client.conn.cancel({sessionId});pendingHold?.();const r=await timed(result,20000,'cancel response');await pause(1500);const toolAlive=alive(ownedToolPid);check('cancel-running-tool',r.stopReason==='cancelled'&&!toolAlive&&!await exists(join(cwd,'slow-finished.txt')),{stopReason:r.stopReason,elapsedMs:Date.now()-started,toolPid:ownedToolPid,toolAlive});}finally{cleanSleeper();}
+    sleeper=await createSleeperFixture();sleepCommand=sleeper.command;
+    const result=turn(`Run exactly this one command with the shell/terminal tool in the current directory, do not change it, and keep it in foreground:\n${sleepCommand}\nIt connects to a fixture control pipe, waits one minute and creates a completion marker. Wait for the tool; do nothing else.`,'cancel-running-tool','allow');result.catch(()=>{});
+    try{await waitForProbeSignal(()=>sleeper.started,'sleeper start',result);const started=Date.now();await client.conn.cancel({sessionId});pendingHold?.();const r=await timed(result,20000,'cancel response');await pause(1500);const toolAlive=sleeper.running;check('cancel-running-tool',r.stopReason==='cancelled'&&!toolAlive&&!await exists(join(cwd,'slow-finished.txt')),{stopReason:r.stopReason,elapsedMs:Date.now()-started,toolAlive});}finally{await sleeper.close();}
   });
   await runCheck('followup-after-stop',async()=>{const started=Date.now();const r=await turn('Do not use any tools. Reply with exactly READY.','followup-after-stop');check('followup-after-stop',r.text.includes('READY'),{elapsedMs:Date.now()-started});});
   await runCheck('cancel-pending-approval',async()=>{
     pendingHold=null;const file=join(cwd,'pending.txt');const result=turn(`Use the file write tool once to create ${file} with MUST-NOT-EXIST. Wait for permission and do nothing else.`,'cancel-pending-approval','hold');result.catch(()=>{});
-    await until(()=>!!pendingHold,'pending permission',result);const started=Date.now();await client.conn.cancel({sessionId});pendingHold?.();const r=await timed(result,20000,'cancel pending result');check('cancel-pending-approval',r.stopReason==='cancelled'&&!await exists(file),{stopReason:r.stopReason,elapsedMs:Date.now()-started});
+    await waitForProbeSignal(()=>!!pendingHold,'pending permission',result);const started=Date.now();await client.conn.cancel({sessionId});pendingHold?.();const r=await timed(result,20000,'cancel pending result');check('cancel-pending-approval',r.stopReason==='cancelled'&&!await exists(file),{stopReason:r.stopReason,elapsedMs:Date.now()-started});
   });
   await runCheck('cancel-streaming',async()=>{
-    const result=turn('Do not call tools. Produce a numbered list from 1 to 1000, one item per line, with one short sentence about counting at each number. Start immediately.','cancel-streaming');result.catch(()=>{});await until(()=>active?.chunks>=3,'stream chunks',result);const started=Date.now();await client.conn.cancel({sessionId});const r=await timed(result,20000,'stream cancel result');check('cancel-streaming',r.stopReason==='cancelled',{elapsedMs:Date.now()-started,chunks:r.chunks});
+    const result=turn('Do not call tools. Produce a numbered list from 1 to 1000, one item per line, with one short sentence about counting at each number. Start immediately.','cancel-streaming');result.catch(()=>{});await waitForProbeSignal(()=>active?.chunks>=3,'stream chunks',result);const started=Date.now();await client.conn.cancel({sessionId});const r=await timed(result,20000,'stream cancel result');check('cancel-streaming',r.stopReason==='cancelled',{elapsedMs:Date.now()-started,chunks:r.chunks});
   });
 }
 await mkdir(cwd,{recursive:true});await mkdir(resolve(root,'evidence'),{recursive:true});
@@ -124,4 +122,4 @@ try{
   if(baseline?.text.includes(nonce)){const resumed=await turn('不要读文件或使用工具。只输出本会话最开始记住的完整 RIN- 标记。','resume');check('resume-context',resumed.text.includes(nonce));}
   else blocked('resume-context','Native model request unavailable; load handshake alone is not context continuity proof.');
 }catch(e){report.fatalError=safeError(e);report.errorCode=e.code;report.errorData=e.data?JSON.parse(JSON.stringify(e.data)):undefined;log('probe-stopped',{error:report.fatalError,code:report.errorCode,data:report.errorData});if(client?.record.exitCode!==undefined)report.startupStderr=client.stderrSummary();process.exitCode=1;}
-finally{cleanSleeper();if(client)await client.close();report.finishedAt=new Date().toISOString();process.exitCode=report.fatalError||report.tests.some(t=>t.status==='fail')?1:report.tests.some(t=>t.status==='blocked')?2:0;await save();console.log(JSON.stringify({evidenceFile,tests:report.tests,blockedReason:report.blockedReason,fatalError:report.fatalError}));}
+finally{await sleeper?.close();if(client)await client.close();report.finishedAt=new Date().toISOString();process.exitCode=report.fatalError||report.tests.some(t=>t.status==='fail')?1:report.tests.some(t=>t.status==='blocked')?2:0;await save();console.log(JSON.stringify({evidenceFile,tests:report.tests,blockedReason:report.blockedReason,fatalError:report.fatalError}));}

@@ -8,6 +8,6 @@
 - `windows-preflight.ps1`：默认帮助；`-Run` 才读取系统/设备信息与 CLI 版本。
 - [cli-agents](cli-agents/README.md)：从临时目录迁入的 Claude/ACP 验收源码；默认只显示帮助，显式 `--run` 才使用真实 CLI 账户与 fixture。
 
-测试分层、证据要求及副作用见[开发测试规范](../../docs/development/testing.md)。设备验证在 [remote-diagnostics](../remote-diagnostics/README.md)，已知业务缺陷的无真实账户复现在 [qa](../qa/README.md)。
+测试分层、证据要求及副作用见[贡献流程](../../CONTRIBUTING.md)。设备验证在 [remote-diagnostics](../remote-diagnostics/README.md)，已知业务缺陷的无真实账户复现在 [qa](../qa/README.md)。
 
 上述 Codex/Windows 工具每次在 `work/qa` 创建唯一运行目录，报告名为 `result.json`。Node 工具可传 `--output=work/qa/新的目录`，PowerShell 用 `-OutputDirectory work/qa/新的目录`；拒绝已有目录和 QA 目录外路径。旧 `docs/evidence` 中的日期报告保持原样。CLI 版本可以用 `--expected-version` 锁定；历史版本的通过不代表其他版本兼容。

@@ -2,7 +2,6 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { inspectLaunch, launchPlan, projectRoot } from './start.mjs';
-import { readCatalog, readyTasks } from './catalog.mjs';
 
 const git = (...args) => {
   try { return execFileSync('git', ['-c', `safe.directory=${projectRoot}`, ...args], { cwd: projectRoot, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true }).trim(); }
@@ -17,7 +16,6 @@ const manifest = JSON.parse(readFileSync(join(projectRoot, 'tools/release/resour
 const expectedRepository = manifest.repository, remote = publicRemote(git('remote', 'get-url', 'origin'));
 const head = git('rev-parse', 'HEAD'), trackedMain = git('rev-parse', 'refs/remotes/origin/main');
 const dirty = git('status', '--porcelain'), launch = inspectLaunch(launchPlan());
-const { ledger } = readCatalog();
 const status = {
   root: projectRoot,
   source: { version: launch.version, entry: 'npm start', mode: launch.mode, storage: launch.storage, ready: launch.ready, problems: launch.problems },
@@ -30,18 +28,12 @@ const status = {
     workingTreeChanges: dirty === null ? null : dirty ? dirty.split('\n').length : 0,
     note: 'Local Git metadata only; no fetch, push or GitHub freshness claim.',
   },
-  development: {
-    handbook: 'docs/development/README.md', progress: 'docs/development/progress.md',
-    tasks: ledger.tasks.length,
-    counts: Object.fromEntries(Object.keys(ledger.statusMeaning).map(status => [status, ledger.tasks.filter(task => task.status === status).length])),
-    readyTasks: readyTasks(ledger).map(task => task.id),
-  },
+  documentation: { usage: 'README.md', build: 'docs/build.md', status: 'docs/project-status.md' },
   components: {
     desktop: 'prototypes/live2d-codex',
     remote: {
       sourcePresent: ['backend/remote-controller.mjs', 'backend/remote-input.cjs', 'native/rc003-helper.cs', 'renderer/remote-ui.mjs'].every(path => existsSync(join(projectRoot, 'prototypes/live2d-codex', path))),
-      integration: Object.fromEntries(['REM-02', 'REM-03', 'REM-04', 'REM-06'].map(id => [id, ledger.tasks.find(task => task.id === id)?.status ?? 'unknown'])),
-      hardwareAcceptance: ledger.tasks.find(task => task.id === 'REM-05')?.status ?? 'unknown',
+      hardwareAcceptance: 'pending real-device acceptance',
     },
     remoteDiagnostics: { path: 'tools/remote-diagnostics', present: existsSync(join(projectRoot, 'tools/remote-diagnostics/session.mjs')), integratedIntoApp: false },
     privateDots: { path: 'prototypes/dots-bridge', present: existsSync(join(projectRoot, 'prototypes/dots-bridge/src/client.mjs')), includedInPublicRelease: false },
@@ -64,9 +56,6 @@ ${status.git.note}
 RC003: ${status.components.remote.sourcePresent ? 'main-application source integrated' : 'application source incomplete'} | Hardware acceptance: ${status.components.remote.hardwareAcceptance}
 Independent RC003 diagnostic: ${status.components.remoteDiagnostics.present ? 'retained' : 'not present'}
 Dots: ${status.components.privateDots.present ? 'local private adapter present' : 'private adapter not present'}
-Development handbook: ${status.development.handbook}
-Task states: ${JSON.stringify(status.development.counts)}
-Ready to start: ${status.development.readyTasks.join(', ') || 'see dependency gates'}
 Current scope and next steps: docs/project-status.md`);
   for (const problem of launch.problems) console.log(`Setup: ${problem}`);
 }

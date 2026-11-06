@@ -13,6 +13,6 @@
 
 交付视频统一24fps、H.264、SDR BT.709，保留源帧顺序和生成标识，移除生成音轨。`work.png`、`user.png`分别是对应循环成品的首帧。`manifest.json`锁定文件名、时长、帧率、大小和哈希；安装包只复制这六个媒体及规范化清单，不包含母片、提示词草稿、生成账户信息或CLI。
 
-视频仅供本项目壁纸使用，不声明生成内容具有排他版权或适用源代码的MIT许可。生成媒体适用[Dreamina服务条款](https://www.capcut.com/clause/dreamina-terms-of-service)及相应地区/功能条件；制作时保留了可见生成标识。当前作为免费候选包的本地显示素材提供，不据此作无限制商用授权。背景音另见[CC0音源说明](../../ambience/README.md)。
+视频仅供本项目壁纸使用，不声明生成内容具有排他版权或适用源代码的MIT许可。生成媒体适用[Dreamina服务条款](https://www.capcut.com/clause/dreamina-terms-of-service)及相应地区/功能条件；制作时保留了可见生成标识。已随0.6.1/0.6.2免费应用包提供本地显示，交付范围见[许可说明](../../../../../docs/licenses.md)，不据此作无限制商用授权。背景音另见[CC0音源说明](../../ambience/README.md)。
 
-源文件与运行媒体二进制保存在忽略的工作目录/安装包中；源码只记录清单和本说明。复现、检查与验收边界见[连续母片制作单](../../../../../docs/development/two-state-continuous-master-2026-10-27.md)和[主应用接入](../../../../../docs/development/two-state-app-integration-2026-10-27.md)。
+源文件与运行媒体二进制保存在忽略的工作目录/安装包中；源码只记录清单和本说明。构建与媒体完整性检查见[构建说明](../../../../../docs/build.md)，实机边界见[项目状态](../../../../../docs/project-status.md)。

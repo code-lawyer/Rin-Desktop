@@ -19,7 +19,6 @@
     "remote:diagnose": "pwsh -NoProfile -File tools/remote-diagnostics/run.ps1",
     "check:public": "node tools/release/audit-public.mjs --worktree",
     "check:project": "node tools/project/check-project.mjs",
-    "project:docs": "node tools/project/render-progress.mjs",
     "qa:known-issues": "node tools/qa/reproduce-known-issues.mjs",
     "qa:inventory": "node tools/qa/project-inventory.mjs",
     "qa:shutdown": "node tools/qa/shutdown-desktop.mjs",
