@@ -51,13 +51,23 @@ function renderProjects() {
 }
 async function selectProject(id, { preservePage = false } = {}) {
   const p = workspace.projects.find(v => v.id === id); if (!p) return;
-  projectId = id; selected = null; historyVersion++; $('search').value = ''; $('detail').hidden = true; $('empty-detail').hidden = false;
+  projectId = id; resetConversationView(); $('search').value = '';
   if (!preservePage) { $('settings').hidden = true; $('conversations').hidden = false; $('settings-tab').setAttribute('aria-pressed','false'); }
   $('project-title').textContent = p.name; $('project-path').textContent = p.cwd; $('project-path').title = p.cwd;
   $('remove-project').disabled = p.cwd.toLowerCase() === current?.cwd?.toLowerCase(); renderProjects(); updateActivity(); await refreshThreads();
 }
+function resetConversationView() {
+  // Invalidate reads even while offline: returning to the same project must
+  // not accept a response from before the intervening project selection.
+  listVersion++; historyVersion++; selected = null; threads = []; listCursor = null; historyCursor = null;
+  $('threads').replaceChildren(); $('history').replaceChildren(); $('detail').hidden = true; $('empty-detail').hidden = false;
+  $('more-threads').hidden = true; $('more-history').hidden = true;
+}
 async function refreshThreads(append = false) {
-  if (!available() || !projectId) return;
+  if (!available() || !projectId) {
+    if (projectId) $('threads').replaceChildren(node('p', '连接恢复后点击「刷新」读取这个项目的对话。', 'empty-list'));
+    return;
+  }
   const version = ++listVersion, id = projectId;
   if (!append) { threads = []; $('threads').replaceChildren(node('p', '正在读取本地对话…', 'empty-list')); }
   try {
@@ -326,9 +336,7 @@ api.onState(state => {
   const changedModel = changedProvider || current?.model !== state.model || current?.effort !== state.effort || JSON.stringify(current?.models) !== JSON.stringify(state.models);
   current = state;
   if (changedProvider || state.connection === 'connecting' && wasReady) {
-    listVersion++; historyVersion++; selected = null; threads = []; listCursor = null; historyCursor = null;
-    $('threads').replaceChildren(); $('history').replaceChildren(); $('detail').hidden = true; $('empty-detail').hidden = false;
-    $('more-threads').hidden = true; $('more-history').hidden = true;
+    resetConversationView();
   }
   updateActivity(); if (changedModel) fillModels();
   if (ready && (changedProvider || !wasReady) && available()) refreshWorkspace().then(() => refreshThreads()).catch(() => {});

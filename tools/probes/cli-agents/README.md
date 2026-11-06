@@ -6,7 +6,8 @@
 
 Claude 与主应用共用 `claude-auth.mjs`：每次启动或恢复进程后，先读取 SDK 解析的 accountInfo，确认 API key 或受支持的云 API 认证，再发送第一条测试请求。纯订阅 OAuth 或未知来源返回条件阻塞，不尝试切换认证或计费来源。CLI 的登录状态不能替代这项检查；API/云 API 的费用由执行者自行承担。
 
-无 `--run` 时只显示帮助，不读取登录、不创建 fixture、不调用推理。普通 `npm test` 和 CI 不运行这些真实账户测试。
+无 `--run` 时只显示帮助，不读取登录、不创建 fixture、不调用推理。普通 `npm test` 和 CI 不运行这些真实账户测试。取消用例通过每次新建的私有控制管道观察计时进程；清理时关闭管道，由计时进程自行退出，不读取可改写的 PID 文件来终止进程。等待工具或审批期间也会立即接收当前请求的失败结果。
+
 
 ```powershell
 node tools/probes/cli-agents/claude-probe.mjs --help
@@ -21,4 +22,4 @@ node tools/probes/cli-agents/acp-probe.mjs grok --run --full
 node tools/probes/cli-agents/acp-probe.mjs opencode --run --full
 ```
 
-隔离依靠独立目录、协议配置和工具请求检查，不是操作系统沙箱。原生 CLI 仍管理其账户和会话。报告可能含测试会话、目录和固定测试正文，只保存在私人工作目录；对外仅提供脱敏摘要。返回 0/1/2 分别表示本探针的通过、失败、条件阻塞；不代表桌面主应用已通过验收。当前接口、测试限制和主应用验收清单见[测试规范](../../../docs/development/testing.md)。
+隔离依靠独立目录、协议配置和工具请求检查，不是操作系统沙箱。原生 CLI 仍管理其账户和会话。报告可能含测试会话、目录和固定测试正文，只保存在私人工作目录；对外仅提供脱敏摘要。返回 0/1/2 分别表示本探针的通过、失败、条件阻塞；不代表桌面主应用已通过验收。当前接口、测试限制和主应用验收清单见[验收清单](../../release/TEST-ACCEPTANCE.md)。

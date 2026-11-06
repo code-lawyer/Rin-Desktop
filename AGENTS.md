@@ -1,10 +1,9 @@
 # Repository working guide
 
-Read `docs/development/README.md`, then the relevant task in `docs/development/backlog.json`. The current user request defines scope; the ledger explains project context and outstanding work without requiring prior chats.
+Read README.md, docs/project-status.md and CONTRIBUTING.md. The current user request defines scope.
 
-- Preserve existing working-tree changes and the original GitHub repository. Main application paths, user data, model/runtime directories and private Dots have intentional compatibility constraints documented in the repository map.
-- Use the root npm commands. Run `npm run check:project`, relevant tests, the frontend build when affected, and `npm run check:public` for public changes. Index auditing is separate from working-tree auditing.
-- Update task status, dependencies, acceptance and evidence in the JSON ledger, then run `npm run project:docs`. Do not manually edit generated progress/reconciliation pages or claim hardware/Agent acceptance from unit tests.
-- Use `tools/qa` and `tools/probes` for maintained verification source; put run outputs in ignored `work/qa`. Live CLI probes require `--run` and an appropriate task scope; ordinary tests must not consume accounts or access hardware.
-- Keep public documentation independent of private research, raw device/account data and machine-specific absolute paths. Historical material is not the current architecture or application data schema.
-- FIX-01 through FIX-05 and DATA-03 have offline evidence in docs/development/review-fixes.md. DATA-01/02 and AGT-02 offline contracts are covered in docs/development/data-agent-validation.md; test candidates use docs/development/test-acceptance.md. RC003 source integration is in docs/development/remote-integration.md. Remaining work includes RC003 hardware/IME coexistence, real multi-CLI/install acceptance and release scope/license review. Do not claim those from unit tests.
+- Preserve existing changes, the original GitHub repository, user data, models, runtimes, original artwork and private Dots. The main application stays in prototypes/live2d-codex for compatibility; source data stays in work/runtime/avatar.
+- Use root npm commands. Run npm run check:project, relevant tests, the frontend build when affected, and npm run check:public. Audit the actual Git index separately before publishing.
+- Keep only maintained usage, build, privacy, license and acceptance instructions. Update the affected guide when behavior changes; do not recreate historical task ledgers, generated progress pages or dated development reports.
+- Maintained verification belongs in tools/qa and tools/probes. Run output belongs in ignored work/qa. Live CLI probes require --run and explicit task scope; ordinary tests must not consume accounts or access hardware.
+- Keep public documentation independent of private data and machine-specific paths. Do not turn unit tests into claims of real hardware, Agent, installation or license acceptance; pending boundaries are in docs/project-status.md.

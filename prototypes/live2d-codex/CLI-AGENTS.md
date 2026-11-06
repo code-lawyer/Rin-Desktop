@@ -1,8 +1,7 @@
 # CLI Agent 接入
 
-状态更新：2026-10-22。0.5.0 保留 Codex，并以实验能力提供 Claude、Grok Build、OpenCode V2。三个新增后端在选择器和包清单中明确标为实验功能。已完成会话并发/关闭、历史恢复、最终回复与草稿保留的离线回归及前端构建；逐家真实账户、任务、权限、中断、朗读与新安装包验收仍未完成。隔离探针结果不代表主应用完整验收，0.5.0 的实际验收范围以仓库发布记录为准。
+状态更新：2026-11-03。已发布0.6.2保留Codex，并继续以实验能力提供Claude、Grok Build、OpenCode V2。三个新增后端在选择器和包清单中明确标为实验功能。已有会话操作竞争/关闭、历史恢复、最终回复与草稿保留的离线回归；这不表示支持多任务并发。逐家真实账户、任务、权限、中断和朗读矩阵仍未完成，隔离探针结果不代表主应用完整验收。实际安装版本以包内 `portable.json` 为准。
 
-源码开发的日期化验证记录位于 `docs/development/review-fixes.md`，下一步以 `docs/development/progress.md` 为准；这两个文件是开发仓库文档，不要求安装包用户准备它们。
 
 ## 启动与选择
 
@@ -54,7 +53,7 @@ OpenCode 使用 V2 ACP v1，调研基线为 `2.0.32`，不兼容 V1 配置格式
 
 原有 Codex 会话和草稿保持兼容。新增 Agent 的显示缓存位于应用数据目录下 `agents/claude`、`agents/grok`、`agents/opencode`，包括会话元数据、最近 200 条显示消息和本地名称；完整历史仍由 CLI 保存。草稿以 Agent、项目和会话共同定位。切换 Agent 不迁移聊天上下文。
 
-发布脚本包含两个协议 SDK、必要依赖及其许可证，不打包三家的 CLI 程序或账号信息。`portable.json` 的 `experimentalBackends` 与界面标识都来自同一份 Agent catalog。当前已完成无账户契约并随 0.5.0 分发实验入口，真实账户/主应用验收仍未完成，不能标为正式支持。发送前保存原稿，不明回执先核查，不能自动重发。详见[交付说明](../../docs/development/data-agent-validation.md)和[验收表](../../docs/development/test-acceptance.md)。
+发布脚本包含两个协议SDK、必要依赖及其许可证，不打包三家的CLI程序或账号信息。`portable.json` 的 `experimentalBackends` 与界面标识都来自同一份Agent catalog。实验入口自0.5.0提供，0.6.2继续保持该边界；无账户契约已通过，真实账户/主应用验收仍未完成，不能标为正式支持。发送前保存原稿，不明回执先核查，不能自动重发。逐项验证见[验收表](../../tools/release/TEST-ACCEPTANCE.md)。
 
 ## 用户手动验收
 

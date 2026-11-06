@@ -1,29 +1,44 @@
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve, dirname, relative } from 'node:path';
-import { root, readCatalog, validateCatalog, generatedDocuments } from './catalog.mjs';
+import { pathToFileURL } from 'node:url';
 import { publicPathIssue } from './public-path.mjs';
-const data = readCatalog(), problems = validateCatalog(data);
-function checkPath(name, from) {
-  const issue = publicPathIssue(root, name);
-  if (issue) problems.push(`${from}: ${issue}`);
-}
-for (const task of data.ledger.tasks) for (const name of [...task.paths, ...task.evidence.map(item => item.ref)]) checkPath(name, task.id);
-for (const [name, content] of generatedDocuments(data)) if (!existsSync(resolve(root, name)) || readFileSync(resolve(root, name), 'utf8') !== content) problems.push(`${name}: stale; run npm run project:docs`);
-const docs = ['README.md','CONTRIBUTING.md','AGENTS.md','PROJECT_PLAN.md','docs/README.md','docs/build.md','docs/privacy.md','docs/project-status.md','tools/qa/README.md','tools/qa/gui/README.md','tools/probes/README.md','tools/probes/cli-agents/README.md','prototypes/live2d-codex/PORTABLE-README.md','prototypes/live2d-codex/CLI-AGENTS.md'];
-function markdownFiles(directory) { for (const entry of readdirSync(resolve(root, directory), { withFileTypes: true })) { const name = directory + '/' + entry.name; if (entry.isDirectory()) markdownFiles(name); else if (name.endsWith('.md')) docs.push(name); } }
-markdownFiles('docs/development');
-let links = 0;
-for (const file of docs) {
-  if (!existsSync(resolve(root, file))) { problems.push(`Missing documentation ${file}`); continue; }
-  const content = readFileSync(resolve(root, file), 'utf8').replace(/```[\s\S]*?```/g, '');
-  for (const match of content.matchAll(/\]\(([^)\s]+)\)/g)) {
-    const target = match[1]; if (/^(https?:|mailto:|#)/i.test(target)) continue;
-    links++; checkPath(relative(root, resolve(root, dirname(file), decodeURI(target.split('#')[0]))), file);
+
+export const root = resolve(import.meta.dirname, '../..');
+
+// Include new public files and omit working-tree deletions without traversing
+// private data, dependencies, models or directory junctions.
+export function checkProject(directory = root) {
+  const files = [...new Set(execFileSync('git', ['-c', `safe.directory=${directory}`, 'ls-files', '--cached', '--others', '--exclude-standard', '-z'], { cwd: directory, encoding: 'utf8' }).split('\0').filter(Boolean))];
+  const documents = files.filter(name => name.endsWith('.md') && existsSync(resolve(directory, name)) && !name.includes('/licenses/'));
+  const problems = [];
+  const check = (name, source) => {
+    const issue = publicPathIssue(directory, name);
+    if (issue) problems.push(`${source}: ${issue}`);
+  };
+  for (const name of ['README.md', 'AGENTS.md', 'CONTRIBUTING.md', 'docs/build.md', 'docs/privacy.md', 'docs/licenses.md', 'docs/project-status.md', 'tools/release/TEST-ACCEPTANCE.md']) check(name, 'required documentation');
+  let links = 0;
+  for (const file of documents) {
+    const content = readFileSync(resolve(directory, file), 'utf8').replace(/```[\s\S]*?```/g, '');
+    for (const match of content.matchAll(/\]\(([^)\s]+)\)/g)) {
+      const target = match[1];
+      if (/^(https?:|mailto:|#)/i.test(target)) continue;
+      links++;
+      try { check(relative(directory, resolve(directory, dirname(file), decodeURI(target.split('#')[0]))), file); }
+      catch { problems.push(`${file}: invalid link ${target}`); }
+    }
   }
+  const packages = ['package.json', 'package-lock.json', 'prototypes/live2d-codex/package.json', 'prototypes/live2d-codex/package-lock.json'];
+  const version = JSON.parse(readFileSync(resolve(directory, packages[0]), 'utf8')).version;
+  for (const name of packages) {
+    const manifest = JSON.parse(readFileSync(resolve(directory, name), 'utf8'));
+    if (manifest.version !== version || (manifest.packages?.[''] && manifest.packages[''].version !== version)) problems.push(`${name}: version differs from ${version}`);
+  }
+  return { version, documents: documents.length, links, problems };
 }
-const layout = JSON.parse(readFileSync(resolve(root, 'docs/development/repository-layout.json'), 'utf8'));
-for (const name of layout.requiredPublicPaths) checkPath(name, 'repository layout');
-const unknown = readdirSync(root, { withFileTypes: true }).filter(entry => entry.isDirectory() && !layout.topLevelDirectories.includes(entry.name)).map(entry => entry.name);
-for (const name of unknown) problems.push(`Unclassified top-level directory ${name}`);
-console.log(JSON.stringify({ tasks: data.ledger.tasks.length, legacyItems: data.legacy.records.length, documents: docs.length, links, problems }, null, 2));
-if (problems.length) process.exitCode = 1;
+
+if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+  const report = checkProject();
+  console.log(JSON.stringify(report, null, 2));
+  if (report.problems.length) process.exitCode = 1;
+}

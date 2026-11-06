@@ -13,7 +13,7 @@ npm run build
 
 单元测试和前端构建不需要语音模型。Windows 设备组件可执行 `npm run qa:remote-component` 编译并检查管道，不访问设备。源码初次连接时自动准备组件；打包脚本预编译到 runtime，使用 Windows 自带 .NET Framework 4.8 和 WinMetadata，不依赖 Python 或 Windows SDK。用户自行安装所选 Agent 的 Windows 原生 CLI：Codex、Claude Code、Grok Build 或 OpenCode V2。新版协议依赖锁定在应用目录的 `package-lock.json`；发布脚本收集 SDK 及必要依赖，不打包 CLI 程序或账号。新增 Agent 的使用和手动验收见 [CLI Agent 说明](../prototypes/live2d-codex/CLI-AGENTS.md)；基础构建通过不等于新增后端完成主应用验收，当前范围见[项目状态](project-status.md)。应用的 Node 运行时、默认女性壁纸与 Cubism Core 从锁定的基础安装包获取。当前壁纸仅使用 `assets/stills/female-v2`、`assets/stills/female-v2-4k` 和 `assets/motion/female`；男士资源已删除，旧安装包恢复工具会过滤它们，打包保留兼容女生素材并明确排除男士资源。
 
-RC003 输入层还使用锁定的 Koffi 3.3.3 和 `@koromix/koffi-win32-x64` 预编译包，通过上述 npm 安装。不要省略 Windows 本平台的 optional dependency。打包脚本显式复制该原生包及许可，并在输出目录加载输入模块；组件检查还在独立副本中用 Electron 的 Node 模式核对加载。连接、按钮设置、麦克风和待验收范围见 [RC003 接入说明](development/remote-integration.md)。
+RC003 输入层还使用锁定的 Koffi 3.3.3 和 `@koromix/koffi-win32-x64` 预编译包，通过上述 npm 安装。不要省略 Windows 本平台的 optional dependency。打包脚本显式复制该原生包及许可，并在输出目录加载输入模块；组件检查还在独立副本中用 Electron 的 Node 模式核对加载。连接、按钮设置、麦克风和待验收范围见 [项目状态](project-status.md)。
 
 ```powershell
 npm run resources
@@ -53,9 +53,9 @@ npm run package
 
 当前两态动态分支还要求 `prototypes/live2d-codex/assets/motion/female/manifest.json` 与正式四段视频、两张回退图。清单沿用播放器的 `format: 1`、`clips`、`posters`，并增加 `integrity`：以六个媒体文件名为键，记录各自的正整数字节数 `bytes` 与小写 SHA-256 `sha256`。四个片段ID为 `work-loop`、`work-user`、`user-loop`、`user-work`；每个条目包含独立的 `.mp4` 文件名、实际 `duration` 与 `fps`，两张 `.png` 由 `posters.work/user` 指定。
 
-正式/测试/便携打包入口在写入新包之前校验这些文件，缺失或哈希不符会停止；只收集六个媒体和规范化运行清单，不把生成账户响应、母片或制作目录整体打包。复制后的字节再次校验，最后才写运行清单。安装包核查还将这六个媒体与当前源码资源逐项比较。完整性校验不代表接缝、4K效果或许可验收。[本轮制作与接入记录](development/two-state-app-integration-2026-10-27.md)区分源代码、媒体和安装验收。已发布0.5.0的基础资源不包含本次四段视频；0.6.0旧候选也不包含2026-10-28后续代码与安全修复，不能用版本号代替包内容核对。
+正式/测试/便携打包入口在写入新包之前校验这些文件，缺失或哈希不符会停止；只收集六个媒体和规范化运行清单，不把生成账户响应、母片或制作目录整体打包。复制后的字节再次校验，最后才写运行清单。安装包核查还将这六个媒体与当前源码资源逐项比较。完整性校验不代表接缝、4K效果或许可验收。源代码、媒体完整性与实际安装验收分别记录。已发布0.5.0的基础资源不包含本次四段视频；0.6.0旧候选也不包含2026-10-28后续代码与安全修复，不能用版本号代替包内容核对。
 
-内部验收使用 `npm run package:test -- --id=<新的测试标识>`，需要相同资源、Inno Setup 和 Windows tar。该命令生成独立 ZIP 与测试安装器、文件/源码指纹、离线检查、数据恢复和验收表，输出 `release/test-builds/<标识>`；不修改正式资源清单、基础版本或已有产物。测试安装器使用独立 AppId/目录/快捷方式，测试数据默认隔离。构建不启动真实 Agent 或硬件，人工验收按[测试清单](development/test-acceptance.md)进行。
+内部验收使用 `npm run package:test -- --id=<新的测试标识>`，需要相同资源、Inno Setup 和 Windows tar。该命令生成独立 ZIP 与测试安装器、文件/源码指纹、离线检查、数据恢复和验收表，输出 `release/test-builds/<标识>`；不修改正式资源清单、基础版本或已有产物。测试安装器使用独立 AppId/目录/快捷方式，测试数据默认隔离。构建不启动真实 Agent 或硬件，人工验收按[测试清单](../tools/release/TEST-ACCEPTANCE.md)进行。
 
 语音模型不打包、不上传到本项目 Release。`prototypes/live2d-codex/voice-resources.json` 只保存上游仓库、固定 revision、文件大小和 SHA-256。运行 `node tools/release/build-voice-manifest.mjs` 可从 Hugging Face 元数据重建清单；清单生成器不会下载权重。资源目录版本独立于应用版本，普通应用升级不触发重复模型下载。
 

@@ -170,6 +170,16 @@ if(process.argv.includes('--video') || process.argv.includes('--fixture-video'))
     checks.push('remote-project-thread-and-category-focus');
     await evaluate(workbench,`document.getElementById('settings-tab').click();document.querySelector('[data-setting-target="remote-settings"]').click()`);await capture(workbench,'remote-settings',1120,760);await capture(workbench,'remote-settings-compact',760,540);
     await evaluate(workbench,`document.querySelector('[data-setting-target="playback-settings"]').click()`);await capture(workbench,'voice-settings-compact',760,540);await capture(workbench,'voice-settings',1120,760);
+    // A connection outage must not leave project A's clickable conversations
+    // under project B's heading. Exercise the bundled renderer in real Chromium.
+    await evaluate(workbench,`(async()=>{const value=(await companion.workspace()).value;value.version++;value.projects.push({id:'second-project',name:'Second project',cwd:'C:/Projects/Second'});interfaceFixture.emit('workspace',value);interfaceFixture.emit('state',{connection:'error'});document.querySelector('[data-project-id="second-project"]').click();})()`);await delay(80);
+    assert.equal(await evaluate(workbench,`document.getElementById('project-title').textContent`),'Second project');
+    assert.equal(await evaluate(workbench,`document.querySelectorAll('.thread-row').length`),0,'offline project selection removes old conversations');
+    assert.equal(await evaluate(workbench,`document.getElementById('more-threads').hidden && document.getElementById('more-history').hidden && document.getElementById('detail').hidden`),true);
+    await evaluate(workbench,`interfaceFixture.emit('state',{connection:'ready'})`);await delay(100);
+    assert.equal(await evaluate(workbench,`document.querySelectorAll('.thread-row').length`),2,'reconnection refreshes the selected project');
+    assert.equal(await evaluate(workbench,`document.getElementById('project-title').textContent`),'Second project');
+    checks.push('offline-project-selection-and-reconnect');
     assert.deepEqual(errors,[],'Renderer console errors');writeFileSync(join(output,'summary.json'),JSON.stringify({checks,errors,synthetic:true,accounts:false,hardware:false},null,2));
     for(const win of windows)win.destroy();app.exit(0);
   }).catch(error=>{console.error(error);writeFileSync(join(output,'failure.txt'),String(error.stack));app.exit(1);});

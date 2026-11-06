@@ -18,11 +18,8 @@ docs/*
 !docs/build.md
 !docs/privacy.md
 !docs/licenses.md
-!docs/release-audit.md
 !docs/README.md
 !docs/project-status.md
-!docs/development/
-!docs/development/**
 prototypes/qwen-tts-evaluation/
 prototypes/dots-bridge/
 prototypes/live2d-codex/backend/dots.mjs

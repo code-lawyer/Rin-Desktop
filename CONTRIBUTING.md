@@ -1,14 +1,11 @@
-# 继续开发 Rin Desktop
+# 维护与贡献
 
-从[开发手册](docs/development/README.md)开始。任务与进度以 `docs/development/backlog.json` 为准；生成的[施工清单](docs/development/progress.md)包含责任角色、前置任务、代码位置、验收和下一动作。
+使用入口见 [README](README.md)，构建与资源准备见 [构建说明](docs/build.md)，支持范围见 [项目状态](docs/project-status.md)。
 
-1. 先查看工作区状态，保留他人/先前未提交改动；选择一个任务 ID，检查依赖和已知限制。
-2. 在台账中标为施工中，记录实际责任人时使用真实信息；没有开工的事项保持待施工。
-3. 修改对应模块，针对行为与失败路径验证。不要在普通自动测试里调用真实账户、设备或模型。
-4. 更新受影响的目标、架构、数据、决策或发布说明；验收结果按[模板](docs/development/templates/verification.md)记录。
-5. 更新台账证据并运行 `npm run project:docs`；通过 `npm run check:project`、`npm test`、`npm run build`、`npm run check:public`。
-6. 对实际暂存文件执行 index 审计并检查 diff，再按[原仓库同步流程](docs/development/data-and-release.md)提交。源代码同步和应用 Release 分别记录。
+1. 保留现有工作区变动。主应用位于 `prototypes/live2d-codex`，根目录 npm 命令是统一入口；不要为了整理目录移动用户数据、模型、runtime 或私人 Dots。
+2. 为实际行为缺陷补充有意义的回归测试。普通测试使用合成账户/协议，不调用真实 CLI、麦克风或遥控器；维护验证源放在 `tools/qa` 和 `tools/probes`，运行产物放在忽略的 `work/qa`。
+3. 运行 `npm run check:project`、相关测试、受影响的前端构建及 `npm run check:public`。发布前运行完整 `npm test`，并使用 `node tools/release/audit-public.mjs --staged` 审计实际暂存内容。
+4. 修改使用行为时同步维护对应指南；当前限制集中在项目状态，不维护重复任务台账、过程报告或自动生成的进度页。
+5. 提交前检查 diff 和公开文件清单；通过原 GitHub 仓库的分支/PR 同步。源码提交与应用 Release 分别验收；既有安装包不会因源码更新自动改变。
 
-`npm run qa:known-issues` 是当前三个问题的合成复现。它返回 1 表示还有已知缺陷，不能通过忽略输出把任务标为完成。对应修复应加入正式回归测试。
-
-源码默认用户数据位置、既有模型、私人 Dots 和 Qwen 旧环境需要保留。移动文件先查引用与忽略/打包规则，确定目标未占用并保存备份；不为整理目录修改业务语义或重建 Git 历史。
+安装候选与实机测试使用 [验收清单](tools/release/TEST-ACCEPTANCE.md)。检查项尚未执行时保持未测，不将单元测试、页面缩放或组件编译描述为硬件、系统 DPI 或真实账户验收。

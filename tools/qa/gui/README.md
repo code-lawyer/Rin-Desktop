@@ -21,20 +21,4 @@ npm run qa:stills -- --character-switch
 | [bubble-drag](cases/bubble-drag.mjs) | wallpaper | 气泡拖动、焦点呼回、草稿、位置恢复、高 DPI |
 | [character-switch](cases/character-switch.mjs) | 隔离生产 renderer | 转发 `qa:stills -- --character-switch`；当前图片失败、重试、快速切换、声线及新进程恢复 |
 
-原来的 `check-avatar-controls`、`check-avatar-drag`、`check-placement`、`check-bubble-drag` 与 `verify-character-switch` 路径转发到上述实现，默认也只显示帮助。人物切换的两个兼容入口仍要求 `--run`；旧 `--package` 明确拒绝，不能用源代码隔离验证声称安装包验收，实际包按 REL-01 与发布清单另测。三个 avatar 验收明确使用 avatar 模式。普通自动测试检查默认门槛和当前图片请求契约，不代表真实 GUI 已验收。
-
-## 历史工具去向（2026-10-21）
-
-15 个旧 `check-*.mjs` 原文，以及迁移前的人物切换工具，完整保存在本机 `work/archive/gui-acceptance-2026-10-21/`；`manifest.json` 记录原路径、SHA-256 与维护替代。原始验收数据和历史证据保持原位。
-
-| 历史入口 | 当前替代或保留原因 |
-| --- | --- |
-| check-characters | character-switch；旧脚本含模型检查，不作为普通人物回归 |
-| check-bubble、check-ui | placement、bubble-drag；旧 DOM/CDP 检查保留为历史 |
-| check-review-fixes | Agent 契约、草稿和输入单元测试；旧脚本含真实 Agent 提示词 |
-| check-integration | 历史集成验收；正式多CLI与遥控器闭环由AGT-03/04/05和REM-02至06重新验收 |
-| check-package、check-final-package | 旧机器/包路径验证；当前发布流程及 REL 任务接管 |
-| check-complete-narration、check-resident-speech、check-resident-ui | 真实模型/声音验收原文保留；离线边界由FIX-01/03回归覆盖，真实声音和安装候选由AGT-03/04/05及REL-01接管 |
-| check-wallpaper | 历史场景采样；当前人物切换和壁纸验收任务接管 |
-
-以上 11 个入口的归档提示桩已从主应用 scripts 目录移出，保存在本机 `work/archive/project-quality-2026-10-21/retired-entrypoints/` 并附哈希清单；原始验收实现仍在前述历史归档。维护目录只保留五个实际转发入口。若后续任务需要复用历史断言，应先迁入这里并采用隔离上下文，而不是直接批量执行归档。设备、模型和发布验收仍按[测试规范](../../../docs/development/testing.md)记录真实结果。
+原来的 `check-avatar-controls`、`check-avatar-drag`、`check-placement`、`check-bubble-drag` 与 `verify-character-switch` 路径转发到上述实现，默认也只显示帮助。人物切换的两个兼容入口仍要求 `--run`；旧 `--package` 明确拒绝，不能用源代码隔离验证声称安装包验收，实际包按[验收清单](../../release/TEST-ACCEPTANCE.md)另测。三个 avatar 验收明确使用 avatar 模式。普通自动测试检查默认门槛和当前图片请求契约，不代表真实 GUI 已验收。
