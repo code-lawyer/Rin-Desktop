@@ -6,6 +6,7 @@ import { readFile, readdir, stat } from 'node:fs/promises';
 import { join, resolve, relative, isAbsolute } from 'node:path';
 import { createRunDirectory, writeRunReport } from './run-output.mjs';
 import { inspectMotionAssets } from '../release/motion-assets.mjs';
+import { inspectPuppetAssets } from '../release/puppet-assets.mjs';
 import { retiredWallpaperAsset } from '../release/resource-assets.mjs';
 
 const option = key => process.argv.find(arg => arg.startsWith(`--${key}=`))?.slice(key.length + 3);
@@ -20,6 +21,9 @@ const hash = async file => { const h = createHash('sha256'); for await (const ch
 const manifest = await json(join(directory, 'manifest.json'));
 const motion = await inspectMotionAssets(join(directory, 'resources/app/assets/motion/female'));
 const sourceMotion = await inspectMotionAssets(join(root, 'prototypes/live2d-codex/assets/motion/female'));
+const puppet = await inspectPuppetAssets(join(directory, 'resources/app/assets/scene/rin-poses'));
+const sourcePuppet = await inspectPuppetAssets(join(root, 'prototypes/live2d-codex/assets/scene/rin-poses'));
+assert.deepEqual(puppet.manifest, sourcePuppet.manifest, 'Packaged character differs from the source rig');
 assert.deepEqual(motion.manifest, sourceMotion.manifest, 'Packaged motion media differs from the current approved runtime files');
 assert.equal(manifest.version, (await json(join(root, 'package.json'))).version);
 assert.equal(manifest.version, (await json(join(directory, 'resources/app/package.json'))).version);
@@ -39,6 +43,7 @@ for (const entry of manifest.files) {
   assert.equal(await hash(file), entry.sha256, entry.file);
   bytes += entry.bytes;
   const local = entry.file.replace(/^resources\/app\//, '');
+  assert.ok(!/^assets\/livliv\//.test(local), 'Rejected split character must not be packaged: ' + entry.file);
   assert.ok(!retiredWallpaperAsset(local.replace(/^assets\//, '')), 'Retired wallpaper in package: ' + entry.file);
   if (entry.file !== local && (/^(main\.cjs|preload\.cjs|voice-resources\.json|backend\/|renderer\/|dist\/)/.test(local) || revisedAssetMetadata.has(local))) {
     assert.equal(await hash(join(root, 'prototypes/live2d-codex', local)), entry.sha256, 'Source mismatch: ' + local);
@@ -66,6 +71,6 @@ if (option('baseline')) {
   }
   assert.ok(preserved > 10);
 }
-const report = {version:manifest.version,files:names.size,bytes,sourceMatches,motionMediaFiles:motion.names.length,preservedArtworkAndCpuFiles:preserved,noModelsCredentialsOrCli:true,accounts:false,hardware:false,passed:true};
+const report = {version:manifest.version,files:names.size,bytes,sourceMatches,motionMediaFiles:motion.names.length,puppetFiles:puppet.names.length,preservedArtworkAndCpuFiles:preserved,noModelsCredentialsOrCli:true,accounts:false,hardware:false,passed:true};
 await writeRunReport(output,report);
 console.log(JSON.stringify({output,...report}));

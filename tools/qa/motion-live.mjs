@@ -1,4 +1,4 @@
-import WebSocket from 'ws';
+import { connectPage } from './cdp.mjs';
 import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import assert from 'node:assert/strict';
@@ -13,7 +13,7 @@ const pages=await (await fetch(`http://127.0.0.1:${port}/json/list`,{signal:Abor
 const find=part=>{const page=pages.find(item=>item.type==='page'&&item.url.startsWith('app://local/renderer/')&&item.url.includes(part));if(!page)throw new Error('Project application window not found: '+part);return page;};
 let workspace,wallpaper;
 try {
-  workspace=await connect(find('workbench.html'));wallpaper=await connect(find('view=wallpaper'));
+  workspace=await connectPage(find('workbench.html'), port);wallpaper=await connectPage(find('view=wallpaper'), port);
   const output=await createRunDirectory('motion-live');
   const before=await workspace.evaluate('(async()=>{const s=(await companion.workspace()).value;return {character:s.settings.character,qwenVoice:s.settings.qwenVoice,voice:s.settings.voice};})()');
   if(args.includes('--enable-preview')){
@@ -46,15 +46,3 @@ try {
   if(!passed)process.exitCode=2;
   if(args.includes('--quit'))await workspace.evaluate("companion.windowAction('quit')").catch(()=>{});
 } finally {workspace?.close();wallpaper?.close();}
-
-async function connect(page){
-  const url=new URL(page.webSocketDebuggerUrl);
-  if(!['localhost','127.0.0.1'].includes(url.hostname)||Number(url.port)!==port)throw new Error('Debug target is not the selected local app.');
-  const socket=new WebSocket(url,{handshakeTimeout:10000});await new Promise((resolve,reject)=>{socket.once('open',resolve);socket.once('error',reject);});
-  socket.on('error',()=>{}); // A transport error also closes the socket and rejects pending commands below.
-  let id=0;const pending=new Map();
-  socket.on('message',bytes=>{const value=JSON.parse(bytes);const item=pending.get(value.id);if(item){pending.delete(value.id);clearTimeout(item.timer);value.error?item.reject(new Error(value.error.message)):item.resolve(value.result);}});
-  socket.on('close',()=>{for(const item of pending.values()){clearTimeout(item.timer);item.reject(new Error('Application closed'));}pending.clear();});
-  const send=(method,params={})=>new Promise((resolve,reject)=>{const key=++id,timer=setTimeout(()=>{pending.delete(key);reject(new Error('Application inspection timed out'));},15000);pending.set(key,{resolve,reject,timer});socket.send(JSON.stringify({id:key,method,params}));});
-  return{send,close:()=>socket.close(),evaluate:async expression=>{const result=await send('Runtime.evaluate',{expression,awaitPromise:true,returnByValue:true});if(result.exceptionDetails)throw new Error(result.exceptionDetails.text);return result.result?.value;}};
-}

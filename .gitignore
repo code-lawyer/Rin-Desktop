@@ -30,6 +30,7 @@ prototypes/live2d-codex/assets/*
 !prototypes/live2d-codex/assets/ambience/
 !prototypes/live2d-codex/assets/stills/
 !prototypes/live2d-codex/assets/motion/
+!prototypes/live2d-codex/assets/scene/
 prototypes/live2d-codex/assets/motion/*
 !prototypes/live2d-codex/assets/motion/female/
 prototypes/live2d-codex/assets/motion/female/*

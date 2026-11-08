@@ -4,6 +4,7 @@ import { createRequire } from 'node:module';
 import { resolve, join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import stills from '../../prototypes/live2d-codex/backend/still-settings.cjs';
+import { POSE_FILES } from '../../prototypes/live2d-codex/renderer/pose-assets.mjs';
 
 export const projectRoot = resolve(import.meta.dirname, '../..');
 const providers = new Set(['codex', 'claude', 'grok', 'opencode', 'dots']);
@@ -69,6 +70,7 @@ export function inspectLaunch(plan, { platform = process.platform, nodeVersion =
   if (plan.mode === 'avatar') resources.push('assets/hiyori/Hiyori.model3.json');
   else {
     for (const pose of stills.POSES) resources.push(`assets/stills/female-v2-4k/${pose}.png`);
+    for (const file of [...POSE_FILES, 'manifest.json']) resources.push(`assets/scene/rin-poses/${file}`);
     resources.push('assets/ambience/light-rain.ogg', 'assets/ambience/soft-keyboard.ogg');
   }
   const missing = resources.filter(name => !existsSync(join(plan.appRoot, name)));

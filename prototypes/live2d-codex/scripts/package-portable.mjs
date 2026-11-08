@@ -5,6 +5,7 @@ import { execFileSync } from 'node:child_process';
 import { writeManifest } from '../../../tools/release/manifest.mjs';
 import { releaseVersion, requireFreshDirectory } from '../../../tools/release/release-inputs.mjs';
 import { inspectMotionAssets, copyMotionAssets } from '../../../tools/release/motion-assets.mjs';
+import { inspectPuppetAssets, copyPuppetAssets } from '../../../tools/release/puppet-assets.mjs';
 import { retiredWallpaperAsset } from '../../../tools/release/resource-assets.mjs';
 import { copyAgentDependencies } from './copy-agent-dependencies.mjs';
 import catalog from '../backend/agent-catalog.cjs';
@@ -20,6 +21,8 @@ await requireFreshDirectory(output);
 const resources = resolve(process.env.VIBE_RESOURCE_APP || root);
 const motionDirectory = join(root, 'assets/motion/female');
 await inspectMotionAssets(motionDirectory);
+const puppetDirectory = join(root, 'assets/scene/rin-poses');
+await inspectPuppetAssets(puppetDirectory);
 await mkdir(output,{recursive:true});
 const appDir = join(output,'resources/app'); await mkdir(appDir,{recursive:true});
 const clean = source => !/(^|[/\\])(__pycache__|cache|\.cache|\.git)([/\\]|$)/.test(relative(resources,source)) && !/\.(pyc|pyo|log|tmp)$/.test(source);
@@ -36,6 +39,7 @@ for (const name of ['character-previews','stills','ambience']) await cp(join(roo
   recursive:true, filter:source=>!retiredWallpaperAsset(relative(join(root,'assets'),source)),
 });
 await copyMotionAssets(motionDirectory, join(appDir, 'assets/motion/female'));
+await copyPuppetAssets(puppetDirectory, join(appDir, 'assets/scene/rin-poses'));
 await mkdir(join(appDir,'scripts'),{recursive:true});
 await cp(join(root,'scripts/wallpaper-host.ps1'),join(appDir,'scripts/wallpaper-host.ps1'));
 for (const name of ['sherpa-onnx-node','sherpa-onnx-win-x64']) await cp(join(root,'node_modules',name),join(appDir,'node_modules',name),{recursive:true});

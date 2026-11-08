@@ -1,0 +1,1 @@
+import './action-assets.mjs';

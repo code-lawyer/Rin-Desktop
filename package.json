@@ -1,6 +1,6 @@
 {
   "name": "vibe-voice",
-  "version": "0.6.2",
+  "version": "0.6.3-rc.1",
   "private": true,
   "type": "module",
   "description": "Windows 4K wallpaper companion for Codex with local voice",
@@ -30,6 +30,7 @@
     "qa:data-agent": "node tools/qa/data-agent.mjs",
     "data:recover": "node tools/qa/recover-data.mjs",
     "probe:claude": "node tools/probes/cli-agents/claude-probe.mjs",
+    "probe:codex": "node tools/probes/codex-probe.mjs",
     "probe:grok": "node tools/probes/cli-agents/acp-probe.mjs grok",
     "probe:opencode": "node tools/probes/cli-agents/acp-probe.mjs opencode",
     "test": "npm --prefix prototypes/live2d-codex test && node --test tests/*.test.mjs",
@@ -68,9 +69,32 @@
     "test:motion": "node --test tests/motion-wallpaper.test.mjs",
     "qa:motion": "node tools/qa/motion-desktop.mjs",
     "qa:motion-live": "node tools/qa/motion-live.mjs",
-    "qa:still-scene": "node tools/qa/still-scene.mjs"
+    "qa:still-scene": "node tools/qa/still-scene.mjs",
+    "art:scene-avatar": "node tools/project/prepare-pose-avatar.mjs",
+    "qa:scene-visual": "node tools/qa/pose-visual.mjs",
+    "qa:puppet": "node tools/qa/puppet-desktop.mjs",
+    "qa:puppet-package": "node tools/qa/puppet-package.mjs",
+    "test:puppet": "node --test tests/puppet-wallpaper.test.mjs tests/still-renderer.test.mjs",
+    "art:action-avatar": "node tools/project/prepare-action-avatar.mjs",
+    "qa:actions": "node tools/qa/action-visual.mjs",
+    "test:actions": "node --test tests/action-rig.test.mjs",
+    "art:pose-avatar": "node tools/project/prepare-pose-avatar.mjs",
+    "test:poses": "node --test tests/pose-dissolve.test.mjs",
+    "qa:poses": "node tools/qa/pose-visual.mjs",
+    "qa:pose-options": "node tools/qa/pose-options.mjs",
+    "qa:release-soak": "node tools/qa/release-soak.mjs",
+    "qa:installer": "pwsh -NoProfile -File tools/qa/installer-check.ps1",
+    "qa:agent-desktop": "node tools/qa/agent-desktop.mjs",
+    "qa:local-speech": "node tools/qa/local-speech.mjs",
+    "qa:data-copy": "node tools/qa/data-copy.mjs",
+    "qa:prerequisites": "node tools/qa/prerequisites.mjs",
+    "qa:upgrade-data": "node tools/qa/upgrade-data.mjs",
+    "qa:agent-interactions": "node tools/qa/agent-interactions.mjs"
   },
   "dependencies": {
     "ws": "8.22.0"
+  },
+  "devDependencies": {
+    "sharp": "0.35.5"
   }
 }

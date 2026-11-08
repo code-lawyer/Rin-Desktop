@@ -12,6 +12,7 @@ Original application source is MIT. This distribution includes separately licens
 | Agent Client Protocol SDK | `@agentclientprotocol/sdk` 1.9.0; Apache-2.0; license retained in the packaged dependency |
 | Koffi | 3.3.3; MIT; Windows x64 prebuilt FFI for application-local input handling; `licenses/koffi-LICENSE.txt` and the source package's notices retained in this distribution |
 | PixiJS, marked, pixi-live2d-display | MIT; copies in `licenses/` |
+| Rin animated painting | Project-generated complete scene and registered expression crops; artwork terms in `resources/app/assets/scene/rin-poses/README.md`; custom WebGL2 renderer and integration use the project MIT license; no LivLiv runtime or sample characters are bundled |
 | Live2D Cubism Core | Proprietary; unmodified runtime, `vendor/LICENSE-CubismCore.md` and `licenses/live2d-proprietary-agreement.html` |
 | Rainy-window scene | Project-generated artwork and custom rig; permitted for display, modification and redistribution with this application; no claim of exclusive rights over generated imagery |
 | Sherpa-onnx | 1.13.8; Apache-2.0 source with GPL-3.0-or-later eSpeak NG statically included in native speech binaries; see corresponding-source attachment |

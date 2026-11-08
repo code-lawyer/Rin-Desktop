@@ -7,6 +7,7 @@ import characters from '../prototypes/live2d-codex/backend/character-profiles.cj
 import stillSettings from '../prototypes/live2d-codex/backend/still-settings.cjs';
 import { stillPose, createIdleCycle, idleDuration, stillActivity } from '../prototypes/live2d-codex/renderer/still-policy.mjs';
 import { isCharacterImageRequest } from '../tools/qa/character-asset-probe.mjs';
+import { puppetPose, puppetActivity } from '../prototypes/live2d-codex/renderer/puppet-state.mjs';
 
 const source = (await readFile(new URL('../prototypes/live2d-codex/renderer/still-wallpaper.js', import.meta.url), 'utf8'))
   .replace(/^import .*;\r?\n/gm, '').replace('export async function', 'async function');
@@ -14,7 +15,7 @@ const tick = () => new Promise(resolve => setImmediate(resolve));
 
 async function fixture(t, { reload = true, pose = 'work' } = {}) {
   let receive, release, waiting = true;
-  const ready = [], reports = [], decisions = [], draws = [], requests = [], events = new Map();
+  const ready = [], reports = [], decisions = [], draws = [], requests = [], puppets = [], events = new Map();
   const context = { drawImage(...args) { draws.push(args); }, createLinearGradient: () => ({ addColorStop() {} }), fillRect() {} };
   const host = { dataset: {}, clientWidth: 1280, clientHeight: 800, append() {} };
   const initial = { character: 'female', characterRequest: 0, paused: false, stills: { stillPose: pose, ambienceEnabled: false } };
@@ -25,18 +26,24 @@ async function fixture(t, { reload = true, pose = 'work' } = {}) {
     commitWallpaper(info) { return info.requestId > 0 && waiting ? new Promise(resolve => { release = () => { waiting = false; resolve({ ok: true, value: true }); }; }) : Promise.resolve({ ok: true, value: true }); },
     finishWallpaper(info, accept) { decisions.push([info.character, accept]); return { ok: true, value: accept }; },
   };
-  const runtime = vm.createContext({ StillSequence, characters, stillSettings, stillPose, createIdleCycle, idleDuration, stillActivity, console, document,
+  const runtime = vm.createContext({ StillSequence, characters, stillSettings, stillPose, puppetPose, puppetActivity, createIdleCycle, idleDuration, stillActivity, console, document,
     performance: { now: () => 0 }, setTimeout: () => 1, clearTimeout() {}, window: { devicePixelRatio: 1, addEventListener() {}, removeEventListener() {} },
     Image: class { get naturalWidth() { return this.src.includes('female-v2-4k') ? 3840 : 1586; } get naturalHeight() { return this.src.includes('female-v2-4k') ? 2400 : 992; } decode() { requests.push(this.src); return Promise.resolve(); } },
     ResizeObserver: class { observe() {} disconnect() {} },
     AmbientPreview: class { update() { return { rain: 0, keys: 0 }; } enable() { return Promise.resolve(true); } close() {} },
+    PuppetWallpaper: class {
+      static async prepare() { const puppet = new this(); puppets.push(puppet); return puppet; }
+      player = { contextLost: false }; pose = 'work'; fit() {} activate() { this.active = true; }
+      update(pose, presentation, hidden) { if (!presentation.paused && !hidden) this.pose = pose; }
+      close() { this.closed = true; }
+    },
   });
   vm.runInContext(source, runtime);
   const app = await runtime.startStillWallpaper({ host, api }); t.after(() => app.destroy()); await tick();
   let current = initial;
   const present = patch => { current = { ...current, ...patch }; receive(current); };
   if(reload) { present({ character: 'female', characterRequest: 1 }); await tick(); }
-  return { host, ready, reports, draws, requests, decisions, present, app, release: () => release(), hide(value) { document.hidden = value; events.get('visibilitychange')(); } };
+  return { host, ready, reports, draws, requests, decisions, puppets, present, app, release: () => release(), hide(value) { document.hidden = value; events.get('visibilitychange')(); } };
 }
 
 test('wallpaper fault injection matches actual anime requests and only approved realistic poster routes', async t => {
@@ -47,17 +54,45 @@ test('wallpaper fault injection matches actual anime requests and only approved 
   for(const url of ['app://local/assets/stills/male/work.png','https://local/assets/stills/female-v2-4k/work.png','app://local/assets/ambience/rain.mp3'])for(const style of ['anime','realistic'])assert.equal(isCharacterImageRequest(url,style),false);
 });
 
-test('female frames preserve the entire new pose and report manual/pause state without loading the old work body', async t => {
+test('anime states reuse one scene and preserve its full-size original loading fallback', async t => {
   const h=await fixture(t,{reload:false,pose:'cup'});
   const imageDraws=h.draws.filter(args=>args[0]?.src);
   assert.equal(imageDraws.length,1);
-  assert.match(imageDraws[0][0].src,/stills\/female-v2-4k\/cup\.png/);
+  assert.match(imageDraws[0][0].src,/stills\/female-v2-4k\/attention\.png/);
   assert.equal(imageDraws[0].length,3,'draw the full image, not a cropped head region');
   assert.equal(h.reports.at(-1).activity,'manual');
+  assert.equal(h.reports.at(-1).model,'rin-scene');
   assert.equal(h.reports.at(-1).sourceWidth,3840);
   assert.equal(h.reports.at(-1).sourceHeight,2400);
+  h.present({stills:{stillPose:'window'}});await tick();
+  assert.equal(h.puppets.length,1);assert.equal(h.host.dataset.pose,'window');
   h.present({paused:true});assert.equal(h.reports.at(-1).activity,'paused');
-  assert.equal(h.host.dataset.pose,'cup');
+  assert.equal(h.host.dataset.pose,'window');
+});
+
+test('GPU loss during commit preparation rejects the candidate without closing the healthy model', async t => {
+  const h=await fixture(t);h.puppets[1].failed=true;h.puppets[1].player.contextLost=true;
+  h.release();await tick();
+  assert.deepEqual(h.decisions.at(-1),['female',false]);
+  assert.equal(h.puppets[0].closed,undefined);assert.equal(h.puppets[1].closed,true);
+  assert.equal(h.reports.at(-1).ready,false);assert.equal(h.host.dataset.rig,'scene');
+});
+
+test('a manual anime pose reports its effective wake activity and restores manual after conversation', async t => {
+  const h = await fixture(t, { reload: false, pose: 'cup' });
+  for (const [flag, activity] of [['chatVisible', 'chat'], ['capturing', 'capturing'], ['speaking', 'speaking']]) {
+    h.present({ [flag]: true });
+    assert.equal(h.reports.at(-1).pose, 'attention');
+    assert.equal(h.reports.at(-1).activity, activity);
+    h.present({ [flag]: false });
+    assert.equal(h.reports.at(-1).pose, 'cup');
+    assert.equal(h.reports.at(-1).activity, 'manual');
+  }
+  h.present({ paused: true, chatVisible: true });
+  assert.equal(h.reports.at(-1).activity, 'paused');
+  h.present({ paused: false });
+  h.hide(true);
+  assert.equal(h.reports.at(-1).activity, 'hidden');
 });
 
 for (const mode of ['paused', 'hidden']) test(`${mode} during preparation keeps the visible character; resume commits only the latest frame`, async t => {
@@ -72,10 +107,11 @@ for (const mode of ['paused', 'hidden']) test(`${mode} during preparation keeps 
   assert.deepEqual(h.decisions.at(-1), ['female', true]);
 });
 
-test('a newer pose during preparation never paints the obsolete pose', async t => {
+test('a newer pose during model preparation applies to the retained and replacement rigs without another model load', async t => {
   const h = await fixture(t); h.present({ stills: { stillPose: 'attention', ambienceEnabled: false } });
   h.release(); await tick(); assert.deepEqual(h.ready, [['female', 'work'], ['female', 'attention']]);
-  assert.deepEqual(h.decisions.slice(1), [['female', false], ['female', true]]);
+  assert.deepEqual(h.decisions.slice(1), [['female', true]]);
+  assert.equal(h.puppets.length,2);assert.ok(h.puppets[0].closed);assert.equal(h.puppets[1].pose,'attention');
 });
 
 test('closing during preparation cancels without accepting or painting the replacement', async t => {

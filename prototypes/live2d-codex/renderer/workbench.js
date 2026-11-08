@@ -150,7 +150,7 @@ function updateCharacterStatus() {
   const animated = status?.phase === 'loading' ? status.wallpaperMotion : workspace.settings.wallpaperMotion;
   for (const radio of document.querySelectorAll('[name="wallpaper-style"]')) radio.checked = radio.value === (animated ? 'realistic' : 'anime');
   $('character-status').dataset.phase = status?.phase || '';
-  $('character-status').textContent = status?.phase === 'error' ? status.error : status?.phase === 'loading' ? '正在载入壁纸…' : '当前风格：' + (animated ? '真人动态' : '动漫静态');
+  $('character-status').textContent = status?.phase === 'error' ? status.error : status?.phase === 'loading' ? '正在载入壁纸…' : '当前风格：' + (animated ? '真人动态' : '动漫动态');
   $('retry-character').hidden = status?.phase !== 'error';
 }
 async function saveWallpaperStyle(wallpaperMotion) {
@@ -267,15 +267,15 @@ function fillStills() {
   const character='female';
   $('still-help').textContent=animated
       ? '点击小图可固定朝向；选择“自动”随工作与对话切换。工作与看向你各自循环播放，在动作接点转身。'
-      : '点击小图可固定查看；选择“自动”恢复轮换。女生以工作为主，每轮穿插捧杯、托腮和看雨；对话时转身陪伴。';
+      : '五种完整坐姿保留眨眼和轻微视线变化，用约 2.8 秒的马赛克分解、聚合切换姿态，背景保持固定。呼出对话、听写或朗读时切到看向你，结束后恢复所选姿态；朗读口型随声音变化。系统减少动态效果时直接切换姿态。';
   if(previewCharacter!==`${character}:${animated}`) {
     previewCharacter=`${character}:${animated}`;
     $('still-previews').replaceChildren();
     for(const pose of animated?['work','attention']:stills.POSES) {
       const label=animated?(pose==='work'?'专注工作':'看向你'):stills.POSE_LABELS[pose];
       const button=node('button'); button.type='button'; button.dataset.pose=pose; button.setAttribute('aria-label','固定查看：'+label);
-      const image=node('img'); image.alt=''; image.src=animated?`app://local/assets/motion/female/${pose==='work'?'work':'user'}.png`:`app://local/assets/stills/female-v2/${pose}.png`;
-      button.append(image,node('span',label)); button.onclick=act(()=>saveStillSetting({stillPose:pose})); $('still-previews').append(button);
+      if(animated) { const image=node('img'); image.alt=''; image.src=`app://local/assets/motion/female/${pose==='work'?'work':'user'}.png`; button.append(image); }
+      button.append(node('span',label)); button.onclick=act(()=>saveStillSetting({stillPose:pose})); $('still-previews').append(button);
     }
   }
   for(const button of $('still-previews').children) button.setAttribute('aria-pressed',String(button.dataset.pose===$('still-pose').value));
@@ -287,8 +287,9 @@ function fillStills() {
 function updateStillStatus() {
   const character='female', shown=workspace.wallpaper;
   const poseLabel=shown?.model==='motion-clips'?(shown?.pose==='attention'?'看向你':'专注工作'):stills.POSE_LABELS[shown?.pose];
+  const phase=shown?.motionPhase==='transition'?(shown.model==='motion-clips'?'正在转身':'正在像素重组'):shown?.model==='motion-clips' && shown.motionPhase==='loop'?'循环播放 · ':'';
   $('still-status').textContent=shown?.character===character && poseLabel && shown?.activity
-    ? `当前画面：${poseLabel} · ${shown.motionPhase==='transition'?'正在转身':shown.model==='motion-clips' && shown.motionPhase==='loop'?'循环播放 · ':''}${shown.motionPhase==='transition'?'':stills.ACTIVITY_LABELS[shown.activity] || '等待状态更新'}` : '等待壁纸画面就绪…';
+    ? `当前画面：${poseLabel} · ${phase}${shown.motionPhase==='transition'?'':stills.ACTIVITY_LABELS[shown.activity] || '等待状态更新'}` : '等待壁纸画面就绪…';
 }
 function updateAmbienceStatus() {
   const status=workspace.ambience;
@@ -310,6 +311,7 @@ for(const [field,key] of [['rain-volume','rainVolume'],['key-volume','keyVolume'
 }
 $('retry-ambience').onclick=act(async()=>acceptWorkspace(await run(api.wallpaperControl('retry-audio'))));
 $('pause-stills').onclick=act(async()=>acceptWorkspace(await run(api.wallpaperControl('pause',!workspace.wallpaperPaused))));
+matchMedia('(prefers-reduced-motion: reduce)').addEventListener('change',fillStills);
 $('tts-resident').onchange = act(async () => { const enabled = $('tts-resident').checked; try { await saveSpeechChoice({ttsResident:enabled}); } finally { updateSpeechStatus(); } });
 $('cancel-resource').onclick = act(async () => { await run(api.cancelDownload()); });
 $('tts-engine').onchange = act(() => saveSpeechChoice({ttsEngine:$('tts-engine').value}));

@@ -12,7 +12,7 @@ import choices from '../backend/wallpaper-choice.cjs';
 
 const main = await fs.readFile(new URL('../main.cjs', import.meta.url), 'utf8');
 const confirmSource = main.slice(main.indexOf('async function confirmWallpaper('), main.indexOf('function recoverWallpaperRenderer('));
-const playbackSource = main.slice(main.indexOf("    handler('speech:playback'"), main.indexOf("    handler('wallpaper:control'"));
+const playbackSource = main.slice(main.indexOf("    handler('speech:playback'"), main.indexOf('    let lastMouthAt ='));
 const tick = () => new Promise(resolve => setImmediate(resolve));
 const deferred = () => { let resolve, reject; const promise = new Promise((a, b) => { resolve = a; reject = b; }); return { promise, resolve, reject }; };
 

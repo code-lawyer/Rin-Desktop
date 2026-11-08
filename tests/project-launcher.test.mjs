@@ -7,6 +7,7 @@ import { join, resolve, sep } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { setTimeout as delay } from 'node:timers/promises';
 import { launchPlan, inspectLaunch, electronEnvironment, buildAndLaunch, projectRoot } from '../tools/project/start.mjs';
+import { POSE_FILES } from '../prototypes/live2d-codex/renderer/pose-assets.mjs';
 
 test('source selection never falls back to an old release, and retains the existing data location', async t => {
   const base = resolve(tmpdir());
@@ -25,6 +26,9 @@ test('source selection never falls back to an old release, and retains the exist
   const missing=checked.problems.find(problem=>problem.startsWith('Missing visual resources:'));
   assert.match(missing,/female-v2-4k\/cup\.png/);
   assert.match(missing,/female-v2-4k\/thinking\.png/);
+  assert.match(missing,/scene\/rin-poses\/scene\.png/);
+  assert.match(missing,/scene\/rin-poses\/cup-blink\.png/);
+  assert.doesNotMatch(missing,/scene\/rin\//);
   assert.doesNotMatch(missing,/reading\.png|rest\.png|smile\.png/);
 });
 
@@ -59,6 +63,33 @@ async function processFixture(t) {
   await writeFile(buildScript, '// Successful fixture build.\n');
   return { root, appRoot: root, buildScript, electron: process.execPath, args: [] };
 }
+
+test('source preflight requires the active complete pose set and no retired skeletal resources', async t => {
+  const fixture=await processFixture(t),plan=launchPlan([],fixture.root);
+  const files={
+    'package.json':JSON.stringify({version:'0.6.2'}),
+    'node_modules/esbuild/package.json':JSON.stringify({name:'esbuild',main:'index.js'}),
+    'node_modules/esbuild/index.js':'// fixture',
+    'node_modules/electron/package.json':JSON.stringify({name:'electron'}),
+    'node_modules/electron/path.txt':'electron.exe',
+    'node_modules/electron/dist/electron.exe':'fixture',
+    'vendor/live2dcubismcore.min.js':'fixture',
+    'assets/ambience/light-rain.ogg':'fixture',
+    'assets/ambience/soft-keyboard.ogg':'fixture',
+  };
+  for(const pose of ['attention','cup','work','thinking','window'])files[`assets/stills/female-v2-4k/${pose}.png`]='fixture';
+  for(const file of [...POSE_FILES,'manifest.json'])files[`assets/scene/rin-poses/${file}`]='fixture';
+  await writeFile(join(plan.root,'package.json'),files['package.json']);
+  for(const [file,bytes] of Object.entries(files)){
+    const path=join(plan.appRoot,file);await mkdir(resolve(path,'..'),{recursive:true});await writeFile(path,bytes);
+  }
+  const options={platform:'win32',nodeVersion:'24.0.0',env:{}};
+  assert.deepEqual(inspectLaunch(plan,options).problems,[]);
+  await rm(join(plan.appRoot,'assets/scene/rin-poses/cup-blink.png'));
+  const missing=inspectLaunch(plan,options);
+  assert.equal(missing.ready,false);
+  assert.match(missing.problems.join('\n'),/rin-poses\/cup-blink\.png/);
+});
 
 test('read-only launch inspection never loads Electron installation hooks', async t => {
   const fixture = await processFixture(t), plan = launchPlan([], fixture.root);
