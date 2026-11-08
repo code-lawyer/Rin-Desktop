@@ -1,7 +1,8 @@
-# Corresponding source — Rin Desktop 0.3.1
+# Corresponding source — CPU speech components
 
-These materials accompany the same-version binary release at
-https://github.com/code-lawyer/Rin-Desktop/releases/tag/v0.3.1 .
+These materials cover the CPU speech components and independent worker retained
+unchanged from Rin Desktop 0.3.1. The archive accompanies the current installer at
+https://github.com/code-lawyer/Rin-Desktop/releases .
 `SOURCES.json` records each original archive, URL and SHA-256. Original source
 archives preserve upstream licenses, notices and build scripts. No warranty is
 provided. GPL/LGPL recipients may modify, rebuild, replace and redistribute the
