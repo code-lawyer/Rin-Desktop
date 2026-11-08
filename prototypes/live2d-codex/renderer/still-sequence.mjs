@@ -1,7 +1,7 @@
 // Decode the target before replacing the visible image. No intermediate poses.
 export class StillSequence {
-  constructor({ load, show, changed = () => {}, failed = () => {}, accept = value => ['work', 'attention'].includes(value) }) {
-    Object.assign(this, { load, show, changed, failed, accept });
+  constructor({ load, show, changed = () => {}, failed = () => {}, discard = () => {}, accept = value => ['work', 'attention'].includes(value) }) {
+    Object.assign(this, { load, show, changed, failed, discard, accept });
     this.current = null; this.target = null; this.paused = false;
     this.pending = null; this.closed = false; this.revision = 0;
     this.failedRevision = -1;
@@ -25,16 +25,20 @@ export class StillSequence {
   async flush() {
     while (!this.closed && !this.paused && this.current !== this.target) {
       const target = this.target, revision = this.revision;
+      let prepared;
       try {
-        const image = await this.load(target);
-        if (this.closed || this.paused || revision !== this.revision) continue;
-        if (await this.show(image, target) === false) {
+        prepared = await this.load(target);
+        if (this.closed || this.paused || revision !== this.revision) { this.discard(prepared); prepared = null; continue; }
+        if (await this.show(prepared, target) === false) {
+          this.discard(prepared); prepared = null;
           if (revision !== this.revision) continue;
           return;
         }
+        prepared = null; // The visible renderer now owns the resource.
         if (this.closed) return;
         this.current = target; this.changed(target);
       } catch (error) {
+        if (prepared) this.discard(prepared);
         if (this.closed) return;
         if (revision !== this.revision) continue;
         this.failedRevision = revision; this.failed(error, target); return;

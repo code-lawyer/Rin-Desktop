@@ -126,7 +126,7 @@ async function confirmWallpaper(info) {
     if (!matches) return false;
     cancelWallpaperCommit();
     wallpaperStatus = { ...requested, phase: 'error', errorFrameRevision: info.frameRevision,
-      error: info.model === 'motion-clips' ? '动态壁纸未能继续播放，已保留当前画面和声线。请重试加载或切回静态壁纸。' : '壁纸未能载入，已保留原画面和声线设置。' };
+      error: info.model === 'motion-clips' ? '动态壁纸未能继续播放，已保留当前画面和声线。请重试加载或切换壁纸风格。' : '壁纸未能载入，已保留原画面和声线设置。' };
     notifyWorkspace(); return false;
   }
   if (info?.ready !== true || !isWallpaperKind(rendererKind) || !isCharacter(info.character) || !Number.isSafeInteger(info.requestId)) return false;
@@ -659,10 +659,20 @@ else {
         } catch(error) { if (owned === playbackRevision) { speaking=false; notifyPresentation(); } throw error; }
       }
       else notifyPresentation();
+      return { revision: owned };
     });
-    handler('wallpaper:control', (_event, action, value) => {
+    let lastMouthAt = 0;
+    ipcMain.on('speech:mouth', (event, value) => {
+      if (!trusted(event) || event.sender !== chat.webContents || !speaking || !avatar || avatar.isDestroyed()
+        || !value || value.revision !== playbackRevision || !Number.isFinite(value.level) || value.level < 0 || value.level > 1) return;
+      const now = Date.now(); if (now - lastMouthAt < 25) return;
+      lastMouthAt = now;
+      avatar.webContents.send('speech:mouth', { revision: playbackRevision, level: value.level });
+    });
+    handler('wallpaper:control', (event, action, value) => {
       if(action==='retry-audio') { ambientRetry++; recoverWallpaperRenderer(); notifyWorkspace(); }
       else if(action==='pause' && typeof value==='boolean') { manualPause=value; const item=trayMenu?.getMenuItemById('pause-wallpaper'); if(item)item.checked=value; notifyWorkspace(); }
+      else if(action==='gesture') throw new Error('单次骨骼动作已停用，请选择完整陪伴姿态。');
       else throw new Error('壁纸操作无效。');
       return workspaceSnapshot();
     });

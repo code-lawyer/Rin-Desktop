@@ -1,0 +1,124 @@
+{
+  "format": 3,
+  "renderer": "layered-scene-rig",
+  "sourceSize": [
+    3840,
+    2400
+  ],
+  "rigSize": [
+    1586,
+    992
+  ],
+  "assets": [
+    {
+      "file": "scene.png",
+      "bytes": 9827785,
+      "sha256": "3fd4964e96eb7d1b9bf6bf7ed753ef24df260cc8e62abf3a668bc7dbec942313"
+    },
+    {
+      "file": "cover.webp",
+      "bytes": 64092,
+      "sha256": "e0f67634a6880747afdf5ca3b1d966d701a68e3cc3eabfe483102d71d0a75208"
+    },
+    {
+      "file": "base.png",
+      "bytes": 14870399,
+      "sha256": "aca1d7c4aa80d42b965f672fd65e5002a04677b207d4415302e20c424361e52f"
+    },
+    {
+      "file": "bodyFront.png",
+      "bytes": 3911141,
+      "sha256": "667a425e3a2b9d950cf98b29af6afd17ade9cf18bfb7f252bcb9291831614c90"
+    },
+    {
+      "file": "blink.png",
+      "bytes": 534664,
+      "sha256": "6b5a6bdf0a7354146d9475a0841986a00fb2ee1a6bccc009c7d269d87efcec1c"
+    },
+    {
+      "file": "halfBlink.png",
+      "bytes": 531273,
+      "sha256": "3ff506264a5ec410906c841dc59162084c0b2309f8c87ca8b7f41c81fa46233d"
+    },
+    {
+      "file": "mouth.png",
+      "bytes": 525388,
+      "sha256": "27aa3bfea5d07f6952739e31911903e3197abc3fd26bbdcf82445b8931fad174"
+    },
+    {
+      "file": "rig.json",
+      "bytes": 1062,
+      "sha256": "3258543eaff1735834aabbc7d75ada6291e35c8ca998a048c81119fe134fbe3a"
+    },
+    {
+      "file": "upper.png",
+      "bytes": 45909,
+      "sha256": "560acb818b58cc57589591073d82e1f4799670f8ff6a31f3711f45a2d36e0ce4"
+    },
+    {
+      "file": "hand.png",
+      "bytes": 13715,
+      "sha256": "1a4fc8c0eb7cab5025e5e747df0130493c3ccdb3524ad87f0bbd1f6fb2eff34c"
+    },
+    {
+      "file": "farUpper.png",
+      "bytes": 34985,
+      "sha256": "9c2d88fd6402a9ed7e89a4e1bdcceb641f3b1765d8adf1e9db7a4959e33badec"
+    },
+    {
+      "file": "farHand.png",
+      "bytes": 9945,
+      "sha256": "351cf8a225ccb8eb99f2cf2dc15c24e5c175011b402f39aa8a090cfb02c2ebb3"
+    },
+    {
+      "file": "waveFore.png",
+      "bytes": 24589,
+      "sha256": "ed0c245ea9b2b183fc21ffd408ea0d5c8de97fab46d3623a74d3bbe15f8f2950"
+    },
+    {
+      "file": "waveHand.png",
+      "bytes": 26688,
+      "sha256": "e18d15d8627e53a83aa0a914505a85c0dba3fd58384eee0e20f2cf6f68e6a085"
+    },
+    {
+      "file": "chinFore.png",
+      "bytes": 30923,
+      "sha256": "33145eff58999711ef4895d72d80cb1aaeeac1131c1ea2934feff7c78c871d34"
+    },
+    {
+      "file": "chinHand.png",
+      "bytes": 10949,
+      "sha256": "87e5a51fb035281f2f05da61c49be0ab93fe07c6263adae78a65b538e57333f2"
+    },
+    {
+      "file": "drinkFore.png",
+      "bytes": 26903,
+      "sha256": "b044d54433c7f888d9e33837eb18f1d23c61508f6771723bbbbf161c19785a6f"
+    },
+    {
+      "file": "cupHand.png",
+      "bytes": 21730,
+      "sha256": "a6d6bcc6c05f010e6f8952856d250ca4fddff0ecc7f49e436b5980f951c23deb"
+    },
+    {
+      "file": "typeNear.png",
+      "bytes": 18750,
+      "sha256": "86f7c1646ac3c0ea7b584c58fd47fd229a713d14e9fc30cc82cf673124be0ef5"
+    },
+    {
+      "file": "typeFar.png",
+      "bytes": 6135,
+      "sha256": "807bc886a388cce95651e42777f346062bc0223eb39a74162dc23318fba24272"
+    },
+    {
+      "file": "foreground.png",
+      "bytes": 90337,
+      "sha256": "9dc8972a30caeccda82473c667e69121d060ee2b3b4a7a8da6a7c47d08cf89f6"
+    },
+    {
+      "file": "cup.png",
+      "bytes": 22744,
+      "sha256": "7182f135cd2bded77b832557502ed61fc9a0e1773cf86444b30d565e35f1e73f"
+    }
+  ]
+}

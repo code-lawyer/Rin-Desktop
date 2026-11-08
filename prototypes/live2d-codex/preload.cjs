@@ -38,6 +38,8 @@ contextBridge.exposeInMainWorld('companion', {
   learnKey: learning => ipcRenderer.invoke('workbench:learn-key', learning),
   capture: target => ipcRenderer.invoke('speech:capture', target),
   playbackState: active => ipcRenderer.invoke('speech:playback', active),
+  mouth: value => ipcRenderer.send('speech:mouth', value),
+  onMouth: callback => { const listener = (_event, value) => callback(value); ipcRenderer.on('speech:mouth', listener); return () => ipcRenderer.removeListener('speech:mouth', listener); },
   wallpaperControl: (action, value) => ipcRenderer.invoke('wallpaper:control', action, value),
   ambientApplied: revision => ipcRenderer.send('wallpaper:ambient-applied', revision),
   ambientStatus: value => ipcRenderer.send('wallpaper:ambient-status', value),

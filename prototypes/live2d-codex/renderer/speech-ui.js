@@ -3,12 +3,15 @@ import { speechProfile } from '../backend/speech-plan.mjs';
 import { ReplyAudio } from './reply-audio.mjs';
 import { isTaskBusy } from '../backend/task-state.mjs';
 import { remoteVoiceStatus } from './remote-voice-status.mjs';
+import { speechEnvelope, mouthAt } from './puppet-state.mjs';
 export { speechChunks } from '../backend/speech-plan.mjs';
 export function installSpeech({ api, state, insert, error, measure, isBusy = () => isTaskBusy(state()) }) {
   const $ = id => document.getElementById(id);
   let settings = {}, speech = {}, workspaceVersion = -1, stream, context, processor, source, chunks, sampleCount, timer, tick, captureTarget, recording = false, starting = false, recognizing = false, readRequested = false, operation = 0, playGeneration = 0, audioContext, audioSource, finishPlayback, narration, pendingCompletion;
   const seenCompletions = new Set();
   let remoteBusy = false, playbackGain, volume = 1, volumeOperation = 0, volumePending = 0, volumeEditing = false;
+  let mouthTimer;
+  function stopMouth() { clearInterval(mouthTimer); mouthTimer = null; }
   const label = text => { $('voice-status').textContent = text; $('voice-status').hidden = !text; measure(); };
   const playbackLabel = text => { $('playback-status').textContent = text; $('playback-status').title = text; $('playback-status').hidden = !text; measure(); };
   function applyVolume(value) {
@@ -74,6 +77,7 @@ export function installSpeech({ api, state, insert, error, measure, isBusy = () 
   }
   async function check(promise) { const r = await promise; if (!r?.ok) throw new Error(r?.error || '语音操作失败。'); return r.value; }
   function stopPlayback(wait = true) {
+    stopMouth();
     playGeneration++; pendingCompletion = null; narration?.modelReady?.(); narration = null; readRequested = false;
     audioSource?.stop(); audioSource?.disconnect?.(); audioSource = null; finishPlayback?.(); finishPlayback = null;
     api.playbackState?.(false);
@@ -101,18 +105,27 @@ export function installSpeech({ api, state, insert, error, measure, isBusy = () 
         if (generation !== playGeneration || !valid(session) || !session.playRequested) return;
         audioContext ??= new AudioContext(); await audioContext.resume();
         if (generation !== playGeneration || !valid(session)) return;
-        if (api.playbackState) await check(api.playbackState(true));
+        const playback = api.playbackState ? await check(api.playbackState(true)) : null;
         if (generation !== playGeneration || !valid(session)) return;
         const buffer = audioContext.createBuffer(1,prepared.samples.length,prepared.sampleRate); buffer.copyToChannel(prepared.samples,0);
         if (!playbackGain) { playbackGain = audioContext.createGain(); playbackGain.connect(audioContext.destination); }
         playbackGain.gain.value = volume;
         audioSource = audioContext.createBufferSource(); audioSource.buffer = buffer; audioSource.connect(playbackGain);
         session.playing = true; playbackLabel('正在朗读'); updateControls();
-        await new Promise(resolve => { finishPlayback = resolve; audioSource.onended = resolve; audioSource.start(); });
+        const envelope = api.mouth && Number.isSafeInteger(playback?.revision) ? speechEnvelope(prepared.samples, prepared.sampleRate) : null;
+        const began = audioContext.currentTime;
+        await new Promise(resolve => {
+          finishPlayback = resolve; audioSource.onended = resolve; audioSource.start();
+          if (envelope) {
+            const publish = () => { if (generation === playGeneration) api.mouth({ revision: playback.revision,
+              level: audioContext.state === 'running' ? volume * mouthAt(envelope, audioContext.currentTime - began) : 0 }); };
+            publish(); mouthTimer = setInterval(publish, 40);
+          }
+        });
         if (generation !== playGeneration) return;
         audioSource?.disconnect?.(); audioSource = null; finishPlayback = null;
       } catch(e) { if (generation === playGeneration && e.name !== 'AbortError') error(e.message); }
-      finally { if (generation === playGeneration) { api.playbackState?.(false); narration = null; $('stop-speech').hidden = true; playbackLabel(!session.playRequested && audio.has(key) ? '已就绪' : ''); updateControls(); } }
+      finally { if (generation === playGeneration) { stopMouth(); api.playbackState?.(false); narration = null; $('stop-speech').hidden = true; playbackLabel(!session.playRequested && audio.has(key) ? '已就绪' : ''); updateControls(); } }
     })();
     return session.promise;
   }

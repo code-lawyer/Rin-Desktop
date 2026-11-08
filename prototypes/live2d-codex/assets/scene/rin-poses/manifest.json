@@ -1,0 +1,99 @@
+{
+  "format": 4,
+  "renderer": "complete-pose-dissolve",
+  "sourceSize": [
+    3840,
+    2400
+  ],
+  "poseSize": [
+    1586,
+    992
+  ],
+  "assets": [
+    {
+      "file": "background.png",
+      "bytes": 3353244,
+      "sha256": "cd03591fdac94b38bac82d54d0a103b241ad5b49847cb9c6455c417be5c7e1f8"
+    },
+    {
+      "file": "foreground.png",
+      "bytes": 104251,
+      "sha256": "bd9f6f994f11b6ca00f831a4a27adb2358cd4e8b9367f642a1ed97c2630a5519"
+    },
+    {
+      "file": "scene.png",
+      "bytes": 9827785,
+      "sha256": "3fd4964e96eb7d1b9bf6bf7ed753ef24df260cc8e62abf3a668bc7dbec942313"
+    },
+    {
+      "file": "cover.webp",
+      "bytes": 55604,
+      "sha256": "383a22fa31bd3389482c114fd0900f31ac71cedec8f5d104b6866740ed516368"
+    },
+    {
+      "file": "poses.json",
+      "bytes": 1866,
+      "sha256": "790610f08e1a225c77bf28d198037901e5ee8709f2baf365e44b339af03f21ea"
+    },
+    {
+      "file": "attention.png",
+      "bytes": 3753867,
+      "sha256": "178956d26bfb39f0ee15aa70df200954d01eaf8651f296e665624a5b5422ad69"
+    },
+    {
+      "file": "attention-blink.png",
+      "bytes": 534664,
+      "sha256": "6b5a6bdf0a7354146d9475a0841986a00fb2ee1a6bccc009c7d269d87efcec1c"
+    },
+    {
+      "file": "cup.png",
+      "bytes": 3814642,
+      "sha256": "f4bab36118a0d57dc1d9d747ff71353c897fb9077ca2cc05e6ab4f01145dfbe8"
+    },
+    {
+      "file": "cup-blink.png",
+      "bytes": 526384,
+      "sha256": "2368833dd6243b7c23e215988f3389164e7db5c108d2863346d6629fcf529d5c"
+    },
+    {
+      "file": "work.png",
+      "bytes": 3736327,
+      "sha256": "01d7ad99df490b872923f17382f12e3f03fa371bd7756b9774914bd96337c5d9"
+    },
+    {
+      "file": "work-blink.png",
+      "bytes": 530905,
+      "sha256": "a19ecc8db09d9f3b5c4f87efbbc779a335fef899a266ac026bf06143fea94cbd"
+    },
+    {
+      "file": "thinking.png",
+      "bytes": 3686071,
+      "sha256": "4ee785fd3f1cbe96e40a666e66cefe2c58523b92682bd119080b417ada4f4f66"
+    },
+    {
+      "file": "thinking-blink.png",
+      "bytes": 526314,
+      "sha256": "e8a9a49571421de6ff5b5fa3229848ccc6dab086a5d87eb11242fe828c41bd13"
+    },
+    {
+      "file": "window.png",
+      "bytes": 3647163,
+      "sha256": "756e2c4597d1e7287bb677f3cc1425c3676d60d584816e50538e682cbd1ed70f"
+    },
+    {
+      "file": "window-blink.png",
+      "bytes": 507269,
+      "sha256": "ee3f6a780bcc55c089fadf10c7fa01be26ef431f113288c1705a82c0426357b9"
+    },
+    {
+      "file": "attention-halfBlink.png",
+      "bytes": 531273,
+      "sha256": "3ff506264a5ec410906c841dc59162084c0b2309f8c87ca8b7f41c81fa46233d"
+    },
+    {
+      "file": "attention-mouth.png",
+      "bytes": 525388,
+      "sha256": "27aa3bfea5d07f6952739e31911903e3197abc3fd26bbdcf82445b8931fad174"
+    }
+  ]
+}

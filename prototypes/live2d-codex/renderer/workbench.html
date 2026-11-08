@@ -25,16 +25,16 @@
       <section class="setting-section" id="wallpaper-settings" data-settings-group="wallpaper" aria-labelledby="wallpaper-heading">
         <h3 id="wallpaper-heading">壁纸风格</h3>
         <div class="character-options" role="radiogroup" aria-label="壁纸风格" aria-describedby="character-help">
-          <label class="character-option"><input type="radio" name="wallpaper-style" value="anime" checked><span class="character-card"><img src="app://local/assets/stills/female-v2/work.png" alt="动漫画风，红衬衫女生在雨夜窗前工作"><span class="character-caption"><strong>动漫静态</strong><span>五种静止姿态 · 自动轮换</span></span></span></label>
+          <label class="character-option"><input type="radio" name="wallpaper-style" value="anime" checked><span class="character-card"><img src="app://local/assets/scene/rin-poses/cover.webp" alt="雨夜坐姿原画中的 Rin"><span class="character-caption"><strong>动漫动态</strong><span>完整姿态切换 · 眨眼与口型</span></span></span></label>
           <label class="character-option"><input type="radio" name="wallpaper-style" value="realistic"><span class="character-card"><img src="app://local/assets/motion/female/work.png" alt="真人画风，红衬衫女生在雨夜窗前工作"><span class="character-caption"><strong>真人动态</strong><span>视频循环 · 工作与看向你</span></span></span></label>
         </div>
         <p id="character-help" class="hint">选择后自动保存，保留你的朗读声线。暂停可停住画面并关闭环境音。</p>
         <p id="character-status" class="hint" role="status" aria-live="polite"></p>
         <button id="retry-character" aria-describedby="character-status" hidden>重试加载</button>
-        <div class="field-grid still-controls"><label>人物姿态<select id="still-pose"><option value="auto">自动 · 随工作与对话切换</option><option value="work">伏案工作</option><option value="cup">捧杯休息</option><option value="thinking">托腮思考</option><option value="window">侧身看雨</option><option value="attention">转身陪伴</option></select></label><button id="pause-stills" aria-pressed="false">暂停壁纸与环境音</button></div>
+        <div class="field-grid still-controls"><label>陪伴状态<select id="still-pose"><option value="auto">自动 · 随工作与对话切换</option><option value="work">专注工作</option><option value="cup">持杯休息</option><option value="thinking">托腮思考</option><option value="window">看向窗外</option><option value="attention">看向你</option></select></label><button id="pause-stills" aria-pressed="false">暂停壁纸与环境音</button></div>
         <p id="still-status" class="hint" role="status" aria-live="polite"></p>
         <div id="still-previews" class="still-previews" role="group" aria-label="预览人物姿态"></div>
-        <p id="still-help" class="hint">点击小图可固定查看；选择“自动”随工作与对话切换。</p>
+        <p id="still-help" class="hint">选择陪伴状态可调整朝向；选择“自动”随工作与对话变化。</p>
       </section>
       <section class="setting-section" id="ambience-settings" data-settings-group="wallpaper" aria-labelledby="ambience-heading">
         <h3 id="ambience-heading">窗边环境音</h3>

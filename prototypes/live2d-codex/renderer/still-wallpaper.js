@@ -4,6 +4,8 @@ import { StillSequence } from './still-sequence.mjs';
 import { AmbientPreview } from './ambient-preview.mjs';
 import { stillPose, createIdleCycle, idleDuration, stillActivity } from './still-policy.mjs';
 import { MotionWallpaper, loadMotionCatalog } from './motion-wallpaper.mjs';
+import { PuppetWallpaper } from './puppet-wallpaper.mjs';
+import { puppetPose, puppetActivity } from './puppet-state.mjs';
 
 export async function startStillWallpaper({ host, api }) {
   const canvas = document.createElement('canvas'); canvas.className = 'wallpaper-still'; host.append(canvas);
@@ -15,7 +17,7 @@ export async function startStillWallpaper({ host, api }) {
   const nextIdlePose = createIdleCycle();
   let idle = 'work', idleTimer, remaining = idleDuration('work'), began = 0, lastReport;
   let received = false, audioRevision = 0, committedRequest = -1;
-  let motion, motionInfo;
+  let motion, motionInfo, puppet, puppetError, fallbackFrame;
   function loadImage(pose, override) {
     const url = override || `app://local/assets/stills/female-v2-4k/${pose}.png`;
     if (!cache.has(url)) {
@@ -24,7 +26,7 @@ export async function startStillWallpaper({ host, api }) {
     }
     return cache.get(url);
   }
-  // Anime stills contain the full pose; video uses its matching poster.
+  // Keep a decoded poster behind each renderer until its first successful paint.
   function compose(image) {
     const frame = document.createElement('canvas'); frame.width = image.naturalWidth; frame.height = image.naturalHeight;
     frame.getContext('2d', { alpha: false }).drawImage(image, 0, 0);
@@ -33,12 +35,13 @@ export async function startStillWallpaper({ host, api }) {
   function fit() {
     const density = window.devicePixelRatio || 1, width = host.clientWidth, height = host.clientHeight;
     canvas.width = Math.max(1, Math.round(width * density)); canvas.height = Math.max(1, Math.round(height * density));
-    if (shown) {
-      const frame = shown.frame, scale = Math.max(canvas.width / frame.width, canvas.height / frame.height);
+    if (shown || fallbackFrame) {
+      const frame = shown?.frame || fallbackFrame, scale = Math.max(canvas.width / frame.width, canvas.height / frame.height);
       context.drawImage(frame, (canvas.width - frame.width * scale) / 2, (canvas.height - frame.height * scale) / 2, frame.width * scale, frame.height * scale);
     }
+    puppet?.fit();
     const [sourceWidth, sourceHeight, headX, headY, headLeft, headRight] = shown?.catalog
-      ? [1280, 720, 940, 210, 830, 1055] : [1586, 992, 1180, 250, 1065, 1310];
+      ? [1280, 720, 940, 210, 830, 1055] : [3840, 2400, 2800, 550, 2580, 3040];
     const scale = Math.max(width / sourceWidth, height / sourceHeight), left = (width - sourceWidth * scale) / 2, top = (height - sourceHeight * scale) / 2;
     const bounded = v => Math.max(0, Math.min(1, v));
     api.avatarAnchor({ x: bounded((headX * scale + left) / width), y: bounded((headY * scale + top) / height), left: bounded((headLeft * scale + left) / width), right: bounded((headRight * scale + left) / width) });
@@ -46,6 +49,7 @@ export async function startStillWallpaper({ host, api }) {
   }
   const sequence = new StillSequence({
     accept: key => typeof key === 'string',
+    discard: frame => frame.puppet?.close(),
     async load(key) {
       const revision = frameRevision;
       const [requestId, character, pose, animated] = JSON.parse(key);
@@ -53,8 +57,17 @@ export async function startStillWallpaper({ host, api }) {
       if (animated) {
         catalog = await loadMotionCatalog(); image = await loadImage(pose, catalog.posters.work);
       }
-      image ??= await loadImage(pose);
-      return { frame: compose(image), frameRevision: revision, requestId, character, pose, animated, catalog, sourceWidth: image.naturalWidth, sourceHeight: image.naturalHeight };
+      image ??= await loadImage('attention');
+      const frame = { frame: compose(image), frameRevision: revision, requestId, character, pose, animated, catalog, sourceWidth: image.naturalWidth, sourceHeight: image.naturalHeight };
+      if (!animated) {
+        try {
+          frame.puppet = await PuppetWallpaper.prepare({ host, activityChanged() { updateAudio(); report(); }, changed(error) {
+            if (closed || shown !== frame) return;
+            puppetError = error; host.dataset.error = error.message; report();
+          } });
+        } catch (error) { error.fallback = frame.frame; throw error; }
+      }
+      return frame;
     },
     async show(frame, key) {
       if (frame.requestId !== committedRequest) {
@@ -62,6 +75,10 @@ export async function startStillWallpaper({ host, api }) {
         let result = await api.commitWallpaper(info);
         if (closed || key !== desiredKey || (shown && (presentation.paused || document.hidden))) {
           api.finishWallpaper(info, false); return false;
+        }
+        if (frame.puppet?.failed || frame.puppet?.player?.contextLost) {
+          api.finishWallpaper(info, false);
+          throw new Error('角色在准备期间失去绘图能力，已保留当前画面。请重试。');
         }
         // No await between the final commit and paint: pause/selection events
         // cannot replace this frame's intent after its settings are published.
@@ -73,10 +90,11 @@ export async function startStillWallpaper({ host, api }) {
         }
         committedRequest = frame.requestId;
       }
-      motion?.close(); motion = null; motionInfo = null;
-      shown = frame; fit(); host.dataset.ready = 'true'; host.dataset.loading = 'false'; delete host.dataset.error;
+      motion?.close(); motion = null; motionInfo = null; puppet?.close(); puppet = frame.puppet; puppetError = null;
+      shown = frame; fallbackFrame = null; fit(); host.dataset.ready = 'true'; host.dataset.loading = 'false'; delete host.dataset.error;
       host.dataset.character = frame.character; host.dataset.pose = frame.pose; host.dataset.rig = 'static';
-      host.dataset.sourceWidth = frame.sourceWidth; host.dataset.sourceHeight = frame.sourceHeight;
+      host.dataset.sourceWidth = frame.sourceWidth;
+      host.dataset.sourceHeight = frame.sourceHeight;
       if (frame.catalog) {
         motion = new MotionWallpaper({ host, catalog: frame.catalog, changed(info) {
           if (closed || shown !== frame) return;
@@ -89,24 +107,32 @@ export async function startStillWallpaper({ host, api }) {
           report(info.phase === 'loop' || info.phase === 'transition'); updateAudio();
         } });
         motion.start(backend, presentation, document.hidden);
-      } else { delete host.dataset.motionPhase; delete host.dataset.motionClip; }
+      } else {
+        delete host.dataset.motionPhase; delete host.dataset.motionClip;
+        puppet.activate(); puppet.update(puppetPose(backend, presentation, idle), presentation, document.hidden); host.dataset.rig = 'scene';
+      }
       report(true);
       updateAudio();
     },
     failed(error, key) {
       const [requestId, character, , wallpaperMotion] = JSON.parse(key);
-      host.dataset.loading = 'false'; host.dataset.error = '姿态图片未能载入，已保留当前画面。请在工作台重试加载。';
+      if (!shown && error.fallback) { fallbackFrame = error.fallback; fit(); }
+      host.dataset.loading = 'false'; host.dataset.error = '壁纸素材未能载入，已保留可用画面。请在工作台重试加载。';
       api.renderReady({ ready: false, kind: 'wallpaper', wallpaperKind: 'artwork', character, wallpaperMotion, requestId, frameRevision, error: host.dataset.error });
       console.error('[wallpaper:still]', error.message);
     },
   });
   function report(painted = false) {
     if (!shown) return;
-    const error = motionInfo?.error;
+    const error = motionInfo?.error || puppetError;
+    const pose = shown.animated ? (motionInfo?.state === 'user' ? 'attention' : 'work') : puppet.frame?.pose || puppet.pose;
+    host.dataset.pose = pose;
     const info = { ready: true, kind: 'wallpaper', wallpaperKind: 'artwork', character: shown.character, wallpaperMotion: shown.animated, requestId: shown.requestId,
-      pose: motionInfo?.state === 'user' ? 'attention' : shown.pose,
-      activity: stillActivity(backend, presentation, document.hidden), model: shown.animated ? 'motion-clips' : 'static-stills',
-      motionPhase: motionInfo?.phase || null, frameRevision: shown.frameRevision, painted, ...(error ? { ready: false, error } : {}),
+      pose,
+      activity: (shown.animated ? stillActivity : puppetActivity)(backend, presentation, document.hidden), model: shown.animated ? 'motion-clips' : 'rin-scene',
+      motionPhase: shown.animated ? motionInfo?.phase || null : puppet.transitioning?.() ? 'transition' : 'loop',
+      gesture: null,
+      frameRevision: shown.frameRevision, painted, ...(error ? { ready: false, error: error.message || String(error) } : {}),
       sourceWidth: shown.frame.width, sourceHeight: shown.frame.height,
       poseSourceWidth: shown.sourceWidth, poseSourceHeight: shown.sourceHeight, renderWidth: canvas.width, renderHeight: canvas.height };
     host.dataset.activity = info.activity;
@@ -118,9 +144,10 @@ export async function startStillWallpaper({ host, api }) {
     if (closed) return;
     const settings = stillSettings.stillSettings(presentation.stills);
     const patch = { enabled: settings.ambienceEnabled, rainVolume: settings.rainVolume, keyVolume: settings.keyVolume,
-      pose: shown?.animated ? (motionInfo?.typing ? 'work' : 'attention') : shown?.pose,
+      pose: shown?.animated ? (motionInfo?.typing ? 'work' : 'attention') : puppet?.typing ? 'work' : 'attention',
       paused: !!presentation.paused, hidden: document.hidden, capturing: !!presentation.capturing, speaking: !!presentation.speaking };
     const levels = audio.update(patch);
+    host.dataset.typing = String(patch.pose === 'work');
     host.dataset.audioRain = String(levels.rain); host.dataset.audioKeys = String(levels.keys);
     // Acknowledge only after gains and pending keyboard sources are silenced.
     audioRevision = presentation.ambientRevision ?? 0; api.ambientApplied?.(audioRevision);
@@ -148,21 +175,23 @@ export async function startStillWallpaper({ host, api }) {
     updateAudio(); updateIdle();
     const character = characters.characterProfile(presentation.character).id;
     const animated = presentation.stills?.wallpaperMotion === true;
-    const pose = animated ? 'work' : stillPose(backend, { ...presentation, character }, idle);
+    const pose = animated ? 'work' : 'puppet';
     const key = JSON.stringify([presentation.characterRequest ?? 0, character, pose, animated]);
-    host.dataset.paused = String(!!presentation.paused); host.dataset.typing = String(shown?.animated ? !!motionInfo?.typing : shown?.pose === 'work');
+    host.dataset.paused = String(!!presentation.paused);
     motion?.update(backend, presentation, document.hidden);
+    puppet?.update(puppetPose(backend, presentation, idle), presentation, document.hidden);
     sequence.setPaused(!!shown && (!!presentation.paused || document.hidden));
     if (key !== desiredKey) { desiredKey = key; frameRevision++; host.dataset.loading = 'true'; sequence.select(key); }
     report();
   }
   const unsubscribe = api.onPresentation(value => { received = true; presentation = value; update(); });
+  const unsubscribeMouth = api.onMouth?.(value => puppet?.receiveMouth(value));
   const initial = await api.presentation(); if (initial.ok && !received) presentation = initial.value;
   const observer = new ResizeObserver(fit); observer.observe(host);
   document.addEventListener('visibilitychange', update); update();
   function destroy() {
     if (closed) return; closed = true; clearTimeout(idleTimer); unsubscribe(); observer.disconnect(); sequence.close();
-    document.removeEventListener('visibilitychange', update); window.removeEventListener('beforeunload', destroy); motion?.close(); audio.close(); canvas.remove(); cache.clear(); shown = null;
+    document.removeEventListener('visibilitychange', update); window.removeEventListener('beforeunload', destroy); unsubscribeMouth?.(); motion?.close(); puppet?.close(); audio.close(); canvas.remove(); cache.clear(); shown = null;
   }
   window.addEventListener('beforeunload', destroy);
   return { setBackendState(value) { backend = value; update(); }, destroy };

@@ -4,7 +4,7 @@ const { POSES, ACTIVITY_LABELS } = require('./still-settings.cjs');
 // Only a newly painted frame for the committed character can recover it.
 function acceptWallpaperReport(status, info, appliedRequest, character) {
   if (!info || info.ready !== true || info.error
-    || !['static-stills', 'motion-clips'].includes(info.model)
+    || !['static-stills', 'motion-clips', 'rin-scene'].includes(info.model)
     || info.wallpaperKind !== 'artwork' || info.requestId !== status.requestId
     || info.requestId !== appliedRequest || info.character !== status.character
     || info.character !== character || !POSES.includes(info.pose)
@@ -14,7 +14,8 @@ function acceptWallpaperReport(status, info, appliedRequest, character) {
   if (status.phase !== 'ready' && !(status.phase === 'error' && info.painted === true
     && info.frameRevision >= (status.errorFrameRevision ?? Infinity))) return status;
   const next = { ...status, phase: 'ready', pose: info.pose, activity: info.activity,
-    model: info.model, motionPhase: info.motionPhase || null, frameRevision: info.frameRevision };
+    model: info.model, motionPhase: info.motionPhase || null, frameRevision: info.frameRevision,
+    gesture: info.model==='rin-scene' && ['nod','shake','tilt','wave'].includes(info.gesture) ? info.gesture : null };
   delete next.error; delete next.errorFrameRevision;
   return JSON.stringify(next) === JSON.stringify(status) ? status : next;
 }

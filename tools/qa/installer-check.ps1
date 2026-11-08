@@ -1,13 +1,13 @@
 param([switch]$Run, [string]$Setup, [string]$PreviousSetup, [switch]$Lifecycle)
 $ErrorActionPreference = 'Stop'
 if (-not $Run) {
-  Write-Output 'Default: help only. Use -Run [-Setup <candidate installer>] [-PreviousSetup <old installer>] for isolated portable extraction. Optional -Lifecycle tests the normal release registration/uninstall only if its AppId and default shortcut group are absent; installs under work/qa. No application startup, accounts or hardware.'
+  Write-Output 'Default: help only. Use -Run [-Setup <candidate installer>] [-PreviousSetup <old installer>] for isolated portable extraction. Optional -Lifecycle tests registration/uninstall only if the matching AppId and default shortcut group are absent; custom candidates must be internal test builds. Installs under work/qa. No accounts or hardware.'
   exit 0
 }
 $repoRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 $version = (Get-Content -LiteralPath (Join-Path $repoRoot 'package.json') -Raw | ConvertFrom-Json).version
+$customSetup = [bool]$Setup
 if ($Setup) {
-  if ($Lifecycle) { throw 'Custom candidate installers support portable extraction only; use the default release for lifecycle checks.' }
   $setup = (Resolve-Path -LiteralPath $Setup).Path
 } else { $setup = Join-Path $repoRoot "release/v$version/Rin-Desktop-$version-Setup.exe" }
 if (-not (Test-Path -LiteralPath $setup -PathType Leaf)) { throw 'Build the installer first.' }
@@ -30,22 +30,26 @@ function Verify-Package([string]$Directory) {
 $fresh = Join-Path $runRoot '中文 空格路径/独立应用'
 Install-Isolated $setup $fresh (Join-Path $runRoot 'fresh-install.log')
 Verify-Package $fresh
+$portable = Get-Content -LiteralPath (Join-Path $fresh 'resources/app/portable.json') -Raw | ConvertFrom-Json
+$testCandidate = $portable.testBuild.channel -eq 'internal-test'
+if ($Lifecycle -and $customSetup -and -not $testCandidate) { throw 'Custom lifecycle candidates must be isolated internal test builds.' }
 $upgrade = $null
 if ($PreviousSetup) {
   $upgrade = Join-Path $runRoot 'upgrade/application'
   Install-Isolated $PreviousSetup $upgrade (Join-Path $runRoot 'previous-install.log')
+  $previousPortable = Get-Content -LiteralPath (Join-Path $upgrade 'resources/app/portable.json') -Raw | ConvertFrom-Json
   Install-Isolated $setup $upgrade (Join-Path $runRoot 'upgrade-install.log')
   Verify-Package $upgrade
 }
 $lifecycleResult = $null
 if ($Lifecycle) {
-  $appKey = '{215174A1-C028-4225-947F-9B15787E578D}_is1'
+  $appKey = if ($testCandidate) { '{768217DB-EA93-4F63-930D-66001B45C188}_is1' } else { '{215174A1-C028-4225-947F-9B15787E578D}_is1' }
   $keys = @("HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\$appKey", "HKCU:\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\$appKey", "HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\$appKey", "HKLM:\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\$appKey")
   foreach ($key in $keys) { if (Test-Path -LiteralPath $key) { throw 'Existing Rin Desktop installation detected; registration test refuses to alter it. Portable checks remain available.' } }
   $registered = [IO.Path]::GetFullPath((Join-Path $runRoot 'lifecycle/application'))
   if (-not $registered.StartsWith($runRoot + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) { throw 'Registration target escapes this QA run.' }
   # DisableProgramGroupPage=yes ignores /GROUP. Guard the actual default group.
-  $group = 'Rin Desktop'
+  $group = if ($testCandidate) { 'Rin Desktop Test' } else { 'Rin Desktop' }
   $groupPath = Join-Path ([Environment]::GetFolderPath('Programs')) $group
   $commonGroupPath = Join-Path ([Environment]::GetFolderPath('CommonPrograms')) $group
   if ((Test-Path -LiteralPath $groupPath) -or (Test-Path -LiteralPath $commonGroupPath)) { throw 'Existing Rin Desktop shortcut group detected; refusing registration test.' }
@@ -54,14 +58,21 @@ if ($Lifecycle) {
   [IO.File]::WriteAllText($sentinel, 'isolated synthetic data must survive uninstall')
   $arguments = @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/SP-', '/TASKS=', "/DIR=`"$registered`"", "/LOG=`"$(Join-Path $runRoot 'registered-install.log')`"")
   $uninstaller = Join-Path $registered 'unins000.exe'
+  $registeredBefore = $null
   try {
+    if ($PreviousSetup) {
+      if (($previousPortable.testBuild.channel -eq 'internal-test') -ne $testCandidate) { throw 'Registered upgrade requires the same installer channel/AppId.' }
+      $process = Start-Process -FilePath $PreviousSetup -ArgumentList $arguments -Wait -PassThru -WindowStyle Hidden
+      if ($process.ExitCode -ne 0) { throw 'Previous registered installation failed.' }
+      $registeredBefore = (Get-Content -LiteralPath (Join-Path $registered 'resources/app/portable.json') -Raw | ConvertFrom-Json).testBuild.id
+    }
     $process = Start-Process -FilePath $setup -ArgumentList $arguments -Wait -PassThru -WindowStyle Hidden
     if ($process.ExitCode -ne 0) { throw 'Registered installation failed.' }
     $registration = $keys | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
     if (-not $registration) { throw 'The installer did not register an uninstall entry.' }
     $record = Get-ItemProperty -LiteralPath $registration
     if ([IO.Path]::GetFullPath($record.InstallLocation).TrimEnd('\') -ne $registered) { throw 'Registered installation path does not match the isolated target.' }
-    if (-not (Test-Path -LiteralPath (Join-Path $groupPath 'Rin Desktop.lnk'))) { throw 'QA Start-menu shortcut missing.' }
+    if (-not (Test-Path -LiteralPath (Join-Path $groupPath ($group + '.lnk')))) { throw 'QA Start-menu shortcut missing.' }
     Verify-Package $registered
   } finally {
     # Only the known fresh test target is eligible for uninstall; never execute a registry command string.
@@ -84,7 +95,7 @@ if ($Lifecycle) {
     }
     $rollbackVersion = $oldManifest.version
   }
-  $lifecycleResult = @{ registration=$true; defaultStartMenuWasAbsent=$true; uninstall=$true; separateSyntheticDataPreserved=$true; rollbackVersion=$rollbackVersion; rollbackIsPortable=$true }
+  $lifecycleResult = @{ registration=$true; registeredUpgrade=[bool]$PreviousSetup; registeredBuildBefore=$registeredBefore; registeredBuildAfter=$portable.testBuild.id; internalTestChannel=$testCandidate; defaultStartMenuWasAbsent=$true; uninstall=$true; separateSyntheticDataPreserved=$true; rollbackVersion=$rollbackVersion; rollbackIsPortable=$true }
 }
 $result = @{ version=$version; freshDirectory=$fresh; upgradeDirectory=$upgrade; portableExtraction=$true; registryAndShortcuts=[bool]$lifecycleResult; applicationStarted=$false; uninstallTested=[bool]$lifecycleResult; lifecycle=$lifecycleResult; accounts=$false; hardware=$false; passed=$true }
 $result | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $runRoot 'result.json') -Encoding utf8
