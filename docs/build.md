@@ -29,10 +29,10 @@ npm run resources
 
 这条命令按 `tools/release/resource-manifest.json` 下载基础安装包，校验 SHA-256 后以不注册安装项的方式解包到 `work/release-resources/版本号`。不下载语音模型或 CLI。源码树缺失的运行时与 Core 目录会连接到解包目录；壁纸资源递归补齐缺失文件，已有文件保留，且不写入目录联接指向的其他位置。补齐后校验动态媒体的大小与哈希，不能只因目录或清单已存在就跳过视频。请先阅读第三方许可。
 
-当前清单锁定0.6.2应用安装包。默认从该版本Release下载；已有同版安装包时可使用下列命令，仍须通过清单的大小和SHA-256校验，不能换成任意安装器。它仅提供锁定的视觉/基础运行资源，不会用安装包中的应用代码覆盖当前源码或Electron依赖。
+当前清单锁定 0.6.3-rc.1 安装包。默认从当前 Release 下载；已有同版安装包时可使用下列命令，仍须通过清单的大小和 SHA-256 校验，不能换成任意安装器。它仅提供锁定的视觉/基础运行资源，不会用安装包中的应用代码覆盖当前源码或 Electron 依赖。使用候选包提供资源不代表其已完成稳定版验收。
 
 ```powershell
-npm run resources -- --installer="release/v0.6.2/Rin-Desktop-0.6.2-Setup.exe"
+npm run resources -- --installer="release/test-builds/v0.6.3-rc.1/Rin-Desktop-0.6.3-rc.1-Setup.exe"
 ```
 
 准备好后，在仓库根目录运行：
@@ -65,7 +65,7 @@ npm run package
 
 内部验收使用 `npm run package:test -- --id=<新的测试标识>`，需要相同资源、Inno Setup 和 Windows tar。该命令生成独立 ZIP 与测试安装器、文件/源码指纹、离线检查、数据恢复和验收表，输出 `release/test-builds/<标识>`；不修改正式资源清单、基础版本或已有产物。测试安装器使用独立 AppId/目录/快捷方式，测试数据默认隔离。构建不启动真实 Agent 或硬件，人工验收按[测试清单](../tools/release/TEST-ACCEPTANCE.md)进行。
 
-供用户下载安装的候选也使用此隔离入口：先同步根目录、应用及两个 lockfile 的候选版本号，提交并推送已审计源码，再以唯一测试标识构建。GitHub Release 标记为预发布，标签指向构建记录中的源码提交，仅上传经过安装验证的 Setup。公开下载文件可命名为 `Rin-Desktop-<候选版本>-Setup.exe`，但必须与原测试安装器逐字节一致；保留包内测试标识、隔离目录和验收说明。候选不替换稳定版 Latest，也不更新稳定资源清单。
+供用户下载安装的候选也使用此隔离入口：先同步根目录、应用及两个 lockfile 的候选版本号，提交并推送已审计源码，再以唯一测试标识构建。GitHub Release 标记为预发布，标签指向构建记录中的源码提交，安装器须通过安装验证。公开下载文件可命名为 `Rin-Desktop-<候选版本>-Setup.exe`，但必须与原测试安装器逐字节一致；保留包内测试标识、隔离目录和验收说明。下载指南直接链接候选发布页；只有预发布版本时，不使用 `releases/latest` 入口。资源清单可以锁定已核验的候选安装器，并须实际验证资源恢复。
 
 语音模型不打包、不上传到本项目 Release。`prototypes/live2d-codex/voice-resources.json` 只保存上游仓库、固定 revision、文件大小和 SHA-256。运行 `node tools/release/build-voice-manifest.mjs` 可从 Hugging Face 元数据重建清单；清单生成器不会下载权重。资源目录版本独立于应用版本，普通应用升级不触发重复模型下载。
 
@@ -73,6 +73,6 @@ npm run package
 
 发布前运行 `npm run check:public` 检查当前工作区的公开文件，再用 `node tools/release/audit-public.mjs --staged` 检查实际暂存内容；继续运行单元测试、原生界面测试、独立目录安装与卸载测试。核对许可和对应源码包；每个 Release 资产必须小于 GitHub 的单文件限制。请勿使用 `git add .` 代替公开文件清单审计。
 
-应用 Release 只上传 `Rin-Desktop-版本-Setup.exe`，不要将开发用 JSON 清单、校验清单或第三方源码混入普通用户的安装附件。版本和安装包校验值保存在仓库清单中；`voice-resources.json` 已随应用提供。
+当前 Release 同页提供 `Rin-Desktop-版本-Setup.exe` 与第三方对应源码 ZIP，普通用户只下载 Setup。不要上传开发用 JSON 清单或单独校验清单；版本和安装包校验值保存在仓库清单中，`voice-resources.json` 已随应用提供。
 
-第三方对应源码单独保存在 `third-party-source-v版本` 的开发者发布页。首次分离已有源码附件时，先创建与该应用版本相同提交的开发者草稿，在 Actions 手动运行 `Archive third-party source`，填写应用版本和开发者发布页 ID。流程会在 GitHub 端复制并核对 SHA-256。确认新页面公开可下载后，才能移除应用 Release 中的原源码附件。开发者发布页标记为非应用更新，不能替换 Latest 应用版本；README 和应用发布说明保留对应源码的明确入口。
+GitHub 当前仅保留最新版 Release。清理旧发布前，把仍在使用的第三方组件对应源码迁到保留的发布页，核对远端大小和 SHA-256，并确认公开下载可用；同时更新资源清单、README、许可说明和 Release 下载入口。源码归档版本独立于应用版本，组件未变时保留原文件名和内容。Git 历史、本地安装包与用户数据不随 Release 清理删除。
