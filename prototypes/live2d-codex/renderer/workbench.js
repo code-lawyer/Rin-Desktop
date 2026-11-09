@@ -9,6 +9,25 @@ import { installSettingsNavigation } from './settings-navigation.mjs';
 const api = window.companion, $ = id => document.getElementById(id);
 installRemoteSettings(api); installRemoteNavigation(api,{notice:text=>notice(text)});
 const settingsNavigation = installSettingsNavigation(document);
+const narrowNavigation = matchMedia('(max-width: 680px)');
+function closeNavigation() {
+  const restoreFocus = $('workbench-sidebar').contains(document.activeElement);
+  document.body.dataset.navigationOpen = 'false';
+  $('toggle-sidebar').setAttribute('aria-expanded', 'false');
+  $('toggle-sidebar').setAttribute('aria-label', '打开项目导航');
+  document.querySelector('main').inert = false;
+  if (restoreFocus && narrowNavigation.matches) $('toggle-sidebar').focus();
+}
+$('toggle-sidebar').onclick = () => {
+  if (document.body.dataset.navigationOpen === 'true') return closeNavigation();
+  document.body.dataset.navigationOpen = 'true';
+  $('toggle-sidebar').setAttribute('aria-expanded', 'true');
+  $('toggle-sidebar').setAttribute('aria-label', '关闭项目导航');
+  document.querySelector('main').inert = true;
+  $('workbench-sidebar').querySelector('button:not(:disabled),select:not(:disabled)')?.focus();
+};
+$('sidebar-backdrop').onclick = closeNavigation;
+narrowNavigation.addEventListener('change', closeNavigation);
 populateAgentPicker($('agent-select'));
 let workspace = { projects: [], settings: {} }, current, projectId, selected, threads = [], listCursor, historyCursor, listVersion = 0, historyVersion = 0, noticeTimer, searchTimer, settingsDirty = false, ready = false;
 const node = (tag, text, cls) => { const n = document.createElement(tag); if (text !== undefined) n.textContent = text; if (cls) n.className = cls; return n; };
@@ -52,7 +71,7 @@ function renderProjects() {
 async function selectProject(id, { preservePage = false } = {}) {
   const p = workspace.projects.find(v => v.id === id); if (!p) return;
   projectId = id; resetConversationView(); $('search').value = '';
-  if (!preservePage) { $('settings').hidden = true; $('conversations').hidden = false; $('settings-tab').setAttribute('aria-pressed','false'); }
+  if (!preservePage) { closeNavigation(); $('settings').hidden = true; $('conversations').hidden = false; $('settings-tab').setAttribute('aria-pressed','false'); }
   $('project-title').textContent = p.name; $('project-path').textContent = p.cwd; $('project-path').title = p.cwd;
   $('remove-project').disabled = p.cwd.toLowerCase() === current?.cwd?.toLowerCase(); renderProjects(); updateActivity(); await refreshThreads();
 }
@@ -251,7 +270,7 @@ $('agent-select').onchange = act(async () => { try { await run(api.chooseProvide
 $('agent-reconnect').onclick = act(() => run(api.reconnect()));
 $('refresh').onclick = act(() => refreshThreads()); $('more-threads').onclick = act(() => refreshThreads(true)); $('more-history').onclick = act(() => loadHistory(true));
 $('search').oninput = () => { clearTimeout(searchTimer); searchTimer = setTimeout(() => refreshThreads(),250); };
-function showSettings() { $('settings').hidden = false; $('conversations').hidden = true; $('settings-tab').setAttribute('aria-pressed','true'); renderProjects(); if (!settingsDirty) fillSettings(); }
+function showSettings() { closeNavigation(); $('settings').hidden = false; $('conversations').hidden = true; $('settings-tab').setAttribute('aria-pressed','true'); renderProjects(); if (!settingsDirty) fillSettings(); }
 $('settings-tab').onclick = showSettings;
 for (const radio of document.querySelectorAll('[name="wallpaper-style"]')) radio.onchange = act(() => saveWallpaperStyle(radio.value === 'realistic'));
 $('retry-character').onclick = act(() => saveWallpaperStyle(workspace.wallpaper.wallpaperMotion === true));
@@ -330,7 +349,7 @@ $('close').onclick = () => api.windowAction('hide-workbench'); $('back-chat').on
 window.addEventListener('blur', () => { if (document.activeElement?.matches('#shortcuts input,#remote-keys input')) document.activeElement.blur(); });
 document.addEventListener('keydown',e => {
   if (e.isComposing) return;
-  if (e.key === 'Escape') { if (!$('settings').hidden && projectId) selectProject(projectId).catch(() => {}); else api.windowAction('hide-workbench'); }
+  if (e.key === 'Escape') { if (document.body.dataset.navigationOpen === 'true') { e.preventDefault(); closeNavigation(); return; } if (!$('settings').hidden && projectId) selectProject(projectId).catch(() => {}); else api.windowAction('hide-workbench'); }
   if (['ArrowDown','ArrowUp'].includes(e.key) && e.target.matches('.thread-row,.project-row')) { e.preventDefault(); const siblings = [...e.target.parentElement.querySelectorAll('button')]; const i = siblings.indexOf(e.target); siblings[(i+(e.key==='ArrowDown'?1:-1)+siblings.length)%siblings.length]?.focus(); }
 });
 api.onState(state => {

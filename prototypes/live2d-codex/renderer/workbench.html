@@ -1,10 +1,11 @@
 <!doctype html>
 <html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'"><title>Rin Desktop · 工作台</title><link rel="stylesheet" href="app://local/renderer/workbench.css"><link rel="stylesheet" href="app://local/renderer/remote-focus.css"></head>
 <body>
-<header class="titlebar"><span class="brand">Rin Desktop</span><span class="title-sub">工作台</span><div class="window-actions"><button id="back-chat">回到对话</button><button id="close" class="close" aria-label="收起工作台"><svg class="ui-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="m5 5 10 10M15 5 5 15"/></svg></button></div></header>
+<header class="titlebar"><button id="toggle-sidebar" class="icon" aria-label="打开项目导航" aria-expanded="false" aria-controls="workbench-sidebar"><svg class="ui-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M3 5h14M3 10h14M3 15h14"/></svg></button><span class="brand">Rin Desktop</span><span class="title-sub">工作台</span><div class="window-actions"><button id="back-chat">回到对话</button><button id="close" class="close" aria-label="收起工作台"><svg class="ui-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="m5 5 10 10M15 5 5 15"/></svg></button></div></header>
 <div id="notice" role="alert" hidden></div>
 <div class="layout">
-  <aside class="sidebar">
+  <button id="sidebar-backdrop" aria-label="关闭项目导航" tabindex="-1"></button>
+  <aside id="workbench-sidebar" class="sidebar" aria-label="项目导航">
     <div class="agent-picker"><label for="agent-select">Agent</label><div class="agent-controls"><select id="agent-select"></select><button id="agent-reconnect" class="icon" aria-label="重新连接 Agent" title="重新连接 Agent"><svg class="ui-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M16 8a6.2 6.2 0 1 0-.6 5M16 3v5h-5"/></svg></button></div></div>
     <div class="section-heading"><h1>项目</h1><button id="add-project" class="icon" aria-label="添加项目文件夹" title="添加本地文件夹"><svg class="ui-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 4v12M4 10h12"/></svg></button></div>
     <div id="projects" class="project-list" aria-label="本地项目"></div>

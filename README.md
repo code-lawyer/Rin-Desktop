@@ -1,14 +1,16 @@
 # Rin Desktop
 
-> 0.6.3-rc.1 是供下载安装验收的预发布测试版：动漫模式采用完整人物姿态和约 2.8 秒像素重组切换，保留眨眼、轻微视线和朗读口型。RC003 完整硬件矩阵及各实验 Agent 的完整验收仍未完成；Grok 已通过本机真实协议检查和 20 项主应用任务，Claude 与 OpenCode 尚待认证后验收，均保持实验标识。安装、认证与使用方法见 [CLI Agent 说明](prototypes/live2d-codex/CLI-AGENTS.md)。
+> 0.6.3-rc.2 是供下载安装验收的预发布测试版：动漫模式采用完整人物姿态和约 2.8 秒像素重组切换，保留眨眼、轻微视线和朗读口型。RC003 完整硬件矩阵及各实验 Agent 的完整验收仍未完成；Grok 已通过本机真实协议检查和 20 项主应用任务，Claude 与 OpenCode 尚待认证后验收，均保持实验标识。安装、认证与使用方法见 [CLI Agent 说明](prototypes/live2d-codex/CLI-AGENTS.md)。
 
-当前源码的动漫模式使用五种完整人物姿态，保留眨眼、轻微视线变化和朗读口型；大姿势通过约 2.8 秒的像素分解、重组切换。下文操作对应当前源码和 0.6.3-rc.1 候选包，GitHub 仅保留这一版 Release。
+当前源码的动漫模式使用五种完整人物姿态，保留眨眼、轻微视线变化和朗读口型；大姿势通过约 2.8 秒的像素分解、重组切换。下文操作对应当前源码和 0.6.3-rc.2 候选包，GitHub 仅保留这一版 Release。
+
+审批卡先显示具体操作和目录，补充说明与前文可展开查看。工作台在窄窗口或较高页面缩放下采用单列表单，项目导航可从左上角按钮展开。
 
 此前存在拼接与变形的骨骼动作已退出主应用路径。完整姿态方案已接入并提供隔离测试，最终视觉验收和长期实机稳定性仍待确认；详情见[当前状态](docs/project-status.md)。
 
 把 Codex 放到 Windows 桌面的 4K 雨夜壁纸中。用对话气泡发送任务，在工作台管理本地项目与对话，也可以按需启用中文听写、回复朗读和遥控器操作。
 
-**[下载 0.6.3-rc.1 测试版](https://github.com/code-lawyer/Rin-Desktop/releases/tag/v0.6.3-rc.1)** · [快捷键](#快捷键) · [常见问题](#常见问题)
+**[下载 0.6.3-rc.2 测试版](https://github.com/code-lawyer/Rin-Desktop/releases/tag/v0.6.3-rc.2)** · [快捷键](#快捷键) · [常见问题](#常见问题)
 
 测试版安装为 **Rin Desktop Test**，与稳定版程序及数据默认隔离。测试前请从托盘退出正在运行的 Rin；需要沿用项目和草稿时，先备份，再选择数据副本。不要让测试版和日用版共用正在打开的数据目录。测试版尚未签名，Windows 可能显示未知发布者；实机验收通过前不作为稳定版推荐。
 
@@ -69,8 +71,8 @@ codex login status
 
 ## 2. 安装并打开 Rin Desktop
 
-1. 打开 [当前应用版本](https://github.com/code-lawyer/Rin-Desktop/releases/tag/v0.6.3-rc.1)。
-2. 在 **Assets** 中下载 **`Rin-Desktop-0.6.3-rc.1-Setup.exe`**。普通用户只需下载这个文件，第三方源码 ZIP 供开发者使用。
+1. 打开 [当前应用版本](https://github.com/code-lawyer/Rin-Desktop/releases/tag/v0.6.3-rc.2)。
+2. 在 **Assets** 中下载 **`Rin-Desktop-0.6.3-rc.2-Setup.exe`**。普通用户只需下载这个文件，第三方源码 ZIP 供开发者使用。
 3. 从托盘退出正在运行的 Rin，再双击安装，按向导完成操作。
 4. 从 Windows 开始菜单打开 **Rin Desktop Test**，桌面会显示雨夜壁纸。
 5. 按 **Ctrl+Alt+空格** 呼出对话气泡。
@@ -189,10 +191,10 @@ CLI 已安装但尚未登录时，也可以点击气泡中的「在浏览器登�
 - **打开**：从 Windows 开始菜单启动 Rin Desktop Test。运行后，点击任务栏右下角的托盘图标，或按 Ctrl+Alt+空格打开气泡；图标可能在「显示隐藏图标」中。
 - **收起窗口**：气泡或工作台右上角的 × 只收起窗口，壁纸和后台服务继续运行。
 - **完全退出**：右键托盘图标，选择「退出桌面伙伴」。应用会退出壁纸及其启动的后台进程，原 Windows 壁纸会重新显露。
-- **升级**：从 [当前应用版本](https://github.com/code-lawyer/Rin-Desktop/releases/tag/v0.6.3-rc.1) 下载新安装包并安装。候选版使用独立测试目录；需要旧数据时，先备份，再在测试版选择数据副本。升级和卸载保留个人数据；Codex CLI 由用户单独维护。
+- **升级**：从 [当前应用版本](https://github.com/code-lawyer/Rin-Desktop/releases/tag/v0.6.3-rc.2) 下载新安装包并安装。候选版使用独立测试目录；需要旧数据时，先备份，再在测试版选择数据副本。升级和卸载保留个人数据；Codex CLI 由用户单独维护。
 - **旧版迁移**：在「壁纸与设置 → 数据」点击「使用已有数据目录」，选择旧的 `workspaces.json` 所在文件夹，按提示重启，即可沿用项目入口、会话、草稿和设置。
 
-当前测试版数据默认保存在 `%LOCALAPPDATA%\VibeVoice\test-builds\v0.6.3-rc.1`；原正式版数据目录为 `%LOCALAPPDATA%\VibeVoice`。Codex 的登录和会话还由 CLI 在其用户目录中管理。项目文件保留在你选择的本地文件夹中，更多说明见 [隐私与数据](docs/privacy.md)。默认不开机自启。
+当前测试版数据默认保存在 `%LOCALAPPDATA%\VibeVoice\test-builds\v0.6.3-rc.2`；原正式版数据目录为 `%LOCALAPPDATA%\VibeVoice`。Codex 的登录和会话还由 CLI 在其用户目录中管理。项目文件保留在你选择的本地文件夹中，更多说明见 [隐私与数据](docs/privacy.md)。默认不开机自启。
 
 ## 常见问题
 
@@ -220,7 +222,7 @@ CLI 已安装但尚未登录时，也可以点击气泡中的「在浏览器登�
 
 ### 获取第三方对应源码
 
-Rin Desktop 0.6.3-rc.1 沿用 0.3.1 的第三方 CPU 语音组件与独立 worker，相关源码与安装器一起保存在[当前发布页](https://github.com/code-lawyer/Rin-Desktop/releases/tag/v0.6.3-rc.1)。需要检查、修改或重新编译这些组件时，下载 `Third-Party-Corresponding-Source-0.3.1.zip`；文件名中的 0.3.1 是这组组件的源码归档版本。包内 `README.md` 提供构建说明，`SOURCES.json` 记录依赖版本、上游地址和校验值。普通安装和使用无需下载这个源码包。
+Rin Desktop 0.6.3-rc.2 沿用 0.3.1 的第三方 CPU 语音组件与独立 worker，相关源码与安装器一起保存在[当前发布页](https://github.com/code-lawyer/Rin-Desktop/releases/tag/v0.6.3-rc.2)。需要检查、修改或重新编译这些组件时，下载 `Third-Party-Corresponding-Source-0.3.1.zip`；文件名中的 0.3.1 是这组组件的源码归档版本。包内 `README.md` 提供构建说明，`SOURCES.json` 记录依赖版本、上游地址和校验值。普通安装和使用无需下载这个源码包。
 
 ### 项目许可
 

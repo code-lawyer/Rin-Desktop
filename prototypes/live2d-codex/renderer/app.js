@@ -99,7 +99,7 @@ function measureBubble() {
     return node.getBoundingClientRect().height + number(style.marginTop) + number(style.marginBottom);
   };
   const replyStyle = getComputedStyle($('messages'));
-  const textHeight = Math.max(number(replyStyle.minHeight), $('reply-content').getBoundingClientRect().height) + number(replyStyle.marginTop) + number(replyStyle.marginBottom);
+  const textHeight = $('messages').hidden ? 0 : Math.max(number(replyStyle.minHeight), $('reply-content').getBoundingClientRect().height) + number(replyStyle.marginTop) + number(replyStyle.marginBottom);
   const chrome = number(outer.paddingTop) + number(outer.paddingBottom) + number(card.paddingTop) + number(card.paddingBottom) + 2;
   const fixed = [document.querySelector('.bubble-header'), $('current-target'), $('context-panel'), $('approval'), $('login-panel'), $('error-banner'), $('submission-panel'), $('activity-line'), $('reply-player'), $('composer')].reduce((sum, node) => sum + height(node), 0);
   const size = { width: (replyText?.length ?? 0) > 900 ? 560 : 440, height: Math.ceil(chrome + fixed + textHeight + 3), viewport: { width: innerWidth, height: innerHeight } };
@@ -113,17 +113,36 @@ function growPrompt() {
 function renderApproval(approvals) {
   const host = $('approval');
   const key = JSON.stringify(approvals); if (key === approvalKey) return; approvalKey = key;
+  $('messages').hidden = approvals.length > 0;
   host.replaceChildren(); host.hidden = !approvals.length; if (!approvals.length) return;
+  $('bubble-card').scrollTop = 0;
   const request = approvals[0];
   host.dataset.kind = request.kind;
   const name = catalog.agentName(current?.provider);
   const titles = { command: `${name} 需要确认这次操作`, files: `${name} 需要文件修改权限`, permissions: `${name} 需要额外权限`, questions: `${name} 想请你补充信息` };
-  host.append(element('h3', '', titles[request.kind]));
+  const heading = element('div', 'approval-heading');
+  heading.append(element('h3', '', titles[request.kind]));
+  const history = element('button', 'text-button', '查看回复'); history.type = 'button';
+  history.setAttribute('aria-controls', 'messages'); history.setAttribute('aria-expanded', 'false');
+  history.addEventListener('click', () => {
+    $('messages').hidden = !$('messages').hidden;
+    history.textContent = $('messages').hidden ? '查看回复' : '收起回复';
+    history.setAttribute('aria-expanded', String(!$('messages').hidden)); scheduleMeasure();
+  });
+  heading.append(history); host.append(heading);
   const body = element('div', 'approval-body'); host.append(body);
-  if (approvals.length > 1) body.append(element('p', '', `还有 ${approvals.length - 1} 个请求等待处理`));
-  if (request.reason) body.append(element('p', '', request.reason));
+  // Keep the operation and its scope ahead of explanatory prose and actions.
+  if (request.command || request.details) body.append(element('pre', 'approval-operation', request.command || request.details));
   if (request.cwd) body.append(element('p', 'approval-directory', `目录：${request.cwd}`));
-  if (request.command || request.details) body.append(element('pre', '', [request.command, request.details].filter(Boolean).join('\n\n')));
+  const explanation = [request.reason, request.command && request.details].filter(Boolean);
+  if (request.kind === 'questions') {
+    if (request.reason) body.append(element('p', '', request.reason));
+  } else if (explanation.length) {
+    const details = element('details', 'approval-context'); details.append(element('summary', '', '查看说明'));
+    for (const text of explanation) details.append(element('p', '', text));
+    body.append(details);
+  }
+  if (approvals.length > 1) body.append(element('p', '', `还有 ${approvals.length - 1} 个请求等待处理`));
   const actions = element('div', 'approval-actions');
   const fields = {};
   if (request.kind === 'questions') {

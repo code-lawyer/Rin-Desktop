@@ -67,7 +67,7 @@ export function installRemoteNavigation(api,{notice=()=>{},compose=()=>false}={}
     // IPC-delivered remote input does not enable Chromium's :focus-visible
     // keyboard heuristic after mouse use. Keep its focus indication explicit.
     document.documentElement?.setAttribute('data-navigation-input','remote');
-    const controls=[...document.querySelectorAll('button,select,input,textarea,summary,a[href],[tabindex="0"]')].filter(el=>!el.disabled && !el.closest('[hidden]') && el.getClientRects().length && el.checkVisibility?.({visibilityProperty:true})!==false);
+    const controls=[...document.querySelectorAll('button,select,input,textarea,summary,a[href],[tabindex="0"]')].filter(el=>!el.disabled && !el.closest('[hidden],[inert]') && el.getClientRects().length && el.checkVisibility?.({visibilityProperty:true})!==false);
     const active=document.activeElement,index=controls.indexOf(active);
     if(compose(action,active)){armed=null;return;}
     if(action==='confirm') {
