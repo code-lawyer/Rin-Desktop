@@ -67,7 +67,7 @@ if(process.argv.includes('--video') || process.argv.includes('--fixture-video'))
   app.whenReady().then(async()=>{
     protocol.handle('app',request=>{const path=decodeURIComponent(new URL(request.url).pathname);if(path.startsWith('/video/'))return new Response('',{status:404});const file=resolve(application,'.'+path);if(!file.startsWith(application+require('node:path').sep))return new Response('',{status:403});return net.fetch(pathToFileURL(file).href);});
     if(process.argv.includes('--visual')) {
-      const result=await require('./visual-cases.cjs')({open,evaluate,delay,output});
+      const result=await require('./visual-cases.cjs')({open,evaluate,delay,output,extended:process.argv.includes('--extended')});
       result.errors=errors;
       writeFileSync(join(output,'summary.json'),JSON.stringify(result,null,2));
       for(const win of windows)win.destroy();

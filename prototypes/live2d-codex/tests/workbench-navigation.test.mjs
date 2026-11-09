@@ -15,7 +15,7 @@ function fixture() {
   };
   const calls = [], requests = [];
   const context = vm.createContext({
-    $, node: (tag, text) => ({ tag, text }), renderProjects() {}, updateActivity() {}, renderThreads() {},
+    $, node: (tag, text) => ({ tag, text }), renderProjects() {}, updateActivity() {}, renderThreads() {}, closeNavigation() {},
     workspace: { projects: [{ id: 'a', name: 'Project A', cwd: 'C:/A' }, { id: 'b', name: 'Project B', cwd: 'C:/B' }] },
     current: { provider: 'codex', connection: 'ready', cwd: 'C:/A' }, projectId: 'a',
     selected: { id: 'old-thread' }, threads: [{ id: 'old-thread' }], listCursor: 'old-list-cursor', historyCursor: 'old-history-cursor', listVersion: 0, historyVersion: 0,

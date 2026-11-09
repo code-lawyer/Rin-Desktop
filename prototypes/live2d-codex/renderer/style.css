@@ -169,10 +169,17 @@ button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-
 #session-label { font-size: 10px; font-variant-numeric: tabular-nums; }
 .approval { display:flex;flex-direction:column;flex: 0 0 auto; margin: 8px 0 12px; padding: 14px; background: var(--approval-surface); border-radius: 12px; font-size: 12px; overflow-wrap:anywhere; }
 .approval h3, .login-panel h3 { flex:0 0 auto;font-size: 13px; line-height:1.6;margin: 0 0 8px; font-weight: 650; }
-.approval-body { min-height:0;max-height:max(96px,24vh);overflow:auto;padding:3px 4px 3px 3px;margin:-3px;overscroll-behavior:contain;scrollbar-width:thin; }
+.bubble-card:has(.approval:not([hidden])) .bubble-content { flex:0 0 auto;min-height:0;overflow:visible; }
+.approval-heading { display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:8px; }
+.approval-heading h3 { margin:0; }
+.approval-heading button { flex:0 0 auto; }
+.approval-body { min-height:0; }
+.approval-context summary { cursor:pointer;color:var(--approval-ink);line-height:1.8; }
+.approval-context summary:focus-visible { outline:2px solid var(--focus);outline-offset:2px; }
+.approval-context p { white-space:pre-wrap; }
 .approval p { margin: 6px 0; line-height: 1.75; }
 .approval-directory { color:#6e5839;font-size:11px; }
-.approval pre { font-family:"Cascadia Code",Consolas,monospace;font-size: 11px; line-height:1.7;white-space: pre-wrap; overflow-wrap:anywhere;background: #f2e7d6; padding: 10px; border-radius: 6px; }
+.approval pre { font-family:"Cascadia Code",Consolas,monospace;font-size: 11px; line-height:1.7;white-space: pre-wrap; overflow-wrap:anywhere;background: #f2e7d6; padding: 10px; border-radius: 6px;margin:0 0 8px; }
 .approval-actions { flex:0 0 auto;display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; padding-top:10px;border-top:1px solid #cbb99670; }
 .approval-actions button { min-height: 34px; padding: 6px 10px; border: 1px solid #cbb996; background: #fffdf9; border-radius: 7px; font-size: 12px; }
 .approval-actions button:hover:not(:disabled) { background:#f2e7d6; }

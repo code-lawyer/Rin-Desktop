@@ -1,13 +1,17 @@
 // Real HTML/CSS/assets with the shared synthetic API. Page zoom is not OS DPI.
 const {writeFileSync}=require('node:fs');
 const {join}=require('node:path');
-module.exports=async function visualCases({open,evaluate,delay,output}) {
+module.exports=async function visualCases({open,evaluate,delay,output,extended=false}) {
   const captures=[],failures=[],checks=[];
   const emit=(win,name,value)=>evaluate(win,`interfaceFixture.emit(${JSON.stringify(name)},${JSON.stringify(value)})`);
   const wait=async(win,condition)=>{
     const end=Date.now()+15000;
     while(!await evaluate(win,condition)){if(Date.now()>end)throw new Error('Timed out: '+condition);await delay(60);}
   };
+  async function verify(win,name,condition) {
+    checks.push(name);
+    if(!await evaluate(win,condition))failures.push({name,condition});
+  }
   async function capture(win,name,width,height,zoom=1) {
     // Hidden Chromium surfaces can return the previous composited frame even
     // after invalidate(). Paint a visible, inactive test window before capture.
@@ -34,6 +38,9 @@ module.exports=async function visualCases({open,evaluate,delay,output}) {
       return {viewport:{width:innerWidth,height:innerHeight,dpr:devicePixelRatio},clipped,
         focus:document.activeElement.id,bodyOverflow:document.body.scrollWidth>innerWidth+1,
         pose:document.getElementById('wallpaper-view')?.dataset.pose,
+        renderedPose:document.querySelector('.wallpaper-puppet[data-active="true"]')?.dataset.actualPose,
+        transitionPhase:document.querySelector('.wallpaper-puppet[data-active="true"]')?.dataset.transitionPhase,
+        poseAmount:document.querySelector('.wallpaper-puppet[data-active="true"]')?.dataset.poseAmount,
         approval:document.getElementById('approval')?.hidden===false,
         error:document.getElementById('error-banner')?.textContent};
     })()`);
@@ -45,13 +52,26 @@ module.exports=async function visualCases({open,evaluate,delay,output}) {
     }
     if(shot.isEmpty())throw new Error('Empty capture: '+name);
     writeFileSync(join(output,name+'.png'),shot.toPNG());
-    captures.push({name,window:{width,height},zoom,pixels:shot.getSize(),...metrics});
+    let accessibility;
+    if(extended) {
+      if(!win.webContents.debugger.isAttached())win.webContents.debugger.attach('1.3');
+      const {nodes}=await win.webContents.debugger.sendCommand('Accessibility.getFullAXTree');
+      const controls=nodes.filter(node=>!node.ignored && /^(button|textbox|combobox|checkbox|radio|slider|spinbutton)$/.test(node.role?.value));
+      accessibility={controls:controls.length,unnamed:controls.filter(node=>!node.name?.value?.trim()).map(node=>({role:node.role.value,backendDOMNodeId:node.backendDOMNodeId}))};
+      if(accessibility.unnamed.length)failures.push({name,unnamedControls:accessibility.unnamed});
+    }
+    captures.push({name,window:{width,height},zoom,pixels:shot.getSize(),...metrics,...(accessibility?{accessibility}:{})});
     if(metrics.clipped.length||metrics.bodyOverflow)failures.push({name,clipped:metrics.clipped,bodyOverflow:metrics.bodyOverflow});
   }
   async function reachable(win,name,selectors) {
     for(const selector of selectors) {
-      const visible=await evaluate(win,`(()=>{const el=document.querySelector(${JSON.stringify(selector)});el.scrollIntoView({block:'center'});el.focus();const r=el.getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return r.top>=0&&r.bottom<=innerHeight+1&&(el===hit||el.contains(hit))})()`);
-      if(!visible)failures.push({name,unreachable:selector});
+      const visibility=await evaluate(win,`(()=>{const el=document.querySelector(${JSON.stringify(selector)});el.scrollIntoView({block:'center'});el.focus();const r=el.getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return {visible:r.top>=0&&r.bottom<=innerHeight+1&&(el===hit||el.contains(hit)),viewport:{width:innerWidth,height:innerHeight},rect:{x:r.x,y:r.y,width:r.width,height:r.height},hit:hit?.id||hit?.className,focused:document.activeElement===el}})()`);
+      if(!visibility.visible) {
+        await delay(150);
+        const screenshot='unreachable-'+String(failures.length+1)+'.png';
+        writeFileSync(join(output,screenshot),(await win.webContents.capturePage(undefined,{stayHidden:true,stayAwake:true})).toPNG());
+        failures.push({name,unreachable:selector,...visibility,screenshot});
+      }
     }
     checks.push(name);
   }
@@ -72,6 +92,16 @@ module.exports=async function visualCases({open,evaluate,delay,output}) {
   await emit(chat,'layout',{fullscreen:false,side:'left',tailY:78});
   await emit(chat,'state',{status:'waiting',approvals:[{id:'visual-approval',kind:'command',reason:'需要你确认以下操作。较长的路径和命令应可滚动查看，审批按钮应始终可达。',cwd:'C:/Projects/Example/设计与前端视觉检查',command:'npm run build && npm run check:project',details:'仅展示合成审批，不执行命令。'}]});
   await capture(chat,'approval-compact',440,390);
+  await verify(chat,'compact approval shows operation and directory before accepting',`(()=>{
+    const operation=document.querySelector('.approval-operation'),directory=document.querySelector('.approval-directory'),actions=document.querySelector('.approval-actions');
+    const visible=el=>{const r=el.getBoundingClientRect();return r.top>=0&&r.bottom<=innerHeight&&r.left>=0&&r.right<=innerWidth};
+    return document.getElementById('messages').hidden&&operation.textContent==='npm run build && npm run check:project'&&visible(operation)&&visible(directory)&&visible(actions)&&operation.getBoundingClientRect().bottom<=actions.getBoundingClientRect().top;
+  })()`);
+  await evaluate(chat,`document.querySelector('.approval-context summary').click()`);
+  await verify(chat,'approval explanation remains available',`document.querySelector('.approval-context').open&&document.querySelector('.approval-context').textContent.includes('仅展示合成审批')`);
+  await evaluate(chat,`document.querySelector('.approval-context summary').click();document.querySelector('.approval-heading button').click()`);
+  await verify(chat,'approval can expand the previous reply',`!document.getElementById('messages').hidden&&document.getElementById('reply-content').textContent.includes('今天的进展')`);
+  await evaluate(chat,`document.querySelector('.approval-heading button').click();document.getElementById('bubble-card').scrollTop=0`);
   await reachable(chat,'compact approval and composer actions remain reachable',['.approval-actions button:first-child','.approval-actions button:last-child','#record-button','#send-button']);
   await capture(chat,'approval-compact-actions',440,390);
   await evaluate(chat,`document.getElementById('bubble-card').scrollTop=0`);
@@ -81,6 +111,7 @@ module.exports=async function visualCases({open,evaluate,delay,output}) {
   await reachable(chat,'compact question fields and actions remain reachable',['.approval select','.approval label:last-child input','.approval-actions button:first-child','#send-button']);
   await evaluate(chat,`document.getElementById('bubble-card').scrollTop=0`);
   await emit(chat,'state',{status:'idle',approvals:[],connection:'error',error:'连接暂时中断。请检查本地 Agent 状态后重试。',messages:[]});
+  await verify(chat,'reply is restored after approval finishes',`!document.getElementById('messages').hidden`);
   await capture(chat,'bubble-error',440,420);
   await emit(chat,'state',{connection:'ready',error:null,messages:[{role:'assistant',text:'可以用，中文显示和回复都正常。',complete:true}]});
   await capture(chat,'bubble-zoom-125',560,620,1.25);
@@ -114,6 +145,9 @@ module.exports=async function visualCases({open,evaluate,delay,output}) {
   for(const pose of ['work','cup','thinking','window','attention']) {
     await emit(wallpaper,'presentation',{stills:{stillPose:pose,ambienceEnabled:false}});
     await wait(wallpaper,`document.getElementById('wallpaper-view').dataset.pose===${JSON.stringify(pose)}`);
+    // The requested pose changes before pixels do. Only accept the complete,
+    // opaque new painting, never the empty chair in the middle of a transition.
+    await wait(wallpaper,`(()=>{const p=document.querySelector('.wallpaper-puppet[data-active="true"]');return p?.dataset.actualPose===${JSON.stringify(pose)}&&p.dataset.transitionPhase==='steady'&&p.dataset.poseAmount==='1.000';})()`);
     await capture(wallpaper,'female-'+pose,1280,800);
   }
   const density=await evaluate(wallpaper,'devicePixelRatio');
@@ -133,5 +167,32 @@ module.exports=async function visualCases({open,evaluate,delay,output}) {
     });
   })()`);
   for(const entry of wallpaperStyles)if(entry.contrast<4.5)failures.push({name:'wallpaper text contrast',...entry});
-  return {captures,checks,failures,wallpaperStyles,synthetic:true,accounts:false,hardware:false,pageZoomOnly:true};
+  if(extended) {
+    for(const zoom of [1.25,1.5,2]) {
+      await evaluate(workbench,`document.querySelector('[data-setting-target="playback-settings"]').click();document.querySelector('.settings-scroll').scrollTop=0`);
+      await capture(workbench,'voice-minimum-zoom-'+Math.round(zoom*100),760,540,zoom);
+      await reachable(workbench,'voice controls at minimum window and '+Math.round(zoom*100)+'%',['#tts-engine','#qwen-voice','#preview-voice','#save-settings']);
+      await evaluate(workbench,`document.querySelector('[data-setting-target="wallpaper-settings"]').click();document.querySelector('.settings-scroll').scrollTop=0`);
+      await capture(workbench,'wallpaper-minimum-zoom-'+Math.round(zoom*100),760,540,zoom);
+      await reachable(workbench,'wallpaper controls at minimum window and '+Math.round(zoom*100)+'%',['#still-pose','#pause-stills']);
+      await capture(workbench,'wallpaper-controls-minimum-zoom-'+Math.round(zoom*100),760,540,zoom);
+    }
+    await evaluate(workbench,`document.getElementById('toggle-sidebar').click()`);
+    await capture(workbench,'navigation-minimum-zoom-200',760,540,2);
+    await verify(workbench,'narrow navigation opens and keeps the content behind it inactive',`document.getElementById('toggle-sidebar').getAttribute('aria-expanded')==='true'&&document.querySelector('main').inert&&document.getElementById('workbench-sidebar').contains(document.activeElement)`);
+    await reachable(workbench,'narrow navigation settings remain reachable',['#agent-select','#settings-tab']);
+    await evaluate(workbench,`interfaceFixture.emit('remoteAction','down')`);
+    await verify(workbench,'remote navigation skips the inactive content behind the sidebar',`document.activeElement.id==='toggle-sidebar'`);
+    await evaluate(workbench,`document.getElementById('settings-tab').focus()`);
+    await evaluate(workbench,`document.getElementById('settings-tab').click()`);
+    await verify(workbench,'choosing settings closes navigation and restores focus',`document.getElementById('toggle-sidebar').getAttribute('aria-expanded')==='false'&&!document.querySelector('main').inert&&document.activeElement.id==='toggle-sidebar'`);
+    await evaluate(workbench,`document.getElementById('toggle-sidebar').click();document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}))`);
+    await verify(workbench,'Escape closes narrow navigation without leaving settings',`document.getElementById('toggle-sidebar').getAttribute('aria-expanded')==='false'&&!document.getElementById('settings').hidden&&!document.querySelector('main').inert`);
+    await evaluate(workbench,`document.getElementById('toggle-sidebar').click()`);
+    await capture(workbench,'navigation-restored-wide',1120,760);
+    await verify(workbench,'widening restores the sidebar and active content',`document.getElementById('toggle-sidebar').getAttribute('aria-expanded')==='false'&&!document.querySelector('main').inert&&document.getElementById('workbench-sidebar').checkVisibility()`);
+    await capture(chat,'bubble-zoom-200',560,620,2);
+    await reachable(chat,'bubble actions at 200%',['#record-button','#send-button']);
+  }
+  return {captures,checks,failures,wallpaperStyles,extended,synthetic:true,accounts:false,hardware:false,pageZoomOnly:true,screenReaderAcceptance:false};
 };

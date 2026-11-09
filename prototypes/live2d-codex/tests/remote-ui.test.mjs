@@ -48,3 +48,14 @@ test('remote selection skips static-only poses when realistic video is selected'
   globalThis.document={querySelectorAll:()=>[select],activeElement:select,addEventListener(){}};
   installRemoteNavigation({onRemoteAction:fn=>receive=fn});receive('right');assert.equal(select.selectedIndex,5);receive('left');assert.equal(select.selectedIndex,1);assert.equal(changed,2);
 });
+
+test('remote navigation and confirmation skip content behind an open navigation panel',t=>{
+  const old=globalThis.document;t.after(()=>globalThis.document=old);let receive,clicked=0;
+  const control=inert=>({tagName:'BUTTON',closest:selector=>inert&&selector.includes('[inert]')?{}:null,getClientRects:()=>[{}],matches:selector=>selector.startsWith('button,'),focus(){document.activeElement=this;},scrollIntoView(){},click(){clicked++;}});
+  const before=control(false),behind=control(true),after=control(false);
+  globalThis.document={querySelectorAll:()=>[before,behind,after],activeElement:before,addEventListener(){}};
+  installRemoteNavigation({onRemoteAction:fn=>receive=fn});
+  receive('down');assert.equal(document.activeElement,after);
+  receive('up');assert.equal(document.activeElement,before);
+  document.activeElement=behind;receive('confirm');assert.equal(clicked,0);
+});
