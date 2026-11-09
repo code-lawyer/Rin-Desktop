@@ -5,6 +5,7 @@ import { resolve, join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import stills from '../../prototypes/live2d-codex/backend/still-settings.cjs';
 import { POSE_FILES } from '../../prototypes/live2d-codex/renderer/pose-assets.mjs';
+import catalog from '../../prototypes/live2d-codex/backend/agent-catalog.cjs';
 
 export const projectRoot = resolve(import.meta.dirname, '../..');
 const providers = new Set(['codex', 'claude', 'grok', 'opencode', 'dots']);
@@ -33,7 +34,7 @@ export function launchPlan(args = [], root = projectRoot) {
   if (!['wallpaper', 'avatar'].includes(mode)) throw new Error('Mode must be wallpaper or avatar.');
   if (options.has('wallpaper') && (options.get('wallpaper') !== 'artwork' || mode !== 'wallpaper')) throw new Error('Video wallpaper is retired. Use --wallpaper=artwork in wallpaper mode.');
   const provider = options.get('provider');
-  if (provider && !providers.has(provider)) throw new Error(`Unknown provider: ${provider}`);
+  if (provider && !providers.has(provider) && !catalog.isCustomAgentId(provider)) throw new Error(`Unknown provider: ${provider}`);
   if (!options.has('mode')) forwarded.unshift('--mode=wallpaper');
   return {
     source: 'working-tree', root, appRoot, mode,
@@ -77,7 +78,7 @@ export function inspectLaunch(plan, { platform = process.platform, nodeVersion =
   if (missing.length) problems.push(`Missing visual resources: ${missing.join(', ')}. Wallpaper resources: npm run resources. Hiyori is a local-only legacy asset.`);
   if (existsSync(join(plan.appRoot, 'portable.json'))) problems.push('The source directory contains portable.json; use a clean source tree, not a release overlay.');
   if (plan.provider === 'dots' && (!existsSync(join(plan.root, 'prototypes/dots-bridge/src/client.mjs')) || !existsSync(join(plan.appRoot, 'backend/dots.mjs')))) problems.push('The private Dots adapter is not present in this checkout. Use a CLI provider.');
-  const adapter = { claude: 'claude-agent.mjs', grok: 'acp-agent.mjs', opencode: 'acp-agent.mjs' }[plan.provider];
+  const adapter = catalog.isCustomAgentId(plan.provider) ? 'acp-agent.mjs' : { claude: 'claude-agent.mjs', grok: 'acp-agent.mjs', opencode: 'acp-agent.mjs' }[plan.provider];
   if (adapter && !existsSync(join(plan.appRoot, 'backend', adapter))) problems.push(`The ${plan.provider} adapter is not present in this source version.`);
   return { ...plan, version, nodeVersion, electron, ready: problems.length === 0, problems };
 }

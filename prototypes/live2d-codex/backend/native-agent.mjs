@@ -26,12 +26,13 @@ export function historyTurns(messages) {
 export class NativeAgent extends EventEmitter {
   constructor({ provider, projectRoot, storageDir }) {
     super(); this.provider = provider; this.spec = catalog.AGENTS[provider];
+    if (!this.spec) throw new Error('未知 Agent，请检查接入配置。');
     this.storageDir = join(resolve(storageDir), 'agents', provider); this.projectRoot = resolve(projectRoot);
     this.queue = Promise.resolve(); this.index = {}; this.known = new Map(); this.pending = new Map(); this.closed = false;
     this.lifecycle = new AgentLifecycle();
     this.state = { provider, agentName: this.spec.name, loginHelp: this.spec.help, connection: 'connecting', status: 'connecting', activity: `正在连接 ${this.spec.name}`, error: null, login: null, version: null,
       cwd: this.projectRoot, projectName: basename(this.projectRoot), threadId: null, turnId: null, threadName: '', model: null, models: [], effort: null, messages: [], approvals: [], restored: false,
-      permissionHint: provider === 'opencode' ? '审批遵循 OpenCode 的项目、全局和 Agent 权限规则；配置为自动允许的操作不会弹窗。' : '工具权限请求由原生 Agent 发出，在此确认。',
+      permissionHint: this.spec.custom ? '审批遵循自定义 Agent 的原生配置；自动允许的操作不会弹窗。' : provider === 'opencode' ? '审批遵循 OpenCode 的项目、全局和 Agent 权限规则；配置为自动允许的操作不会弹窗。' : '工具权限请求由原生 Agent 发出，在此确认。',
       renameLocal: provider !== 'claude', canStartNew: false };
   }
   get busy() { return !!this.run || !!this.lifecycle.active || isTaskBusy(this.state); }
@@ -97,7 +98,7 @@ export class NativeAgent extends EventEmitter {
     try {
       if (this.closed) return;
       await this.load(); if (this.closed) return; this.changed();
-      this.binary = findAgent(this.provider); this.state.version = await versionOf(this.binary); this.state.canStartNew = true;
+      await this.prepareNative(); this.state.canStartNew = true;
       if (this.closed) return;
       if (!(await stat(this.state.cwd)).isDirectory()) throw new Error('项目目录不可访问，请恢复目录或选择其他项目。');
       if (this.closed) return;
@@ -109,6 +110,7 @@ export class NativeAgent extends EventEmitter {
     } catch (error) { await this.disposeNative().catch(() => {}); this.report(error, { connection: true }); }
     finally { operation.release(); }
   }
+  async prepareNative() { this.binary = findAgent(this.provider); this.state.version = await versionOf(this.binary); }
   assertReady() { if (this.closed || this.state.connection !== 'ready') throw new Error(`${this.spec.name} 尚未连接，请先重新连接。`); }
   idle() { this.assertReady(); if (this.busy) throw new Error('请先完成或停止当前任务。'); }
   push(message) { this.state.messages.push(message); if (this.state.messages.length > 200) this.state.messages.splice(0, this.state.messages.length - 200); }
@@ -232,7 +234,7 @@ export class NativeAgent extends EventEmitter {
       Object.assign(this.state, { cwd: resolve(cwd), projectName: basename(cwd), threadId: item?.id ?? null, turnId: null,
         threadName: item ? this.index[item.id]?.alias || item.name || '' : '', messages: item ? this.index[item.id]?.messages ?? [] : [],
         approvals: [], error: null, restored: false, effort: null, ...(item ? { model: null } : {}) });
-      this.binary ||= findAgent(this.provider);
+      if (!this.binary) await this.prepareNative();
       await this.openNative(); operation.check();
       this.state.connection = 'ready'; this.state.activity = item ? '已恢复，可以继续对话' : '准备就绪';
     }, { allowDisconnected: !item, disposeOnError: true, validate: async () => {

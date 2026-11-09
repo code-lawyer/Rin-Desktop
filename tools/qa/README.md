@@ -7,6 +7,7 @@
 | `npm run qa:inventory -- --run` | 只读文件元数据与目录占用，不跟随目录联接；不自动删除 |
 | `npm run qa:known-issues` | 合成数据/协议复现已知业务边界 |
 | `npm run qa:interface` | 隔离 Electron 界面与工作台，无账户或硬件 |
+| `npm run qa:puppet-package -- --run --package="<测试包目录>"` | 实际包的主进程、设置 IPC、自定义 Agent 添加/编辑/重连/删除与数据保留；启动本地合成 ACP 子进程，随后检查壁纸切换、退出及重启恢复。不连接真实账户或硬件，不改系统剪贴板 |
 | `npm run qa:visual -- --run [--extended]` | 隔离页面、布局、长内容、缩放与完整姿态截图；扩展模式增加最小窗口的 125%–200% 页面缩放、控件可达性与 Chromium 无障碍名称检查。页面缩放不代表系统 DPI，无障碍树检查不代替读屏实测 |
 | `npm run qa:shutdown -- --run` | 隔离桌面退出与子进程清理 |
 | `npm run qa:stills -- --character-switch` | 生产 renderer/preload + 合成后端，验证失败重试、切换与重启恢复 |

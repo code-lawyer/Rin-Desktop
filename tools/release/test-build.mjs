@@ -34,7 +34,7 @@ for(const name of ['data-safety','submission-safety','agent-protocol','agent-con
 for(const name of ['data-agent','recover-data'])await cp(join(root,`tools/qa/${name}.mjs`),join(stage,`tools/${name}.mjs`));
 await cp(join(root,'tools/release/TEST-ACCEPTANCE.md'),join(stage,'TEST-ACCEPTANCE.md'));
 const cliGuide=join(stage,'CLI-AGENTS.md');
-await writeFile(cliGuide,(await readFile(join(app,'CLI-AGENTS.md'),'utf8')).replaceAll('../../tools/release/TEST-ACCEPTANCE.md','TEST-ACCEPTANCE.md'));
+await writeFile(cliGuide,(await readFile(cliGuide,'utf8')).replaceAll('https://github.com/code-lawyer/Rin-Desktop/blob/main/tools/release/TEST-ACCEPTANCE.md','TEST-ACCEPTANCE.md'));
 await writeFile(join(stage,'source-state.json'),JSON.stringify(source,null,2));
 for(const [name,script] of [['Run-Offline-Checks','data-agent'],['Recover-Data','recover-data']])await writeFile(join(stage,name+'.cmd'),`@echo off\r\n"%~dp0resources\\app\\runtime\\node.exe" "%~dp0tools\\${script}.mjs" %*\r\nset "RIN_TEST_EXIT=%errorlevel%"\r\nif "%~1"=="" pause\r\nexit /b %RIN_TEST_EXIT%\r\n`);
 await writeFile(join(stage,'Run-Remote-Checks.cmd'),`@echo off\r\n"%~dp0resources\\app\\runtime\\node.exe" --test "%~dp0resources\\app\\tests\\remote-integration.test.mjs" "%~dp0resources\\app\\tests\\remote-ui.test.mjs" "%~dp0resources\\app\\tests\\speech-ui.test.mjs" "%~dp0resources\\app\\tests\\composer-controls.test.mjs"\r\nset "RIN_TEST_EXIT=%errorlevel%"\r\nif "%~1"=="" pause\r\nexit /b %RIN_TEST_EXIT%\r\n`);

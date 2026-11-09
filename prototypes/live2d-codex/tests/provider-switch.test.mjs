@@ -23,7 +23,7 @@ for (const stage of ['construct', 'old-close', 'mkdir', 'write', 'connect']) {
     };
     let beforeQuit;
     const context = vm.createContext({
-      closing: false, quitting: false, pendingDataSelection: null, pendingRelaunch: null, flushChatDraft: async () => {}, backend: old, store: {}, provider: 'codex', changingProvider: false, providerChange: null,
+      closing: false, quitting: false, pendingDataSelection: null, pendingRelaunch: null, flushChatDraft: async () => {}, backend: old, store: {}, provider: 'codex', changingProvider: false, providerChange: null, customAgentStore: null, changingAgentConfig: false,
       captureTarget: null, avatar: null, chat: null, workbench: null, previousState: null, rememberedTarget: null,
       tray: null, storageDir: 'fixture', stopSpeech() {}, isCliAgent: () => true, bindBackend() {},
       makeBackend: async () => { await pause('construct'); return replacement; },
@@ -54,7 +54,7 @@ test('a failed quit preparation does not strand an already running provider swit
   const replacement = { closed: false, snapshot: () => ({}), async close() { this.closed = true; }, async connect() { events.push('connected'); } };
   let beforeQuit;
   const context = vm.createContext({
-    closing: false, quitting: false, pendingDataSelection: null, pendingRelaunch: null, backend: old, store: {}, provider: 'codex', changingProvider: false, providerChange: null,
+    closing: false, quitting: false, pendingDataSelection: null, pendingRelaunch: null, backend: old, store: {}, provider: 'codex', changingProvider: false, providerChange: null, customAgentStore: null, changingAgentConfig: false,
     captureTarget: null, avatar: null, chat: null, workbench: null, previousState: null, rememberedTarget: null,
     tray: null, storageDir: 'fixture', stopSpeech() {}, isCliAgent: () => true, bindBackend() {},
     makeBackend: async () => replacement, mkdir: async () => {}, writeFile: async () => {}, join: (...parts) => parts.join('/'), agentName: kind => kind,

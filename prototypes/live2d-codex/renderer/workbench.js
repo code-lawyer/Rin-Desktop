@@ -6,9 +6,11 @@ import catalog from '../backend/agent-catalog.cjs';
 import { populateAgentPicker } from './agent-picker.mjs';
 import { installRemoteSettings, installRemoteNavigation } from './remote-ui.mjs';
 import { installSettingsNavigation } from './settings-navigation.mjs';
+import { installCustomAgentSettings } from './custom-agent-settings.mjs';
 const api = window.companion, $ = id => document.getElementById(id);
 installRemoteSettings(api); installRemoteNavigation(api,{notice:text=>notice(text)});
 const settingsNavigation = installSettingsNavigation(document);
+const agentSettings = installCustomAgentSettings({ api, document });
 const narrowNavigation = matchMedia('(max-width: 680px)');
 function closeNavigation() {
   const restoreFocus = $('workbench-sidebar').contains(document.activeElement);
@@ -37,10 +39,20 @@ async function run(promise) { try { const r = await promise; if (!r?.ok) throw n
 const act = action => event => { Promise.resolve().then(() => action(event)).catch(() => {}); };
 // A completed unload event may arrive before the older IPC save response.
 // Never replace a newer snapshot with that stale response.
-function acceptWorkspace(value) { if ((value.version ?? 0) < (workspace.version ?? 0)) return false; workspace = value; return true; }
+function acceptWorkspace(value) {
+  if ((value.version ?? 0) < (workspace.version ?? 0)) return false;
+  workspace = value;
+  agentSettings.workspaceChanged(value);
+  populateAgentPicker($('agent-select'), { customAgents: value.customAgents ?? [] });
+  $('agent-config-error').textContent = value.agentConfigError || '';
+  $('agent-config-error').hidden = !value.agentConfigError;
+  updateActivity();
+  return true;
+}
 const busy = () => isTaskBusy(current);
 const available = () => current?.connection === 'ready' && catalog.isCliAgent(current?.provider);
 function updateActivity() {
+  if (current) agentSettings.stateChanged(current);
   const name = catalog.agentName(current?.provider);
   const connection = current?.connection;
   $('connection').textContent = current?.provider === 'dots' ? '请选择一个 CLI Agent' : connection === 'ready' ? `${name} · 已连接` : connection === 'authentication' ? `${name} · 需要登录` : connection === 'error' ? `${name} · 连接需要处理` : `正在连接 ${name}…`;
@@ -51,9 +63,9 @@ function updateActivity() {
   $('agent-reconnect').disabled = busy() || current?.connection === 'connecting';
   $('agent-help').textContent = !available() ? [current?.error, current?.loginHelp].filter(Boolean).join('\n\n') : '';
   $('agent-details').hidden = !$('agent-help').textContent;
-  $('permission-hint').textContent = current?.permissionHint || '';
+  $('permission-hint').textContent = [current?.permissionHint, current?.canResume === false ? '此 Agent 不支持恢复会话；历史仅显示本地缓存，重启后需新建对话。' : ''].filter(Boolean).join(' ');
   $('new-thread').disabled = busy() || !available() && !current?.canStartNew || !projectId;
-  $('resume').disabled = busy() || !available() || !selected;
+  $('resume').disabled = busy() || !available() || !selected || current?.canResume === false;
   $('rename').disabled = !available() || !selected;
   $('busy-note').hidden = !busy(); $('model').disabled = busy() || !available(); $('effort').disabled = busy() || !available() || !(current?.models?.find(m => m.model === current.model)?.efforts?.length);
 }
@@ -119,6 +131,7 @@ async function loadHistory(older = false) {
     const result = await run(api.history(id, older ? historyCursor : null, current.provider));
     if (version !== historyVersion || selected?.id !== id) return;
     if (!older) $('history').replaceChildren();
+    if (!older && result.localOnly) $('history').append(node('p', '此 Agent 不支持原生历史恢复，以下仅显示 Rin 缓存的最近消息。', 'hint'));
     const fragment = document.createDocumentFragment();
     for (const turn of result.turns) for (const item of turn.items ?? []) {
       if (!['userMessage','agentMessage'].includes(item.type)) continue;
@@ -343,7 +356,7 @@ $('retry-tts').onclick = act(() => saveSpeechChoice({ttsResident:true}));
 $('choose-qwen').onclick = act(async () => { acceptWorkspace(await run(api.chooseQwen())); updateSpeechStatus(); });
 $('use-existing-data').onclick = act(() => run(api.useData()));
 $('save-settings').onclick = act(saveSettings); $('preview-voice').onclick = act(async () => { await saveSettings(); await run(api.previewVoice()); }); $('refresh-microphones').onclick = act(refreshDevices);
-$('settings').addEventListener('change',event => { if (!event.target.closest('#remote-settings,#ambience-settings') && event.target.name !== 'wallpaper-style' && !['still-pose','model','effort','tts-resident','tts-engine','qwen-voice','auto-speak','prepare-speech','completion-sound'].includes(event.target.id)) settingsDirty = true; });
+$('settings').addEventListener('change',event => { if (!event.target.closest('#remote-settings,#ambience-settings,#agent-settings') && event.target.name !== 'wallpaper-style' && !['still-pose','model','effort','tts-resident','tts-engine','qwen-voice','auto-speak','prepare-speech','completion-sound'].includes(event.target.id)) settingsDirty = true; });
 $('model').onchange = act(async () => { await run(api.chooseModel($('model').value)); }); $('effort').onchange = act(async () => { await run(api.chooseEffort($('effort').value)); });
 $('close').onclick = () => api.windowAction('hide-workbench'); $('back-chat').onclick = () => api.windowAction('show-chat');
 window.addEventListener('blur', () => { if (document.activeElement?.matches('#shortcuts input,#remote-keys input')) document.activeElement.blur(); });

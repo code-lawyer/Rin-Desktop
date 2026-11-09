@@ -20,6 +20,12 @@ export function agentEnvironment(env = process.env) {
   for (const key of Object.keys(copy)) if (key.toUpperCase() === 'ELECTRON_RUN_AS_NODE') delete copy[key];
   return copy;
 }
+export function explicitAgentBinary(file) {
+  let valid = false;
+  try { valid = typeof file === 'string' && isAbsolute(file) && statSync(file).isFile() && (process.platform !== 'win32' || file.toLowerCase().endsWith('.exe')); } catch {}
+  if (!valid) throw new Error('自定义 Agent 的 command 必须指向已安装的可执行文件绝对路径（Windows 下为 .exe）。');
+  return resolve(file);
+}
 export function findAgent(id, env = process.env) {
   const spec = catalog.AGENTS[id];
   if (!spec) throw new Error('未知 Agent。');

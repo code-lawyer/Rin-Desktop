@@ -5,6 +5,7 @@ node_modules/
 *.pcm
 .env
 .env.*
+custom-agents.json*
 !*.example.json
 prototypes/live2d-codex/dist/
 /release/

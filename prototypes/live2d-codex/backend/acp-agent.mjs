@@ -1,7 +1,7 @@
 import { Readable, Writable } from 'node:stream';
 import { randomUUID } from 'node:crypto';
 import { NativeAgent, historyTurns, pathKey } from './native-agent.mjs';
-import { spawnAgent, agentEnvironment, closeChild, deadline } from './agent-process.mjs';
+import { spawnAgent, agentEnvironment, closeChild, deadline, explicitAgentBinary } from './agent-process.mjs';
 import { questionsView, questionAnswers, formView, formAnswer } from './agent-questions.mjs';
 import { restoreHistory } from './reply-state.mjs';
 import packageInfo from '../package.json' with { type: 'json' };
@@ -16,12 +16,22 @@ function replayMessage(messages, update) {
 }
 
 export class AcpCompanion extends NativeAgent {
-  constructor(options) { super(options); this.endpoints = new Set(); this.spawn = options.spawnAgent ?? spawnAgent; }
+  constructor(options) {
+    super(options); this.endpoints = new Set(); this.spawn = options.spawnAgent ?? spawnAgent;
+    this.launch = options.launch;
+    if (this.spec.custom && (!this.launch || this.launch.id !== this.provider || this.launch.protocol !== 'acp')) throw new Error('缺少自定义 Agent 的 ACP 启动配置。');
+  }
+  async prepareNative() {
+    if (!this.spec.custom) return super.prepareNative();
+    // A bridge may be hosted by node.exe or another interpreter. Its version
+    // comes from ACP initialize, not from running the host with --version.
+    this.binary = explicitAgentBinary(this.launch.command);
+  }
   sessionMeta() { return this.provider === 'grok' ? { yoloMode: false, autoMode: false, 'x.ai/hooks': { pre_tool_use: [{ hookCallbackIds: ['rin-permission-mode'] }] } } : {}; }
   async endpoint(cwd, { history = false, onUpdate } = {}) {
     const { ClientSideConnection, ndJsonStream } = await import('@agentclientprotocol/sdk');
     if (this.closed) throw new Error('Agent 已关闭。');
-    const args = this.provider === 'grok' ? ['--no-auto-update', '--permission-mode', 'default', '--no-subagents', 'agent', '--no-leader', 'stdio'] : ['acp'];
+    const args = this.spec.custom ? this.launch.args : this.provider === 'grok' ? ['--no-auto-update', '--permission-mode', 'default', '--no-subagents', 'agent', '--no-leader', 'stdio'] : ['acp'];
     const child = this.spawn(this.binary, args, cwd, { ...agentEnvironment(), ...(this.provider === 'grok' ? { GROK_LOGIN_ENV: '0' } : {}) });
     const ep = { child, history, closing: false, sessionId: null }; this.endpoints.add(ep);
     child.stderr.on('data', () => {});
@@ -47,6 +57,10 @@ export class AcpCompanion extends NativeAgent {
     try {
       ep.init = await deadline(conn.initialize({ protocolVersion: 1, clientInfo: { name: 'rin-desktop', version: packageInfo.version }, clientCapabilities: { fs: { readTextFile: false, writeTextFile: false }, terminal: false, elicitation: { form: {} } }, _meta: { clientIdentifier: 'rin-desktop', startupHints: { nonInteractive: false } } }), 45000, 'ACP 初始化');
       if (ep.init.protocolVersion !== 1) throw new Error('该 CLI 的 ACP 协议版本不受支持。');
+      if (this.spec.custom && this.launch.authMethodId) {
+        if (!ep.init.authMethods?.some(method => method.id === this.launch.authMethodId)) throw new Error('Agent 未声明配置中的 authMethodId，请检查认证配置。');
+        await deadline(conn.authenticate({ methodId: this.launch.authMethodId }), 30000, '自定义 Agent 认证');
+      }
       if (this.provider === 'grok') {
         if (!ep.init.authMethods?.some(m => m.id === 'cached_token')) throw new Error('Grok login required：请先在终端运行 grok 完成登录。');
         await deadline(conn.authenticate({ methodId: 'cached_token', _meta: { headless: true } }), 30000, 'Grok 登录复用');
@@ -65,6 +79,8 @@ export class AcpCompanion extends NativeAgent {
   async openNative() {
     if (this.provider === 'opencode' && !/(?:^|\s|v)2\./.test(this.state.version ?? '')) throw new Error('此接入需要 OpenCode V2，请安装 V2 或通过 VIBE_OPENCODE_BINARY 指定其程序。');
     const ep = await this.endpoint(this.state.cwd); this.active = ep; const id = this.state.threadId;
+    if (this.spec.custom) this.state.version = ep.init.agentInfo?.version ?? null;
+    this.state.canResume = !!ep.init.agentCapabilities?.loadSession;
     this.replay = id ? [] : null; ep.sessionId = id;
     let session;
     try {
@@ -78,7 +94,7 @@ export class AcpCompanion extends NativeAgent {
       // The Grok process is dedicated (--no-leader); override auto-approve only
       // in that process, including after loading a previously saved session.
       if (this.provider === 'grok') await ep.conn.extNotification('_x.ai/yolo_mode_changed', { yolo_mode: false, auto_mode: false, permission_mode: 'ask' });
-      this.state.login = this.provider === 'grok' ? 'CLI 已保存的登录' : 'CLI 模型提供商认证';
+      this.state.login = this.spec.custom ? '自定义 Agent 管理认证' : this.provider === 'grok' ? 'CLI 已保存的登录' : 'CLI 模型提供商认证';
     } finally { this.replay = null; }
   }
   models(result) {
@@ -129,6 +145,7 @@ export class AcpCompanion extends NativeAgent {
     return this.ask({ kind: 'questions', reason: p.message || '', questions: formView(p.requestedSchema) }, answer => formAnswer(p.requestedSchema, answer), { action: 'cancel' }, signal);
   }
   extension(ep, method, p) {
+    if (this.spec.custom) throw new Error('此自定义接入不支持 Agent 私有扩展请求。');
     if (method === 'x.ai/hooks/run') {
       if (this.closed || !this.acceptingUpdates || this.active !== ep || ep.history || this.stopRequested || ep.closing || /always|bypass/i.test(p.permissionMode ?? '')) return { decision: 'deny', systemMessage: 'Rin requires interactive permissions. Stop this action.' };
       return {};
@@ -188,10 +205,12 @@ export class AcpCompanion extends NativeAgent {
     this.assertReady(); const item = this.session(id);
     if (cursor) return { turns: [], nextCursor: null };
     if (id === this.state.threadId && this.run) return { turns: historyTurns(this.state.messages), nextCursor: null };
+    if (!this.active.init.agentCapabilities?.loadSession) return { turns: historyTurns(this.index[id]?.messages ?? []), nextCursor: null, localOnly: true };
     // Replay in a separate CLI connection: inspecting history must not change
     // the active session or attach a second prompt to a running conversation.
     const messages = [], ep = await this.endpoint(item.cwd, { history: true, onUpdate: update => replayMessage(messages, update) });
     try {
+      if (!ep.init.agentCapabilities?.loadSession) throw new Error('CLI 不支持读取原生会话。');
       ep.sessionId = id;
       await deadline(ep.conn.loadSession({ sessionId: id, cwd: item.cwd, mcpServers: [], _meta: this.sessionMeta() }), 45000, '历史读取');
       return { turns: historyTurns(restoreHistory(messages, this.index[id]?.messages)), nextCursor: null };

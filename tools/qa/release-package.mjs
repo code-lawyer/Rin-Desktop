@@ -28,7 +28,7 @@ assert.deepEqual(motion.manifest, sourceMotion.manifest, 'Packaged motion media 
 assert.equal(manifest.version, (await json(join(root, 'package.json'))).version);
 assert.equal(manifest.version, (await json(join(directory, 'resources/app/package.json'))).version);
 assert.equal(manifest.version, (await json(join(directory, 'resources/app/portable.json'))).version);
-const names = new Set(), forbidden = /\.(onnx|safetensors|wav|pcm)$|(^|\/)(codex|claude|grok|opencode)\.exe$|^resources\/app\/(models|runtime\/qwen|agents)\/|(^|\/)(workspaces|session|auth|provider|appearance)\.json$/i;
+const names = new Set(), forbidden = /\.(onnx|safetensors|wav|pcm)$|(^|\/)(codex|claude|grok|opencode)\.exe$|^resources\/app\/(models|runtime\/qwen|agents)\/|(^|\/)custom-agents\.json(?:\..*)?$|(^|\/)(workspaces|session|auth|provider|appearance)\.json$/i;
 // These two source-owned descriptions intentionally changed when male assets
 // retired. Verify them against current source; compare all other assets to the
 // previous package byte-for-byte.
@@ -52,6 +52,14 @@ for (const entry of manifest.files) {
 }
 assert.ok(names.size > 100 && sourceMatches > 20);
 assert.equal(bytes, manifest.bytes);
+// Installed instructions must resolve locally or point to a public web page.
+const guide = await readFile(join(directory, 'CLI-AGENTS.md'), 'utf8');
+for (const [, target] of guide.matchAll(/\[[^\]]*\]\(([^)]+)\)/g)) {
+  if (/^(https?:|#)/i.test(target)) continue;
+  const file = resolve(directory, target.split('#')[0]), inside = relative(directory, file);
+  assert.ok(inside && !inside.startsWith('..') && !isAbsolute(inside), 'Guide link escapes the package: ' + target);
+  assert.ok((await stat(file)).isFile(), 'Missing packaged guide link: ' + target);
+}
 async function checkExtra(folder, prefix = '') {
   for (const entry of await readdir(folder, {withFileTypes:true})) {
     const name = prefix + entry.name;

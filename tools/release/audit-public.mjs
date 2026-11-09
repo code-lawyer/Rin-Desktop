@@ -9,7 +9,7 @@ const listing=staged?['--cached']:worktree?['--cached','--others','--exclude-sta
 const names=[...new Set(execFileSync('git',['-c',`safe.directory=${root}`,'ls-files',...listing,'-z'],{cwd:root,encoding:'utf8'}).split('\0').filter(Boolean))];
 const problems=[];let bytes=0;
 let scanned=0;
-const forbidden=/^(work|release|artwork)\/|(^|\/)(node_modules|\.venv|__pycache__|models|runtime|vendor|evidence|research)(\/|$)|(^|\/)(auth|session|workspaces|appearance|provider)\.json$|\.(wav|pcm|mp4|zip|7z|exe|dll|safetensors)$/i;
+const forbidden=/^(work|release|artwork)\/|(^|\/)(node_modules|\.venv|__pycache__|models|runtime|vendor|evidence|research)(\/|$)|(^|\/)(auth|session|workspaces|appearance|provider)\.json$|(^|\/)custom-agents\.json(?:\..*)?$|\.(wav|pcm|mp4|zip|7z|exe|dll|safetensors)$/i;
 const secrets=[/sk-(?:proj-|svcacct-)?[A-Za-z0-9_-]{32,}/,/gh[pousr]_[A-Za-z0-9]{30,}/,/-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/];
 for(const name of names){
   let data;
