@@ -188,6 +188,7 @@ createInterface({input:process.stdin}).on('line',line=>{
   config = value(await call('removeCustomAgent', entry.id, config.revision));
   assert.deepEqual(config.entries, []);
   assert.equal(await readFile(cache, 'utf8'), saved, 'removing configuration retains session data');
+  value(await call('windowAction', 'hide-chat'));
   checks.push('packaged custom Agent IPC, picker, real synthetic ACP child, edit/reconnect, removal and retained session data');
 }
 try {
