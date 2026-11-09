@@ -11,22 +11,25 @@ if(process.argv.includes('--video') || process.argv.includes('--fixture-video'))
   let remote={phase:'connected',audio:'idle',config:{device:{name:'RC003',id:'fixture'},buttons,autoConnect:true},devices:[],keysAvailable:true};
   const state={provider:'codex',connection:'ready',status:'idle',cwd:'C:/Projects/Example',projectName:'Documents',threadId:'fixture-thread',threadName:'遥控器语音体验',model:'fixture-model',models:[{name:'Fixture model',model:'fixture-model',efforts:[{reasoningEffort:'medium'}]}],effort:'medium',messages:[{role:'assistant',text:'可以用，已收到你的消息，中文显示和回复都正常。',complete:true}],approvals:[],activity:''};
   const workspace={version:1,projects:[{id:'example',name:'Documents',cwd:state.cwd}],settings:{character:'female',ttsResident:true,ttsEngine:'qwen',qwenVoice:'Serena',autoSpeak:false,prepareSpeech:false,playbackVolume:.8,completionSound:true,shortcuts:{chat:'Control+Alt+Space',record:'Control+Alt+V',send:'Control+Alt+Enter',readReply:'Control+Alt+R',stopSpeech:'Control+Alt+S',workbench:'Control+Alt+P'},remoteKeys:{},rc003:remote.config},speech:{phase:'ready',asr:true,engine:'qwen',engines:{qwen:true,kokoro:true}},resources:{phase:'idle',packs:[{id:'asr',label:'本地听写',installed:true,bytes:200000000},{id:'qwen',label:'自然语音',installed:true,bytes:4000000000},{id:'kokoro',label:'轻量语音',installed:true,bytes:200000000}]}};
-  let draft='',sends=0,spoken=0,renderInfo=null;
+  let draft='',sends=0,spoken=0,renderInfo=null,promptCopies=0;
   let presentation={mode:'wallpaper',wallpaperKind:'artwork',character:'female',characterRequest:0,chatVisible:false,paused:false,manualPause:false};
   const applyEvent=(name,value)=>{
     if(name==='presentation')presentation={...presentation,...value};
     if(name==='state')Object.assign(state,value);
+    if(name==='workspace'){if(value.version===undefined)workspace.version++;Object.assign(workspace,value);value=workspace;}
     if(name==='wallpaper-request'){workspace.wallpaper={phase:'loading',...value};workspace.version++;name='workspace';value=workspace;}
     emit(name,name==='presentation'?presentation:name==='state'?state:value);
   };
   ipcRenderer.on('fixture:relay',(_event,name,value)=>applyEvent(name,value));
   const api={snapshot:()=>ok(state),workspace:()=>ok(workspace),appearance:()=>ok({scale:1,mode:'wallpaper'}),onState:fn=>on('state',fn),onWorkspace:fn=>on('workspace',fn),onAppearance:fn=>on('appearance',fn),onFocus:fn=>on('focus',fn),onLayout:fn=>on('layout',fn),onRemote:fn=>on('remote',fn),onRemoteAction:fn=>on('remoteAction',fn),onRemoteText:fn=>on('remoteText',fn),onInputAction:fn=>on('inputAction',fn),onSpeech:(event,fn)=>on('speech:'+event,fn),onCompletionSound:fn=>on('sound',fn),onWorkbenchRefresh:fn=>on('workbench',fn),
+    customAgents:()=>ipcRenderer.invoke('fixture:agents-list').then(ok),saveCustomAgent:(...args)=>ipcRenderer.invoke('fixture:agents-save',...args).then(ok),removeCustomAgent:(...args)=>ipcRenderer.invoke('fixture:agents-remove',...args).then(ok),reloadCustomAgents:()=>ipcRenderer.invoke('fixture:agents-reload').then(ok),pickAgentProgram:()=>ipcRenderer.invoke('fixture:agents-program').then(ok),copyAgentPrompt:name=>ipcRenderer.invoke('fixture:agents-prompt',name).then(value=>{promptCopies++;return ok(value);}),
+    chooseProvider:id=>ipcRenderer.invoke('fixture:agents-connect',id).then(ok),reconnect:()=>ipcRenderer.invoke('fixture:agents-connect',state.provider).then(ok),
     remote:()=>ok(remote),draft:(_target,text)=>{if(text!==undefined)draft=text;return ok({text:draft});},resizeBubble(){},windowAction:()=>ok(),stopSpeech:()=>ok(),capture:()=>ok(),listThreads:()=>ok({data:[{id:'fixture-first',name:'第一段对话',updatedAt:1},{id:'fixture-second',name:'第二段对话',updatedAt:2}],nextCursor:null}),history:()=>ok({turns:[],nextCursor:null}),learnKey:()=>ok(),send:()=>{sends++;return ok({cancelled:true});},synthesize:()=>{spoken++;return new Promise(()=>{});},setPlaybackVolume:value=>{workspace.settings.playbackVolume=value;workspace.version++;emit('workspace',workspace);return ok(workspace);},
     presentation:()=>ok(presentation),onPresentation:fn=>on('presentation',fn),avatarAnchor(){},commitWallpaper:()=>ok(true),finishWallpaper:()=>({ok:true,value:true}),
     renderReady:info=>{renderInfo=info;},
     saveSettings:async patch=>{if('character' in patch || 'wallpaperKind' in patch)await ipcRenderer.invoke('fixture:wallpaper-choice',patch);else{Object.assign(workspace.settings,patch);workspace.version++;emit('workspace',workspace);}return {ok:true,value:workspace};}};
   contextBridge.exposeInMainWorld('companion',api);
-  contextBridge.exposeInMainWorld('interfaceFixture',{emit:(name,value)=>{if(name==='remote')remote={...remote,...value};applyEvent(name,name==='remote'?remote:value);},stats:()=>({sends,draft,spoken,renderInfo,volume:workspace.settings.playbackVolume})});
+  contextBridge.exposeInMainWorld('interfaceFixture',{emit:(name,value)=>{if(name==='remote')remote={...remote,...value};applyEvent(name,name==='remote'?remote:value);},stats:()=>({sends,draft,spoken,renderInfo,promptCopies,volume:workspace.settings.playbackVolume})});
 } else {
   const {app,BrowserWindow,protocol,net,ipcMain}=require('electron');
   const {join,resolve}=require('node:path');
@@ -37,12 +40,23 @@ if(process.argv.includes('--video') || process.argv.includes('--fixture-video'))
   if(!output || !resolve(output).startsWith(join(root,'work','qa')+require('node:path').sep))throw new Error('Use an output beneath work/qa.');
   mkdirSync(output,{recursive:true});app.setPath('userData',join(output,'electron-profile'));app.disableHardwareAcceleration();
   protocol.registerSchemesAsPrivileged([{scheme:'app',privileges:{standard:true,secure:true,supportFetchAPI:true}}]);
-  const errors=[],checks=[];let windows=[];
+  const errors=[],checks=[];let windows=[],customStore,setupPrompt,fixtureProvider='codex',fixtureLaunch;
   const present={mode:'wallpaper',wallpaperKind:'artwork',character:'female',characterRequest:0,chatVisible:false,paused:false,manualPause:false};
   const relay=(name,value)=>{for(const win of windows)if(!win.isDestroyed())win.webContents.send('fixture:relay',name,value);};
+  const agentView=()=>({...customStore.snapshot(),activeId:fixtureProvider,needsReconnect:fixtureProvider.startsWith('custom-')&&JSON.stringify(fixtureLaunch)!==JSON.stringify(customStore.entries.find(entry=>entry.id===fixtureProvider))});
+  const publishAgents=()=>{relay('workspace',{customAgents:customStore.entries.map(({id,name})=>({id,name})),agentConfigRevision:customStore.revision,agentConfigError:customStore.error,agentNeedsReconnect:agentView().needsReconnect});return agentView();};
+  ipcMain.handle('fixture:agents-list',agentView);
+  ipcMain.handle('fixture:agents-save',async(_event,entry,revision,creating)=>{await customStore.save(entry,revision,{creating});return publishAgents();});
+  ipcMain.handle('fixture:agents-remove',async(_event,id,revision)=>{if(id===fixtureProvider)throw new Error('请先切换到其他 Agent');await customStore.remove(id,revision);return publishAgents();});
+  ipcMain.handle('fixture:agents-reload',async()=>{await customStore.reload();return publishAgents();});
+  ipcMain.handle('fixture:agents-program',()=>process.execPath);
+  // Synthetic clipboard and connection: no real clipboard, process or account.
+  ipcMain.handle('fixture:agents-prompt',(_event,name)=>setupPrompt({file:customStore.file,name}));
+  ipcMain.handle('fixture:agents-connect',(_event,id)=>{fixtureProvider=id;fixtureLaunch=customStore.entries.find(entry=>entry.id===id);relay('state',{provider:id,connection:'ready',status:'idle',canResume:true});publishAgents();});
   ipcMain.handle('fixture:wallpaper-choice',(_event,patch)=>{present.character=patch.character;present.wallpaperKind=patch.wallpaperKind;present.characterRequest++;relay('wallpaper-request',{character:present.character,wallpaperKind:present.wallpaperKind,requestId:present.characterRequest});relay('presentation',present);});
   const delay=ms=>new Promise(r=>setTimeout(r,ms));
   async function evaluate(win,code){return win.webContents.executeJavaScript(code);}
+  async function until(win,expression,label){for(let n=0;n<100;n++){if(await evaluate(win,expression))return;await delay(25);}throw new Error('Interface condition not reached: '+label);}
   async function capture(win,name,width,height) {
     win.setSize(width,height);await delay(150);
     const overflow=await evaluate(win,`[...document.querySelectorAll('button,input,select,textarea')].filter(el=>!el.closest('[hidden]')&&el.getClientRects().length).filter(el=>{const r=el.getBoundingClientRect();return r.right>innerWidth+1||r.left<0;}).map(el=>el.id||el.textContent)`);
@@ -65,6 +79,9 @@ if(process.argv.includes('--video') || process.argv.includes('--fixture-video'))
     await win.loadURL('app://local/renderer/'+file);await delay(300);return win;
   }
   app.whenReady().then(async()=>{
+    const {CustomAgentStore}=await import(pathToFileURL(join(application,'backend/custom-agents.mjs')).href);
+    ({agentSetupPrompt:setupPrompt}=await import(pathToFileURL(join(application,'backend/agent-setup-prompt.mjs')).href));
+    customStore=new CustomAgentStore(output,{env:{}});await customStore.reload();
     protocol.handle('app',request=>{const path=decodeURIComponent(new URL(request.url).pathname);if(path.startsWith('/video/'))return new Response('',{status:404});const file=resolve(application,'.'+path);if(!file.startsWith(application+require('node:path').sep))return new Response('',{status:403});return net.fetch(pathToFileURL(file).href);});
     if(process.argv.includes('--visual')) {
       const result=await require('./visual-cases.cjs')({open,evaluate,delay,output,extended:process.argv.includes('--extended')});
@@ -180,6 +197,78 @@ if(process.argv.includes('--video') || process.argv.includes('--fixture-video'))
     assert.equal(await evaluate(workbench,`document.querySelectorAll('.thread-row').length`),2,'reconnection refreshes the selected project');
     assert.equal(await evaluate(workbench,`document.getElementById('project-title').textContent`),'Second project');
     checks.push('offline-project-selection-and-reconnect');
+    await evaluate(workbench,`document.getElementById('settings-tab').click();document.querySelector('[data-setting-target="agent-settings"]').click()`);
+    await until(workbench,`!document.getElementById('agents-add').disabled&&document.getElementById('agent-settings').checkVisibility()`,'custom settings loaded');
+    await evaluate(workbench,`document.querySelector('.settings-scroll').scrollTop=0`);await delay(250);
+    await capture(workbench,'agent-settings-empty',1120,760);
+    await evaluate(workbench,`document.getElementById('agents-add').click();document.getElementById('agent-name').value='自定义测试助手';document.getElementById('agent-pick-program').click()`);
+    await until(workbench,`document.getElementById('agent-command').value.endsWith('.exe')&&!document.getElementById('agent-editor-fields').disabled`,'program picker');
+    await evaluate(workbench,`document.getElementById('agent-add-argument').click();document.querySelector('#agent-args input').value='C:/Fixture Tools/bridge.mjs';document.getElementById('agent-add-argument').click();document.querySelectorAll('#agent-args input')[1].value='--stdio'`);
+    await capture(workbench,'agent-settings-form',1120,760);await capture(workbench,'agent-settings-form-compact',760,540);await capture(workbench,'agent-settings-form-narrow',520,760);
+    await evaluate(workbench,`document.getElementById('agent-editor').requestSubmit()`);
+    await until(workbench,`document.getElementById('agent-editor').hidden&&document.querySelectorAll('.custom-agent-row').length===1`,'create configuration');
+    const created=customStore.entries[0];assert.equal(created.name,'自定义测试助手');assert.deepEqual(created.args,['C:/Fixture Tools/bridge.mjs','--stdio']);
+    assert.equal(await evaluate(chat,`!!document.querySelector('#provider-select option[value="${created.id}"]')`),true,'new configuration reaches bubble');
+    await evaluate(workbench,`document.querySelector('[data-action="edit"]').click();document.getElementById('agent-name').value='自定义测试助手 · 已编辑';document.getElementById('agent-name').dispatchEvent(new Event('input',{bubbles:true}));companion.workspace().then(result=>interfaceFixture.emit('workspace',result.value))`);
+    assert.equal(await evaluate(workbench,`document.getElementById('agent-name').value`),'自定义测试助手 · 已编辑','unrelated updates retain editor input');
+    assert.equal(await evaluate(workbench,`document.getElementById('agent-id').readOnly`),true,'existing ID is stable');
+    await evaluate(workbench,`document.getElementById('agent-editor').requestSubmit()`);
+    await until(workbench,`document.getElementById('agent-editor').hidden`,'edit configuration');
+    assert.equal(customStore.entries[0].id,created.id);assert.equal(customStore.entries[0].name,'自定义测试助手 · 已编辑');
+    await evaluate(workbench,`document.getElementById('agent-prompt-target').value='示例 Agent';document.getElementById('agent-copy-prompt').click()`);
+    await until(workbench,`interfaceFixture.stats().promptCopies===1`,'copy setup prompt');
+    const promptText=await evaluate(workbench,`document.getElementById('agent-prompt-preview').value`);
+    assert.ok(promptText.includes(JSON.stringify(customStore.file)));assert.match(promptText,/示例 Agent/);assert.match(promptText,/保留其他配置/);
+    await evaluate(workbench,`document.querySelector('[data-action="connect"]').click()`);
+    await until(workbench,`document.querySelector('[data-action="remove"]').disabled&&document.getElementById('agents-status').textContent.includes('已连接')`,'connect synthetic agent');
+    await evaluate(workbench,`document.querySelector('[data-action="edit"]').click();document.querySelectorAll('#agent-args input')[1].value='--updated';document.getElementById('agent-editor').requestSubmit()`);
+    await until(workbench,`document.getElementById('agent-editor').hidden&&document.getElementById('agents-list').textContent.includes('重连后生效')`,'active edit pending reconnect');
+    assert.equal(fixtureLaunch.args[1],'--stdio','active transport keeps old arguments');
+    await evaluate(workbench,`document.querySelector('.settings-scroll').scrollTop=0`);await capture(workbench,'agent-settings-list',1120,760);
+    await evaluate(workbench,`document.querySelector('[data-action="connect"]').click()`);
+    await until(workbench,`companion.customAgents().then(result=>!result.value.needsReconnect)`,'reconnect applies saved launch');
+    assert.equal(fixtureLaunch.args[1],'--updated');
+    await evaluate(workbench,`companion.chooseProvider('codex')`);
+    await until(workbench,`!document.querySelector('[data-action="remove"]').disabled`,'switch before removal');
+    const retained=join(output,'agents',created.id);mkdirSync(retained,{recursive:true});writeFileSync(join(retained,'session.json'),'fixture history remains');
+    await evaluate(workbench,`document.querySelector('[data-action="remove"]').click();document.getElementById('agent-confirm-cancel').click()`);
+    assert.equal(customStore.entries.length,1,'cancel deletion preserves configuration');
+    await evaluate(workbench,`document.querySelector('[data-action="remove"]').click();document.getElementById('agent-confirm-accept').click()`);
+    await until(workbench,`document.querySelectorAll('.custom-agent-row').length===0`,'delete configuration');
+    assert.equal(require('node:fs').readFileSync(join(retained,'session.json'),'utf8'),'fixture history remains');
+    const supplied={...created,id:'custom-from-agent',name:'Agent 帮我添加的助手'};
+    writeFileSync(customStore.file,JSON.stringify({format:1,agents:[supplied]}));
+    await evaluate(workbench,`document.getElementById('agents-reload').click()`);
+    await until(workbench,`document.querySelectorAll('.custom-agent-row').length===1&&document.getElementById('agents-list').textContent.includes('Agent 帮我添加')`,'reload agent-written configuration');
+    await evaluate(workbench,`document.querySelector('[data-action="edit"]').click();document.getElementById('agent-name').value='未保存的修改';document.getElementById('agent-name').dispatchEvent(new Event('input',{bubbles:true}))`);
+    writeFileSync(customStore.file,JSON.stringify({format:1,agents:[{...supplied,name:'来自其他 Agent 的更新'}]}));
+    await evaluate(workbench,`document.getElementById('agent-editor').requestSubmit()`);
+    await until(workbench,`document.getElementById('agents-status').textContent.includes('其他操作修改')`,'external update conflict');
+    assert.equal(await evaluate(workbench,`document.getElementById('agent-name').value`),'未保存的修改');
+    await evaluate(workbench,`document.getElementById('agents-reload').click();document.getElementById('agent-confirm-cancel').click()`);
+    assert.equal(await evaluate(workbench,`document.getElementById('agent-name').value`),'未保存的修改');
+    await evaluate(workbench,`document.getElementById('agents-reload').click();document.getElementById('agent-confirm-accept').click()`);
+    await until(workbench,`document.getElementById('agent-editor').hidden&&document.getElementById('agents-list').textContent.includes('来自其他 Agent 的更新')`,'reload after explicit discard');
+    checks.push('custom-agent-settings-create-edit-connect-remove-prompt-and-conflicts');
+    // Runtime registrations must reach both pickers without exposing launch
+    // configuration, and capability limits must affect the actual controls.
+    for(const [win,picker] of [[chat,'provider-select'],[workbench,'agent-select']]) {
+      await evaluate(win,`(async()=>{const value=(await companion.workspace()).value;value.version+=10;value.customAgents=[{id:'custom-fixture',name:'本地测试 Agent'}];value.agentConfigError='';interfaceFixture.emit('workspace',value);interfaceFixture.emit('state',{provider:'custom-fixture',connection:'ready',status:'idle',canResume:false,permissionHint:'自定义权限提示'});})()`);await delay(100);
+      assert.equal(await evaluate(win,`document.getElementById('${picker}').value`),'custom-fixture');
+      assert.match(await evaluate(win,`document.getElementById('${picker}').selectedOptions[0].textContent`),/自定义.*实验/);
+      await evaluate(win,`(async()=>{const value=(await companion.workspace()).value;value.version++;interfaceFixture.emit('workspace',value);})()`);
+      assert.equal(await evaluate(win,`document.getElementById('${picker}').value`),'custom-fixture','refresh retains custom selection');
+    }
+    await evaluate(workbench,`document.querySelector('.thread-row').click()`);await delay(50);
+    assert.equal(await evaluate(workbench,`document.getElementById('resume').disabled`),true);
+    assert.match(await evaluate(workbench,`document.getElementById('permission-hint').textContent`),/本地缓存/);
+    await evaluate(workbench,`interfaceFixture.emit('state',{canResume:true})`);
+    assert.equal(await evaluate(workbench,`document.getElementById('resume').disabled`),false);
+    for(const win of [chat,workbench]) {
+      await evaluate(win,`(async()=>{const value=(await companion.workspace()).value;value.version++;value.agentConfigError='配置格式需要修正';interfaceFixture.emit('workspace',value);})()`);
+      assert.equal(await evaluate(win,`document.getElementById('agent-config-error').hidden`),false);
+    }
+    checks.push('custom-agent-pickers-capabilities-and-config-errors');
     assert.deepEqual(errors,[],'Renderer console errors');writeFileSync(join(output,'summary.json'),JSON.stringify({checks,errors,synthetic:true,accounts:false,hardware:false},null,2));
     for(const win of windows)win.destroy();app.exit(0);
   }).catch(error=>{console.error(error);writeFileSync(join(output,'failure.txt'),String(error.stack));app.exit(1);});

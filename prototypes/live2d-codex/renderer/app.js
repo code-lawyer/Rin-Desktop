@@ -267,7 +267,14 @@ if (isWallpaper) {
   installCompletionSound(api);
   installRemoteNavigation(api,{notice:error,compose:(action,active)=>composerControls?.action(action,active)});
   api.onRemoteText(value=>drafts.appendExternal(value).then(()=>{composerControls?.refresh();}).catch(()=>error('听写文字已保存在草稿中，请重新打开这段对话。')));
-  api.workspace().then(r => { if (r.ok && !r.value.legacyDotsAvailable) $('provider-select').querySelector('[value="dots"]')?.remove(); });
+  const showAgentChoices = value => {
+    const changed = populateAgentPicker($('provider-select'), { dots: value.legacyDotsAvailable, customAgents: value.customAgents ?? [] });
+    $('agent-config-error').textContent = value.agentConfigError || '';
+    $('agent-config-error').hidden = !value.agentConfigError;
+    if (changed && current) render(current);
+  };
+  api.workspace().then(r => { if (r.ok) showAgentChoices(r.value); });
+  api.onWorkspace(showAgentChoices);
   speechControls = installSpeech({ api, state: () => current, isBusy: () => busy() || sending || pendingReply, error, measure: () => {scheduleMeasure();composerControls?.refresh();}, insert: text => { const prompt = $('prompt'); prompt.value += (prompt.value && !/\s$/.test(prompt.value) ? ' ' : '') + text; drafts.edited(); growPrompt(); saveDraft(); prompt.focus(); } });
   composerControls = installComposerControls({api,drafts,submit:submitDraft,readReply:()=>speechControls.readReply(),isLocked:()=>quitRequest !== null || sending || ['pending','unknown'].includes(current?.submission?.status) || ! $('approval').hidden,isCapturing:()=>speechControls.isCapturing(),error,measure:scheduleMeasure});
   installDraftShutdown();

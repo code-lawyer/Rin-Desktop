@@ -47,7 +47,9 @@ await copyAgentDependencies(root, appDir);
 await writeFile(join(appDir,'package.json'),JSON.stringify({name:'vibe-voice',version,type:'module',main:'main.cjs',private:true},null,2));
 await writeFile(join(appDir,'portable.json'),JSON.stringify({version,platform:'win32-x64',backend:'codex',backends:Object.keys(catalog.AGENTS),experimentalBackends:Object.entries(catalog.AGENTS).filter(([,spec])=>spec.experimental).map(([id])=>id),...(testBuild?{testBuild:{id:testBuild,channel:'internal-test'}}:{})}));
 await cp(join(root,'PORTABLE-README.md'),join(output,'USER-GUIDE.md'));
-const cliGuide = (await readFile(join(root,'CLI-AGENTS.md'),'utf8')).replaceAll('../../tools/release/TEST-ACCEPTANCE.md', 'https://github.com/code-lawyer/Rin-Desktop/blob/main/tools/release/TEST-ACCEPTANCE.md');
+const cliGuide = (await readFile(join(root,'CLI-AGENTS.md'),'utf8'))
+  .replaceAll('../../tools/release/TEST-ACCEPTANCE.md', 'https://github.com/code-lawyer/Rin-Desktop/blob/main/tools/release/TEST-ACCEPTANCE.md')
+  .replaceAll('../../docs/privacy.md', 'https://github.com/code-lawyer/Rin-Desktop/blob/main/docs/privacy.md');
 await writeFile(join(output,'CLI-AGENTS.md'), cliGuide);
 await cp(join(root,'THIRD-PARTY-NOTICES.md'),join(output,'THIRD-PARTY-NOTICES.md'));
 await cp(join(workspace,'LICENSE'),join(output,'LICENSE-VibeVoice.txt'));

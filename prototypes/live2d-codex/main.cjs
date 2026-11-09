@@ -1,5 +1,5 @@
-const { app, BrowserWindow, ipcMain, protocol, screen, Tray, Menu, nativeImage, dialog, globalShortcut, shell, net, session, powerMonitor } = require('electron');
-const { isCliAgent, agentName } = require('./backend/agent-catalog.cjs');
+const { app, BrowserWindow, ipcMain, protocol, screen, Tray, Menu, nativeImage, dialog, globalShortcut, shell, clipboard, net, session, powerMonitor } = require('electron');
+const { isCliAgent, agentName, isCustomAgentId, setCustomAgents, customAgentChoices } = require('./backend/agent-catalog.cjs');
 const { join, resolve, relative, extname, sep } = require('node:path');
 const { readFile, writeFile, mkdir, rename } = require('node:fs/promises');
 const { pathToFileURL } = require('node:url');
@@ -42,6 +42,8 @@ let avatar, chat, workbench, backend, tray, store, submissions, speech, voiceRes
 let quitting = false, draftFlushRequest, draftFlushSerial = 0, pendingRelaunch = null, pendingDataSelection = null;
 let shortcutErrors = [], rememberedTarget = '', keyLearning = false, shortcutResumeAt = 0, workspaceVersion = 0;
 let provider = 'codex', changingProvider = false, providerChange = null, changingData = false;
+let customAgentLaunches = new Map(), agentConfigError = '';
+let customAgentStore, changingAgentConfig = false;
 let desiredBubble = { width: 440, height: 220 }, previousState, readingMode = false, avatarAnchor = null;
 let characterScale = 1, characterBox, dragOrigin, appearanceTimer, appearanceQueue = Promise.resolve();
 let bubblePosition = null, chatDragOrigin, currentChatLayout;
@@ -114,7 +116,25 @@ function hideChat() { if (readingMode) { readingMode = false; chat.setFullScreen
 function toggleChat() { chat?.isVisible() ? hideChat() : showChat(); }
 function recallChat() { chat?.isVisible() && chat.isFocused() ? hideChat() : showChat(); }
 function showWorkbench(page) { hideChat(); workbench?.show(); workbench?.focus(); workbench?.webContents.send('workbench:refresh', typeof page === 'string' ? page : null); }
-function workspaceSnapshot() { return { ...store.snapshot(), version: workspaceVersion, speech: speech.status(), remote: remote?.snapshot(), wallpaper: wallpaperStatus, ambience: ambienceStatus, wallpaperPaused: manualPause, resources: voiceResources?.snapshot(), shortcutErrors, legacyDotsAvailable }; }
+function workspaceSnapshot() { return { ...store.snapshot(), version: workspaceVersion, customAgents: customAgentChoices(), agentConfigError, agentConfigRevision: customAgentStore?.revision, agentNeedsReconnect: isCustomAgentId(provider) && JSON.stringify(customAgentLaunches.get(provider)) !== JSON.stringify(backend?.launch), speech: speech.status(), remote: remote?.snapshot(), wallpaper: wallpaperStatus, ambience: ambienceStatus, wallpaperPaused: manualPause, resources: voiceResources?.snapshot(), shortcutErrors, legacyDotsAvailable }; }
+function agentSettingsSnapshot() {
+  return { ...customAgentStore.snapshot(), activeId: provider, needsReconnect: isCustomAgentId(provider) && JSON.stringify(customAgentLaunches.get(provider)) !== JSON.stringify(backend?.launch) };
+}
+async function changeAgentConfiguration(operation) {
+  if (closing || quitting || changingData || changingProvider || changingAgentConfig) throw new Error('应用正在切换或保存，请稍后再修改 Agent 配置。');
+  changingAgentConfig = true;
+  try {
+    const result = await operation();
+    if (closing) return;
+    agentConfigError = result.error;
+    if (!result.error) {
+      setCustomAgents(result.entries);
+      customAgentLaunches = new Map(result.entries.map(entry => [entry.id, entry]));
+    }
+    notifyWorkspace();
+    return agentSettingsSnapshot();
+  } finally { changingAgentConfig = false; }
+}
 function notifyWorkspace() { workspaceVersion++; notifyPresentation(); for (const win of [chat, workbench]) if (win && !win.isDestroyed()) win.webContents.send('workbench:state', workspaceSnapshot()); }
 function stopSpeech() { playbackRevision++; speaking = false; notifyPresentation(); chat?.webContents.send('speech:stop'); return speech?.stop().catch(error => console.error('[speech:stop]', error.message)); }
 async function confirmWallpaper(info) {
@@ -228,10 +248,11 @@ async function makeBackend(kind) {
     const { ClaudeCompanion } = await import(pathToFileURL(join(root, 'backend/claude-agent.mjs')).href);
     return new ClaudeCompanion({ projectRoot: argument('project') ?? projectRoot, storageDir });
   }
-  if (kind === 'grok' || kind === 'opencode') {
+  if (kind === 'grok' || kind === 'opencode' || customAgentLaunches.has(kind)) {
     const { AcpCompanion } = await import(pathToFileURL(join(root, 'backend/acp-agent.mjs')).href);
-    return new AcpCompanion({ provider: kind, projectRoot: argument('project') ?? projectRoot, storageDir });
+    return new AcpCompanion({ provider: kind, projectRoot: argument('project') ?? projectRoot, storageDir, launch: customAgentLaunches.get(kind) });
   }
+  if (kind !== 'codex') throw new Error('该 Agent 未注册，请检查接入配置。');
   const { CodexCompanion } = await import(pathToFileURL(join(root, 'backend/codex.mjs')).href);
   return new CodexCompanion({ projectRoot: argument('project') ?? projectRoot, storageDir });
 }
@@ -264,6 +285,7 @@ async function changeProvider(next, { reconnect = false } = {}) {
   stopSpeech();
   if (!isCliAgent(next) && next !== 'dots') throw new Error('请选择支持的 Agent。');
   if (changingProvider) throw new Error('正在切换对话来源。');
+  if (changingAgentConfig) throw new Error('正在保存 Agent 配置，请稍候。');
   if (next === provider && !reconnect) return;
   if (backend.busy) throw new Error('请先等待或停止当前任务。');
   changingProvider = true;
@@ -352,9 +374,16 @@ else {
         return new Response(request.method === 'HEAD' ? null : await readFile(file), { headers: { 'Content-Type': types[extname(file)] ?? 'application/octet-stream', 'X-Content-Type-Options': 'nosniff' } });
       } catch { return new Response('', { status: 404 }); }
     });
+    const { CustomAgentStore } = await import(pathToFileURL(join(root, 'backend/custom-agents.mjs')).href);
+    const { agentSetupPrompt } = await import(pathToFileURL(join(root, 'backend/agent-setup-prompt.mjs')).href);
+    customAgentStore = new CustomAgentStore(storageDir);
+    const agentConfiguration = await customAgentStore.reload();
+    agentConfigError = agentConfiguration.error;
+    setCustomAgents(agentConfiguration.entries); customAgentLaunches = new Map(agentConfiguration.entries.map(entry => [entry.id, entry]));
     let savedProvider;
     try { savedProvider = JSON.parse(await readFile(join(storageDir, 'provider.json'), 'utf8')).provider; } catch {}
     provider = argument('provider') ?? savedProvider ?? 'codex';
+    if (isCustomAgentId(provider) && !isCliAgent(provider)) agentConfigError ||= '所选自定义 Agent 未加载，已切换到 Codex。原有草稿和会话记录保留；请在 Agent 设置中恢复或重新读取接入配置后连接。';
     if ((!isCliAgent(provider) && provider !== 'dots') || (provider === 'dots' && !legacyDotsAvailable)) provider = 'codex';
     backend = await makeBackend(provider);
     console.info('[companion:startup]', 'backend');
@@ -485,11 +514,13 @@ else {
     console.info('[companion:startup]', 'windows');
     const handler = (channel, fn) => ipcMain.handle(channel, async (event, ...args) => {
       if (!trusted(event)) return { ok: false, error: '不受信任的窗口。' };
+      if (channel.startsWith('agents:') && event.sender !== workbench?.webContents) return { ok: false, error: '请在工作台的 Agent 设置中操作。' };
       if (closing) return { ok: false, error: '应用正在退出。' };
       if (quitting && channel !== 'workbench:draft' && channel !== 'speech:stop' && !(channel === 'speech:capture' && args[0] === null) && !(channel === 'speech:playback' && args[0] === false)) return { ok: false, error: '正在保存草稿并退出，请稍候。' };
       if (submissions.active.has(provider) && /^(companion:(send|new|provider|reconnect|model)|workbench:(new|resume|effort|use-data))$/.test(channel)) return { ok: false, error: '正在保存发送记录，请稍候。' };
       if (changingProvider && /^(companion:(send|new|provider|reconnect|login|model|respond|submission)|workbench:(list|history|resume|new|rename|effort))$/.test(channel)) return { ok: false, error: '正在连接 Agent，请稍候。' };
       if (changingData && /^(companion:(send|new|provider|model)|speech:capture|workbench:(new|resume|remove|add|use-data))$/.test(channel)) return {ok:false,error:'正在选择数据目录，请稍候。'};
+      if (changingAgentConfig && /^(companion:(send|new|provider|reconnect|model)|workbench:(new|resume|effort|use-data))$/.test(channel)) return { ok: false, error: '正在保存 Agent 配置，请稍候。' };
       try { return { ok: true, value: await fn(event, ...args) }; } catch (error) { return { ok: false, error: error.message }; }
     });
     handler('companion:snapshot', () => ({ ...backend.snapshot(), provider, submission: submissions.snapshot(provider) }));
@@ -540,6 +571,24 @@ else {
     handler('companion:respond', (_event, data) => backend.respond(data?.id, data?.answer));
     handler('companion:project', showWorkbench);
     handler('workbench:snapshot', workspaceSnapshot);
+    handler('agents:list', agentSettingsSnapshot);
+    handler('agents:save', (_event, entry, revision, creating) => changeAgentConfiguration(() => customAgentStore.save(entry, revision, { creating: creating === true })));
+    handler('agents:remove', (_event, id, revision) => changeAgentConfiguration(() => {
+      if (id === provider) throw new Error('请先切换到另一个 Agent，再删除当前接入配置。会话和草稿会保留。');
+      return customAgentStore.remove(id, revision);
+    }));
+    handler('agents:reload', () => changeAgentConfiguration(() => customAgentStore.reload({ guard: entries => {
+      if (isCustomAgentId(provider) && !entries.some(entry => entry.id === provider)) throw new Error('文件中已移除当前 Agent，请先切换到其他 Agent，再重新读取。现有连接和记录已保留。');
+    } })));
+    handler('agents:pick-program', async () => {
+      const chosen = await dialog.showOpenDialog(workbench, { title: '选择 Agent 或桥接程序的可执行文件', properties: ['openFile'], filters: [{ name: 'Windows 程序', extensions: ['exe'] }] });
+      return chosen.canceled ? null : chosen.filePaths[0];
+    });
+    handler('agents:copy-prompt', (_event, name) => {
+      if (typeof name !== 'string' || name.length > 80) throw new Error('Agent 名称不能超过 80 个字符。');
+      const prompt = agentSetupPrompt({ file: customAgentStore.file, name });
+      clipboard.writeText(prompt); return prompt;
+    });
     handler('remote:command', (event, command, value) => {
       if(command==='snapshot')return remote.snapshot();
       if(command==='cancel')return remote.cancel('本次遥控器听写已取消。');
@@ -826,17 +875,22 @@ else {
   }
   app.on('before-quit', event => {
     if (closing) return; event.preventDefault(); if (quitting) return;
+    // Observe only the operation active when quitting begins. A previous,
+    // already-reported failure must not permanently prevent closing the app.
+    const pendingAgentSave = changingAgentConfig ? customAgentStore?.queue.then(() => null, error => error) : null;
     quitting = true; globalShortcut.unregisterAll(); cancelWallpaperCommit();
     (async () => {
       try {
         remote?.cancel().catch(() => {});
         await flushChatDraft();
+        const agentSaveError = await pendingAgentSave;
+        if (agentSaveError) { showWorkbench(); throw new Error('Agent 配置未保存，退出已取消：' + agentSaveError.message); }
         if (pendingDataSelection) { await pendingDataSelection(); pendingDataSelection = null; }
         if (pendingRelaunch) { app.relaunch(pendingRelaunch); pendingRelaunch = null; }
       } catch (error) {
         quitting = false; pendingDataSelection = null; pendingRelaunch = null; registerShortcuts();
         try { if (chat && !chat.isDestroyed()) { chat.webContents.send('draft:flush-cancelled', error.message); showChat(); } } catch { /* A renderer can disappear while the flush is pending. */ }
-        dialog.showErrorBox('草稿尚未保存，退出已取消', error.message);
+        dialog.showErrorBox('保存未完成，退出已取消', error.message);
         return;
       }
       closing = true;

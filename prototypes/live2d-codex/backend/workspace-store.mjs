@@ -10,7 +10,7 @@ import { remoteSettings } from './remote-config.mjs';
 import { readJson, writeJson, prepareJson } from './durable-json.mjs';
 import { pathKey } from './path-identity.mjs';
 export { pathKey } from './path-identity.mjs';
-const { isCliAgent } = catalog;
+const { isCliAgent, isStoredCliAgent } = catalog;
 
 export const { DEFAULT_SHORTCUTS, DEFAULT_REMOTE_KEYS } = actions;
 const { DEFAULT_CHARACTER, characterProfile, isCharacter, isQwenVoice, isChineseVoice } = characters;
@@ -18,7 +18,7 @@ const defaults = () => ({ format: 1, projects: [], drafts: {}, settings: { chara
 export const draftKey = target => {
   if (!target || typeof target.cwd !== 'string') throw new Error('草稿目标无效。');
   const provider = target?.provider ?? 'codex';
-  if (!isCliAgent(provider) && provider !== 'dots') throw new Error('草稿来源无效。');
+  if (!isStoredCliAgent(provider) && provider !== 'dots') throw new Error('草稿来源无效。');
   if (target.threadId != null && (typeof target.threadId !== 'string' || !target.threadId || target.threadId.length > 200)) throw new Error('草稿会话无效。');
   // Keep existing Codex keys unchanged; Dots has no local project directory.
   return provider === 'dots' ? `dots|${target.threadId ?? 'new'}` : `${provider === 'codex' ? '' : provider + '|'}${pathKey(target.cwd)}|${target.threadId ?? 'new'}`;
@@ -36,7 +36,7 @@ export function validateWorkspace(saved) {
   for (const d of Object.values(saved.drafts ?? {})) if (!object(d) || typeof d.text !== 'string' || d.dictationIds !== undefined && (!Array.isArray(d.dictationIds) || d.dictationIds.some(id => typeof id !== 'string'))) throw new Error('草稿记录无效。');
   if (!object(saved.submissions ?? {})) throw new Error('发送记录无效。');
   for (const [provider, s] of Object.entries(saved.submissions ?? {})) {
-    if (!isCliAgent(provider) || !object(s) || typeof s.id !== 'string' || typeof s.text !== 'string' || s.target?.provider !== provider || !['pending','unknown','confirmed','released','not-sent'].includes(s.status)) throw new Error('发送记录无效。');
+    if (!isStoredCliAgent(provider) || !object(s) || typeof s.id !== 'string' || typeof s.text !== 'string' || s.target?.provider !== provider || !['pending','unknown','confirmed','released','not-sent'].includes(s.status)) throw new Error('发送记录无效。');
     draftKey(s.target);
   }
   return saved;
@@ -46,7 +46,7 @@ function canonicalDrafts(drafts = {}) {
   const result = {};
   for (const [oldKey, draft] of Object.entries(drafts)) {
     const parts = oldKey.split('|');
-    const provider = isCliAgent(parts[0]) ? parts.shift() : 'codex';
+    const provider = isStoredCliAgent(parts[0]) ? parts.shift() : 'codex';
     const key = parts[0] === 'dots' || parts.length < 2 ? oldKey : `${provider === 'codex' ? '' : provider + '|'}${pathKey(parts.shift())}|${parts.join('|')}`;
     const existing = result[key];
     // Aliases may contain independently edited drafts. Show all distinct text
