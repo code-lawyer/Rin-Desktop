@@ -1,6 +1,6 @@
 {
   "name": "vibe-voice-desktop",
-  "version": "0.6.3-rc.3",
+  "version": "0.6.3-rc.4",
   "private": true,
   "type": "module",
   "main": "main.cjs",

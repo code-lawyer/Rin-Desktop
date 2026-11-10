@@ -49,7 +49,8 @@ await writeFile(join(appDir,'portable.json'),JSON.stringify({version,platform:'w
 await cp(join(root,'PORTABLE-README.md'),join(output,'USER-GUIDE.md'));
 const cliGuide = (await readFile(join(root,'CLI-AGENTS.md'),'utf8'))
   .replaceAll('../../tools/release/TEST-ACCEPTANCE.md', 'https://github.com/code-lawyer/Rin-Desktop/blob/main/tools/release/TEST-ACCEPTANCE.md')
-  .replaceAll('../../docs/privacy.md', 'https://github.com/code-lawyer/Rin-Desktop/blob/main/docs/privacy.md');
+  .replaceAll('../../docs/privacy.md', 'https://github.com/code-lawyer/Rin-Desktop/blob/main/docs/privacy.md')
+  .replaceAll('../../docs/project-status.md', 'https://github.com/code-lawyer/Rin-Desktop/blob/main/docs/project-status.md');
 await writeFile(join(output,'CLI-AGENTS.md'), cliGuide);
 await cp(join(root,'THIRD-PARTY-NOTICES.md'),join(output,'THIRD-PARTY-NOTICES.md'));
 await cp(join(workspace,'LICENSE'),join(output,'LICENSE-VibeVoice.txt'));

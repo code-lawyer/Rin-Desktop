@@ -80,17 +80,29 @@ export class AcpCompanion extends NativeAgent {
     if (this.provider === 'opencode' && !/(?:^|\s|v)2\./.test(this.state.version ?? '')) throw new Error('此接入需要 OpenCode V2，请安装 V2 或通过 VIBE_OPENCODE_BINARY 指定其程序。');
     const ep = await this.endpoint(this.state.cwd); this.active = ep; const id = this.state.threadId;
     if (this.spec.custom) this.state.version = ep.init.agentInfo?.version ?? null;
-    this.state.canResume = !!ep.init.agentCapabilities?.loadSession;
-    this.replay = id ? [] : null; ep.sessionId = id;
+    const canLoad = !!ep.init.agentCapabilities?.loadSession;
+    const canResume = !!ep.init.agentCapabilities?.sessionCapabilities?.resume;
+    this.state.canResume = canLoad || canResume;
+    this.state.historyLocalOnly = !canLoad;
+    this.replay = id && canLoad ? [] : null; ep.sessionId = id;
     let session;
     try {
-      if (id && !ep.init.agentCapabilities?.loadSession) throw new Error('此 CLI 不支持加载会话。');
-      session = await deadline(id ? ep.conn.loadSession({ sessionId: id, cwd: this.state.cwd, mcpServers: [], _meta: this.sessionMeta() }) : ep.conn.newSession({ cwd: this.state.cwd, mcpServers: [], _meta: this.sessionMeta() }), 45000, id ? '恢复会话' : '创建会话');
+      if (id && !this.state.canResume) throw Object.assign(new Error('此 Agent 不支持恢复已有会话。可以新建对话，旧会话和本地记录会保留。'), { code: 'ACP_RESUME_UNSUPPORTED' });
+      const params = { cwd: this.state.cwd, mcpServers: [], _meta: this.sessionMeta() };
+      const opening = !id ? ep.conn.newSession(params)
+        : canLoad ? ep.conn.loadSession({ sessionId: id, ...params })
+          : ep.conn.resumeSession({ sessionId: id, ...params });
+      session = await deadline(opening, 45000, id ? '恢复会话' : '创建会话');
       ep.sessionId = session.sessionId || id;
       if (!ep.sessionId) throw new Error('CLI 没有返回会话编号。');
       this.state.threadId = ep.sessionId; this.models(session);
       if (this.closed || ep.closing) throw new Error('Agent 已关闭。');
-      if (id) { this.state.messages = restoreHistory(this.replay, this.state.messages).slice(-200); this.state.restored = true; }
+      if (id) {
+        // resume restores context without replaying messages. Its empty replay
+        // is not an empty transcript and must never replace the display cache.
+        if (canLoad) this.state.messages = restoreHistory(this.replay, this.state.messages).slice(-200);
+        this.state.restored = true;
+      }
       // The Grok process is dedicated (--no-leader); override auto-approve only
       // in that process, including after loading a previously saved session.
       if (this.provider === 'grok') await ep.conn.extNotification('_x.ai/yolo_mode_changed', { yolo_mode: false, auto_mode: false, permission_mode: 'ask' });
@@ -204,7 +216,7 @@ export class AcpCompanion extends NativeAgent {
   async history(id, cursor = null) {
     this.assertReady(); const item = this.session(id);
     if (cursor) return { turns: [], nextCursor: null };
-    if (id === this.state.threadId && this.run) return { turns: historyTurns(this.state.messages), nextCursor: null };
+    if (id === this.state.threadId && this.run) return { turns: historyTurns(this.state.messages), nextCursor: null, ...(this.state.historyLocalOnly ? { localOnly: true } : {}) };
     if (!this.active.init.agentCapabilities?.loadSession) return { turns: historyTurns(this.index[id]?.messages ?? []), nextCursor: null, localOnly: true };
     // Replay in a separate CLI connection: inspecting history must not change
     // the active session or attach a second prompt to a running conversation.

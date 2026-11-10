@@ -6,7 +6,7 @@
 <div class="layout">
   <button id="sidebar-backdrop" aria-label="关闭项目导航" tabindex="-1"></button>
   <aside id="workbench-sidebar" class="sidebar" aria-label="项目导航">
-    <div class="agent-picker"><label for="agent-select">Agent</label><div class="agent-controls"><select id="agent-select"></select><button id="agent-reconnect" class="icon" aria-label="重新连接 Agent" title="重新连接 Agent"><svg class="ui-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M16 8a6.2 6.2 0 1 0-.6 5M16 3v5h-5"/></svg></button></div></div>
+    <div class="agent-picker"><div class="agent-picker-heading"><label for="agent-select">Agent</label><button id="manage-agents" type="button" aria-controls="agent-settings">选择与管理</button></div><div class="agent-controls"><select id="agent-select"></select><button id="agent-reconnect" class="icon" aria-label="重新连接 Agent" title="重新连接 Agent"><svg class="ui-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M16 8a6.2 6.2 0 1 0-.6 5M16 3v5h-5"/></svg></button></div></div>
     <p id="agent-config-error" class="hint" role="alert" hidden></p>
     <div class="section-heading"><h1>项目</h1><button id="add-project" class="icon" aria-label="添加项目文件夹" title="添加本地文件夹"><svg class="ui-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 4v12M4 10h12"/></svg></button></div>
     <div id="projects" class="project-list" aria-label="本地项目"></div>
@@ -77,12 +77,11 @@
       </section>
       <section class="setting-section" data-settings-group="keyboard" hidden><details class="setting-details"><summary>兼容其他按键设备</summary><p class="hint">RC003 使用「遥控器」分类连接。以下通用按键对所有键盘生效，听写使用电脑麦克风。</p><label class="check"><input id="remote-enabled" type="checkbox">启用通用按键</label><div class="key-fields" id="remote-keys"></div></details></section>
       <section class="setting-section" id="agent-settings" data-settings-group="agents" hidden aria-labelledby="agents-heading">
-        <div class="setting-row"><div><h3 id="agents-heading">自定义 Agent</h3><p class="hint">添加支持 ACP 的本机 Agent，沿用它已有的账号和权限设置。</p></div><button id="agents-add" class="primary" type="button">添加 Agent</button></div>
-        <div class="agent-setup-assist"><h4>让 Agent 帮你接入</h4><p class="hint">复制提示词给能访问本机的 Agent，它会检查安装、准备配置并验证连接。完成后回来点击“重新读取”。</p><div class="custom-agent-prompt-controls"><label for="agent-prompt-target">想接入的 Agent<input id="agent-prompt-target" maxlength="80" placeholder="可留空，直接交给当前使用的 Agent"></label><button id="agent-copy-prompt" type="button">复制接入提示词</button></div><details class="setting-details"><summary>查看提示词</summary><textarea id="agent-prompt-preview" readonly rows="10" aria-label="可复制的 Agent 接入提示词"></textarea></details></div>
-        <div class="setting-row custom-agent-list-heading"><h4>已添加的 Agent</h4><button id="agents-reload" class="quiet" type="button">重新读取</button></div>
+        <div class="setting-row agents-heading"><div><h3 id="agents-heading">选择 Agent</h3><p class="hint">连接你想使用的助手。各自的会话和草稿分别保留。</p></div><div class="custom-agent-actions"><button id="agents-reload" class="quiet" type="button" title="重新读取自定义 Agent 配置">重新读取</button><button id="agents-add" class="primary" type="button">添加 Agent</button></div></div>
         <p id="agents-status" class="hint" role="status" aria-live="polite"></p>
-        <p id="agents-empty" class="hint">还没有自定义 Agent。可以手动添加，也可以让 Agent 帮你配置。</p>
-        <div id="agents-list" aria-label="自定义 Agent 列表"></div>
+        <p id="agents-config-error" class="hint" role="alert" hidden></p>
+        <div id="agents-list" aria-label="所有 Agent"></div>
+        <p id="agents-empty" class="hint">需要其他助手？点击“添加 Agent”，或展开下方的接入帮助。</p>
         <div id="agent-confirm" class="custom-agent-confirm" role="group" aria-label="确认配置操作" hidden><p id="agent-confirm-message"></p><div class="custom-agent-actions"><button id="agent-confirm-accept" type="button">确认</button><button id="agent-confirm-cancel" type="button">取消</button></div></div>
         <form id="agent-editor" class="custom-agent-editor" hidden>
           <h4 id="agent-editor-title">添加自定义 Agent</h4>
@@ -93,9 +92,11 @@
             <div class="setting-row"><div><label id="agent-args-label">启动参数</label><p class="hint">按实际启动顺序逐项添加，不用填写 JSON，也不用额外加引号。</p></div><button id="agent-add-argument" type="button">添加参数</button></div>
             <div id="agent-args" aria-labelledby="agent-args-label"></div>
             <details class="setting-details"><summary>高级选项</summary><label for="agent-id">接入标识<input id="agent-id" required maxlength="55" pattern="custom-[a-z0-9][a-z0-9\-]{0,47}" autocomplete="off"></label><p class="hint">用于关联会话和草稿，已有接入的标识不可更改。</p><label for="agent-auth-method">认证方法（可选）<input id="agent-auth-method" maxlength="200" placeholder="通常留空；按 Agent 的 ACP 文档填写" autocomplete="off"></label><p class="hint">登录继续由原生 CLI 或本机环境管理，请勿在这里填写 API Key。</p></details>
+            <p id="agent-editor-error" class="hint" role="alert" hidden></p>
             <div class="custom-agent-actions"><button id="agent-save" class="primary" type="submit">保存 Agent</button><button id="agent-cancel-edit" type="button">取消编辑</button></div>
           </fieldset>
         </form>
+        <details class="agent-setup-assist" id="agent-setup-assist"><summary>让 Agent 帮你接入其他助手</summary><p class="hint">复制提示词给能访问本机的 Agent，它会检查安装、准备配置并验证连接。完成后回来点击“重新读取”。</p><div class="custom-agent-prompt-controls"><label for="agent-prompt-target">想接入的 Agent<input id="agent-prompt-target" maxlength="80" placeholder="可留空，直接交给当前使用的 Agent"></label><button id="agent-copy-prompt" type="button">复制接入提示词</button></div><details class="setting-details"><summary>查看提示词</summary><textarea id="agent-prompt-preview" readonly rows="10" aria-label="可复制的 Agent 接入提示词"></textarea></details></details>
         <details class="setting-details"><summary>配置位置与使用说明</summary><p id="agent-config-source" class="hint"></p><p id="agent-config-location" class="custom-agent-path"></p><p class="hint">保存后选择器立即更新。修改当前 Agent 时，重连后使用新设置；正在使用的 Agent 需先切换再删除。删除只移除接入配置，保留会话和草稿。</p><p class="hint">自定义接入仍为实验功能。程序以你的 Windows 用户权限运行，工具审批由它的原生规则决定。</p></details>
       </section>
       <section class="setting-section" id="data-settings" data-settings-group="data" hidden><h3>本地数据</h3><p class="hint">沿用便携版中的项目、会话、草稿和设置。选择后重启应用。</p><button id="use-existing-data">使用已有数据目录</button></section>

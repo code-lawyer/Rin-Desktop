@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, rm, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { ClaudeCompanion, claudeAuthentication } from '../backend/claude-agent.mjs';
@@ -12,10 +12,34 @@ import { JsonLineDecoder } from '../backend/json-line-decoder.mjs';
 import { formAnswer } from '../backend/agent-questions.mjs';
 import catalog from '../backend/agent-catalog.cjs';
 import { parseCustomAgents } from '../backend/custom-agents.mjs';
+import { WorkspaceStore } from '../backend/workspace-store.mjs';
+import { SubmissionGuard, submissionBaseline } from '../backend/submission-guard.mjs';
+import { agentConnectionHelp } from '../renderer/agent-connection-help.mjs';
 
 const deferred = () => { let resolve, reject; const promise = new Promise((a,b) => { resolve=a; reject=b; }); return { promise, resolve, reject }; };
 async function waitFor(predicate) { for (let n=0;n<100;n++) { if (predicate()) return; await new Promise(resolve => setImmediate(resolve)); } assert.fail('Fixture event not observed'); }
 async function directory(t) { const root = await mkdtemp(join(tmpdir(),'rin-protocol-')); t.after(() => rm(root,{recursive:true,force:true})); return root; }
+
+for (const failure of ['thread', 'project']) test(`Codex ${failure} recovery failure stays actionable after transport connects`, async t => {
+  const root = await directory(t), agent = new CodexCompanion({ projectRoot: root, storageDir: root }), calls = [];
+  const messages = [{ role: 'user', text: '原来的问题' }, { role: 'assistant', text: '原来的回答', complete: true }];
+  Object.assign(agent.state, { threadId: 'saved-thread', messages: structuredClone(messages), loginHelp: '不应出现在恢复错误中的认证提示' });
+  if (failure === 'project') agent.projectError = '原项目目录不可用，请选择原目录。';
+  agent.rpc = { close: async () => {}, request: async method => {
+    calls.push(method);
+    if (method === 'model/list') return { data: [] };
+    if (method === 'thread/resume') throw new Error('Thread not found');
+    assert.fail('Unexpected RPC: ' + method);
+  } };
+  t.after(() => agent.close());
+  await agent.finishConnection();
+  const state = agent.snapshot();
+  assert.equal(state.connection, 'ready'); assert.equal(state.status, 'error');
+  assert.equal(agentConnectionHelp(state), state.error, 'usable transport must not hide the session recovery error or append login advice');
+  assert.equal(state.threadId, 'saved-thread'); assert.deepEqual(state.messages, messages);
+  await assert.rejects(agent.send('不要发送'), /恢复连接或开始新对话/);
+  assert.deepEqual(calls, failure === 'project' ? ['model/list'] : ['model/list', 'thread/resume']);
+});
 function channel() {
   const queue=[], waiting=[]; let closed=false;
   return { push(value) { const next=waiting.shift(); if(next)next({value,done:false});else queue.push(value); }, end(){closed=true;for(const next of waiting.splice(0))next({done:true});},
@@ -98,37 +122,56 @@ test('Claude idle callbacks are denied and unexpected EOF fails its pending turn
 
 // A synthetic stdio peer exercises the installed ACP SDK's JSON-RPC framing,
 // validation and callbacks. No child process, account or network is used.
-function acpPeer(cwd, initialization = {}) {
+function acpPeer(cwd, initialization = {}, restore = {}) {
   const child=Object.assign(new EventEmitter(),{stdin:new PassThrough(),stdout:new PassThrough(),stderr:new PassThrough(),pid:null}), calls=[], requests=new Map();
-  let nextId=1000, promptRequest;
+  let nextId=1000, promptRequest, restoreRequest;
   const send=message=>child.stdout.write(JSON.stringify({jsonrpc:'2.0',...message})+'\n');
   const session={sessionId:'session',models:{currentModelId:'fixture',availableModels:[{modelId:'fixture',name:'Fixture'}]}};
+  const finishRestore = () => {
+    assert.ok(restoreRequest);
+    if (restore.error) send({id:restoreRequest.id,error:restore.error});
+    else {
+      if (restoreRequest.method === 'session/load') for (const message of restore.messages ?? []) {
+        send({method:'session/update',params:{sessionId:'session',update:{sessionUpdate:message.role === 'user' ? 'user_message_chunk' : 'agent_message_chunk',content:{type:'text',text:message.text}}}});
+      }
+      // Restore responses need not repeat the session ID. Keep model handling
+      // covered on both paths through the real SDK response decoder.
+      send({id:restoreRequest.id,result:{models:session.models}});
+    }
+    restoreRequest=null;
+  };
   const decoder=new JsonLineDecoder(message=>{
     if(!message.method){const pending=requests.get(message.id);requests.delete(message.id);if(message.error)pending?.reject(new Error(message.error.message));else pending?.resolve(message.result);return;}
     calls.push(message);
     if(message.method==='session/prompt'){promptRequest=message;return;}
     if(message.method==='session/cancel'){if(promptRequest){send({id:promptRequest.id,result:{stopReason:'cancelled'}});promptRequest=null;}return;}
     if(message.id===undefined)return;
+    if(['session/load','session/resume'].includes(message.method)){restoreRequest=message;restore.onRequest?.(message);if(!restore.pending)finishRestore();return;}
     const result=message.method==='initialize'?{protocolVersion:1,agentCapabilities:{loadSession:true,sessionCapabilities:{list:{}}},authMethods:[{id:'cached_token',name:'Cached'}],agentInfo:{name:'fixture',version:'bridge-1'},...initialization}:
-      ['session/new','session/load'].includes(message.method)?session:
+      message.method==='session/new'?session:
       message.method==='session/list'?{sessions:[{sessionId:'session',cwd,title:'Fixture',updatedAt:'2026-10-21T00:00:00Z'}]}:{};
     send({id:message.id,result});
   });
   child.stdin.on('data',chunk=>decoder.push(chunk));
-  return {child,calls,request(method,params){const id=nextId++, pending=deferred();requests.set(id,pending);send({id,method,params});return pending.promise;},
+  return {child,calls,finishRestore,request(method,params){const id=nextId++, pending=deferred();requests.set(id,pending);send({id,method,params});return pending.promise;},
     update(update,sessionId='session'){send({method:'session/update',params:{sessionId,update}});},
     finish(stopReason='end_turn'){assert.ok(promptRequest);send({id:promptRequest.id,result:{stopReason}});promptRequest=null;},
     drop(){child.stdout.end();child.emit('exit',1);},stop(){child.stdout.end();child.stdin.end();child.stderr.end();} };
 }
-async function acp(t,provider,{initialization,authMethodId}={}){
-  const root=await directory(t),peers=[];
+async function acp(t,provider,{initialization,authMethodId,restore}={}){
+  const root=await directory(t),peers=[],agents=[];
   const launch=catalog.isCustomAgentId(provider)?parseCustomAgents({format:1,agents:[{id:provider,name:'Fixture custom agent',protocol:'acp',command:process.execPath,args:['bridge with spaces.mjs','--stdio'],...(authMethodId?{authMethodId}:{})}]} )[0]:undefined;
   if(launch)catalog.setCustomAgents([launch]);
-  const agent=new AcpCompanion({provider,projectRoot:root,storageDir:root,launch,spawnAgent:(_binary,args,cwd)=>{const peer=acpPeer(cwd,initialization);peer.args=args;peers.push(peer);return peer.child;}});
-  t.after(async()=>{await agent.close();for(const peer of peers)peer.stop();if(launch)catalog.setCustomAgents([]);});
+  const create=()=>{
+    const agent=new AcpCompanion({provider,projectRoot:root,storageDir:root,launch,spawnAgent:(_binary,args,cwd)=>{const peer=acpPeer(cwd,initialization,restore);peer.args=args;peers.push(peer);return peer.child;}});
+    if(!launch)agent.prepareNative=async()=>{agent.binary='unused';agent.state.version='2.0.0';};
+    agents.push(agent);return agent;
+  };
+  const agent=create();
+  t.after(async()=>{for(const agent of agents)await agent.close();for(const peer of peers)peer.stop();if(launch)catalog.setCustomAgents([]);});
   if(launch)await agent.connect();
   else {agent.binary='unused';agent.state.version='2.0.0';await agent.openNative();Object.assign(agent.state,{connection:'ready',status:'idle'});}
-  return {agent,root,peers,get peer(){return peers.at(-1);}};
+  return {agent,root,peers,get peer(){return peers.at(-1);},get latestAgent(){return agents.at(-1);},async restart(){await agents.at(-1).close();const next=create();await next.connect();return next;}};
 }
 const permission={sessionId:'session',toolCall:{toolCallId:'tool',title:'Fixture write',kind:'edit',status:'pending',rawInput:{path:'fixture.txt'}},options:[{optionId:'once',name:'Allow once',kind:'allow_once'},{optionId:'no',name:'Reject',kind:'reject_once'},{optionId:'always',name:'Always',kind:'allow_always'}]};
 
@@ -207,6 +250,108 @@ test('custom ACP without history capabilities shows local cache, refuses resume 
   await assert.rejects(agent.resumeConversation('session',root),/不支持/);
   assert.equal(peers.flatMap(p=>p.calls).some(call=>call.method==='session/load'),false);
   await agent.newConversation(root);assert.equal(agent.state.connection,'ready');
+});
+
+const resumeCapabilities = {sessionCapabilities:{list:{},resume:{}}};
+const cachedConversation = () => ['completed','interrupted','failed','unknown'].flatMap((turnStatus,n)=>[
+  {id:`user-${n}`,turnId:`turn-${n}`,role:'user',text:`保存的请求 ${n}\n第二行`,complete:true,turnStatus},
+  {id:`answer-${n}`,turnId:`turn-${n}`,role:'assistant',text:`保存的回复 ${n}`,complete:true,phase:'final_answer',turnStatus},
+]);
+
+for(const provider of ['grok','opencode','custom-restore']) for(const [kind,capabilities,method] of [
+  ['load only',{loadSession:true},'session/load'],
+  ['resume only',resumeCapabilities,'session/resume'],
+  ['load and resume',{loadSession:true,...resumeCapabilities},'session/load'],
+]) test(`${provider}: ${kind} preserves saved history and outcomes across two restarts`,async t=>{
+  const messages=cachedConversation(), f=await acp(t,provider,{initialization:{agentCapabilities:capabilities},restore:{messages}});
+  f.agent.state.messages=structuredClone(messages);await f.agent.persist();
+  for(let n=0;n<2;n++){
+    const agent=await f.restart();
+    assert.equal(agent.state.connection,'ready',agent.state.error);assert.equal(agent.state.threadId,'session');
+    assert.equal(agent.state.canResume,true);assert.equal(agent.state.restored,true);assert.equal(agent.state.model,'fixture');
+    assert.equal(agent.state.historyLocalOnly,method==='session/resume');assert.deepEqual(agent.state.messages,messages);
+    assert.deepEqual(JSON.parse(await readFile(join(agent.storageDir,'index.json'),'utf8')).sessions.session.messages,messages);
+    const restoration=f.peer.calls.find(call=>call.method===method);
+    assert.deepEqual(restoration.params,{sessionId:'session',cwd:f.root,mcpServers:[],_meta:agent.sessionMeta()});
+    if(provider==='grok'){
+      assert.ok(f.peer.calls.some(call=>call.method==='authenticate'));
+      assert.ok(f.peer.calls.some(call=>call.method==='_x.ai/yolo_mode_changed' && call.params.yolo_mode===false));
+    }
+  }
+  const methods=f.peers.flatMap(peer=>peer.calls.map(call=>call.method));
+  assert.equal(methods.filter(value=>value==='session/new').length,1);
+  assert.equal(methods.filter(value=>value===method).length,2);
+  assert.equal(methods.includes(method==='session/load'?'session/resume':'session/load'),false);
+  assert.equal(methods.includes('session/prompt'),false);
+});
+
+test('resume-only empty history stays usable and history viewing does not restore another connection',async t=>{
+  const f=await acp(t,'custom-empty-resume',{initialization:{agentCapabilities:resumeCapabilities}}), agent=await f.restart();
+  assert.equal(agent.state.connection,'ready',agent.state.error);assert.deepEqual(agent.state.messages,[]);
+  const count=f.peers.length, history=await agent.history('session');
+  assert.equal(history.localOnly,true);assert.deepEqual(history.turns,[]);assert.equal(f.peers.length,count);
+  await agent.send('new synthetic request');await waitFor(()=>f.peer.calls.some(call=>call.method==='session/prompt'));
+  const duringTurn=await agent.history('session');assert.equal(duringTurn.localOnly,true);assert.equal(f.peers.length,count);
+  f.peer.update({sessionUpdate:'agent_message_chunk',content:{type:'text',text:'new synthetic answer'}});f.peer.finish();await agent.run;
+  assert.equal(agent.state.messages.at(-1).text,'new synthetic answer');assert.equal(agent.state.messages.at(-1).turnStatus,'completed');
+});
+
+for(const [name,capabilities,error,connection] of [
+  ['unsupported',{},null,'error'],
+  ['null resume',{sessionCapabilities:{resume:null}},null,'error'],
+  ['missing session',resumeCapabilities,{code:-32002,message:'Session not found'},'error'],
+  ['authentication',resumeCapabilities,{code:-32000,message:'Authentication required'},'authentication'],
+  ['load failure with resume available',{loadSession:true,...resumeCapabilities},{code:-32002,message:'Session not found'},'error'],
+]) test(`ACP restore ${name} preserves stored ID and cache without creating or retrying a session`,async t=>{
+  const f=await acp(t,'custom-restore-failure',{initialization:{agentCapabilities:capabilities},restore:{error}}), messages=cachedConversation();
+  f.agent.state.messages=structuredClone(messages);await f.agent.persist();
+  const files=['index.json','session.json'], before=await Promise.all(files.map(name=>readFile(join(f.agent.storageDir,name))));
+  const agent=await f.restart();
+  assert.equal(agent.state.connection,connection);assert.equal(agent.state.threadId,'session');assert.equal(agent.state.restored,false);
+  assert.deepEqual(agent.state.messages,messages);assert.equal(agent.endpoints.size,0);
+  assert.deepEqual(await Promise.all(files.map(name=>readFile(join(agent.storageDir,name)))),before);
+  const methods=f.peer.calls.map(call=>call.method);
+  assert.deepEqual(methods,error?['initialize',capabilities.loadSession?'session/load':'session/resume']:['initialize']);
+  assert.match(agent.state.error,error?new RegExp(error.message):/不支持恢复已有会话/);
+});
+
+for(const failure of ['disconnect','timeout','close']) test(`pending ACP resume ${failure} cannot erase cache or revive the closed connection`,async t=>{
+  const started=deferred(), f=await acp(t,'custom-pending-resume',{initialization:{agentCapabilities:resumeCapabilities},restore:{pending:true,onRequest:()=>started.resolve()}}), messages=cachedConversation();
+  f.agent.state.messages=structuredClone(messages);await f.agent.persist();
+  const before=await readFile(join(f.agent.storageDir,'index.json'));
+  if(failure==='timeout')t.mock.timers.enable({apis:['setTimeout']});
+  const opening=f.restart();await Promise.race([started.promise,opening.then(()=>assert.fail('Restore completed without the pending protocol request'))]);
+  const agent=f.latestAgent, peer=f.peer;
+  if(failure==='disconnect')peer.drop();
+  else if(failure==='timeout'){
+    t.mock.timers.tick(45000);await opening;
+    assert.equal(agent.state.connection,'error');assert.match(agent.state.error,/超时/);
+    peer.finishRestore();await new Promise(resolve=>setImmediate(resolve));
+    t.mock.timers.reset();
+  }else{await agent.close();peer.finishRestore();}
+  await opening;
+  assert.deepEqual(agent.state.messages,messages);assert.equal(agent.endpoints.size,0);
+  assert.deepEqual(await readFile(join(agent.storageDir,'index.json')),before);
+  if(failure==='disconnect')assert.equal(agent.state.connection,'error');
+  assert.equal(f.peers.flatMap(peer=>peer.calls).some(call=>call.method==='session/prompt'),false);
+});
+
+test('resume cache is never delivery evidence and uncertain submissions keep their draft without resending',async t=>{
+  const f=await acp(t,'custom-resume-receipt',{initialization:{agentCapabilities:resumeCapabilities}});
+  const message={id:'cached-user',role:'user',text:'do this once',complete:true,turnStatus:'unknown'};
+  f.agent.state.messages=[message];await f.agent.persist();
+  const store=new WorkspaceStore(f.root);await store.load();await store.add(f.root);
+  const target={provider:f.agent.provider,cwd:f.root,threadId:'session'};
+  await store.saveDraft(target,message.text);
+  await store.transaction(data=>{data.submissions={[target.provider]:{id:'unconfirmed',status:'unknown',text:message.text,target,originalTarget:target,userMessageId:message.id,baseline:submissionBaseline([])}};});
+  const agent=await f.restart();assert.equal(agent.state.connection,'ready',agent.state.error);
+  const guard=new SubmissionGuard(store), active=agent.active;
+  const result=await guard.reconcile(agent,target.provider,'unconfirmed');
+  assert.equal(result.status,'unknown');assert.equal(store.draft(target),message.text);assert.equal(agent.active,active);assert.equal(agent.endpoints.size,1);
+  assert.deepEqual(agent.state.messages,[message]);
+  await assert.rejects(guard.send(agent,target.provider,message.text),/核查/);
+  const methods=f.peers.flatMap(peer=>peer.calls.map(call=>call.method));
+  assert.equal(methods.filter(method=>method==='session/resume').length,1);assert.equal(methods.includes('session/prompt'),false);assert.equal(methods.includes('session/load'),false);
 });
 
 test('Grok native question extension and permission bypass hook preserve user control',async t=>{

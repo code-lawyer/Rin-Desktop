@@ -6,11 +6,12 @@ import catalog from '../backend/agent-catalog.cjs';
 import { populateAgentPicker } from './agent-picker.mjs';
 import { installRemoteSettings, installRemoteNavigation } from './remote-ui.mjs';
 import { installSettingsNavigation } from './settings-navigation.mjs';
-import { installCustomAgentSettings } from './custom-agent-settings.mjs';
+import { installAgentSettings } from './custom-agent-settings.mjs';
+import { agentConnectionHelp } from './agent-connection-help.mjs';
 const api = window.companion, $ = id => document.getElementById(id);
 installRemoteSettings(api); installRemoteNavigation(api,{notice:text=>notice(text)});
 const settingsNavigation = installSettingsNavigation(document);
-const agentSettings = installCustomAgentSettings({ api, document });
+const agentSettings = installAgentSettings({ api, document });
 const narrowNavigation = matchMedia('(max-width: 680px)');
 function closeNavigation() {
   const restoreFocus = $('workbench-sidebar').contains(document.activeElement);
@@ -55,15 +56,16 @@ function updateActivity() {
   if (current) agentSettings.stateChanged(current);
   const name = catalog.agentName(current?.provider);
   const connection = current?.connection;
-  $('connection').textContent = current?.provider === 'dots' ? '请选择一个 CLI Agent' : connection === 'ready' ? `${name} · 已连接` : connection === 'authentication' ? `${name} · 需要登录` : connection === 'error' ? `${name} · 连接需要处理` : `正在连接 ${name}…`;
-  $('connection').title = connection === 'ready' ? `${name} · 本机工作区\n${current?.cwd || ''}` : current?.error || $('connection').textContent;
-  $('connection').dataset.state = connection || 'connecting';
+  const sessionError = connection === 'ready' && current?.status === 'error';
+  $('connection').textContent = current?.provider === 'dots' ? '请选择一个 CLI Agent' : sessionError ? `${name} · 会话需要处理` : connection === 'ready' ? `${name} · 已连接` : connection === 'authentication' ? `${name} · 需要登录` : connection === 'error' ? `${name} · 连接需要处理` : `正在连接 ${name}…`;
+  $('connection').title = connection === 'ready' && !sessionError ? `${name} · 本机工作区\n${current?.cwd || ''}` : current?.error || $('connection').textContent;
+  $('connection').dataset.state = sessionError ? 'error' : connection || 'connecting';
   $('agent-select').value = current?.provider ?? 'codex';
   $('agent-select').disabled = busy() || current?.connection === 'connecting';
   $('agent-reconnect').disabled = busy() || current?.connection === 'connecting';
-  $('agent-help').textContent = !available() ? [current?.error, current?.loginHelp].filter(Boolean).join('\n\n') : '';
+  $('agent-help').textContent = agentConnectionHelp(current);
   $('agent-details').hidden = !$('agent-help').textContent;
-  $('permission-hint').textContent = [current?.permissionHint, current?.canResume === false ? '此 Agent 不支持恢复会话；历史仅显示本地缓存，重启后需新建对话。' : ''].filter(Boolean).join(' ');
+  $('permission-hint').textContent = [current?.permissionHint, current?.canResume === false ? '此 Agent 不支持恢复会话；历史仅显示本地缓存，重启后需新建对话。' : current?.historyLocalOnly ? '可以恢复会话上下文；历史仅显示本机缓存的最近消息，可能不完整。' : ''].filter(Boolean).join(' ');
   $('new-thread').disabled = busy() || !available() && !current?.canStartNew || !projectId;
   $('resume').disabled = busy() || !available() || !selected || current?.canResume === false;
   $('rename').disabled = !available() || !selected;
@@ -131,7 +133,7 @@ async function loadHistory(older = false) {
     const result = await run(api.history(id, older ? historyCursor : null, current.provider));
     if (version !== historyVersion || selected?.id !== id) return;
     if (!older) $('history').replaceChildren();
-    if (!older && result.localOnly) $('history').append(node('p', '此 Agent 不支持原生历史恢复，以下仅显示 Rin 缓存的最近消息。', 'hint'));
+    if (!older && result.localOnly) $('history').append(node('p', '此 Agent 不提供历史回放，以下仅显示本机缓存的最近消息；没有缓存时不会显示旧消息。', 'hint'));
     const fragment = document.createDocumentFragment();
     for (const turn of result.turns) for (const item of turn.items ?? []) {
       if (!['userMessage','agentMessage'].includes(item.type)) continue;
@@ -285,6 +287,7 @@ $('refresh').onclick = act(() => refreshThreads()); $('more-threads').onclick = 
 $('search').oninput = () => { clearTimeout(searchTimer); searchTimer = setTimeout(() => refreshThreads(),250); };
 function showSettings() { closeNavigation(); $('settings').hidden = false; $('conversations').hidden = true; $('settings-tab').setAttribute('aria-pressed','true'); renderProjects(); if (!settingsDirty) fillSettings(); }
 $('settings-tab').onclick = showSettings;
+$('manage-agents').onclick = () => { showSettings(); document.querySelector('[data-setting-target="agent-settings"]').click(); };
 for (const radio of document.querySelectorAll('[name="wallpaper-style"]')) radio.onchange = act(() => saveWallpaperStyle(radio.value === 'realistic'));
 $('retry-character').onclick = act(() => saveWallpaperStyle(workspace.wallpaper.wallpaperMotion === true));
 let stillSaving = 0;

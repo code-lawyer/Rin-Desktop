@@ -1,9 +1,18 @@
 import { agentSetupPrompt } from '../backend/agent-setup-prompt.mjs';
 import { isTaskBusy } from '../backend/task-state.mjs';
+import { agentConnectionHelp } from './agent-connection-help.mjs';
+import catalog from '../backend/agent-catalog.cjs';
 
-export function installCustomAgentSettings({ api, document }) {
+const builtinDescriptions = {
+  codex: '沿用 Codex CLI 的登录和本地会话。',
+  claude: '连接 Claude Code，使用 API 或云平台认证。',
+  grok: '沿用 Grok Build CLI 已保存的登录。',
+  opencode: '连接 OpenCode V2 和已配置的模型。',
+};
+
+export function installAgentSettings({ api, document }) {
   const $ = id => document.getElementById(id);
-  let data, editing = null, dirty = false, busy = false, current, confirmation;
+  let data, editing = null, dirty = false, busy = false, current, confirmation, listKey;
   const node = (tag, text, className) => {
     const element = document.createElement(tag);
     if (text !== undefined) element.textContent = text;
@@ -19,12 +28,34 @@ export function installCustomAgentSettings({ api, document }) {
     $('agents-status').textContent = message;
     $('agents-status').dataset.error = String(error);
   }
-  async function run(action) {
+  function editorError(message = '') {
+    const error = $('agent-editor-error');
+    error.textContent = message; error.hidden = !message;
+    if (message) {
+      $('agent-save').scrollIntoView({ block: 'nearest' });
+      error.scrollIntoView({ block: 'nearest' });
+    }
+  }
+  async function run(action, onError = message => status(message, true)) {
     if (busy) return;
+    // Disabling a button blurs it before the list's next render. Keep its
+    // identity until the operation finishes, unless the user moves elsewhere.
+    const focused = document.activeElement;
+    const listFocus = $('agents-list').contains(focused) ? { agentId: focused.dataset.agentId, action: focused.dataset.action } : null;
+    let focusMoved = false;
+    const onFocus = event => { if (event.target !== document.body) focusMoved = true; };
+    document.addEventListener('focusin', onFocus);
     busy = true; controls();
     try { return await action(); }
-    catch (error) { status(error.message, true); }
-    finally { busy = false; controls(); }
+    catch (error) { onError(error.message); }
+    finally {
+      document.removeEventListener('focusin', onFocus);
+      busy = false; controls();
+      if (!focusMoved && document.activeElement === document.body) {
+        const target = listFocus ? [...$('agents-list').querySelectorAll('button')].find(button => button.dataset.agentId === listFocus.agentId && button.dataset.action === listFocus.action) : focused;
+        if (target?.isConnected && !target.matches(':disabled') && !target.closest('[hidden],[inert]') && target.checkVisibility({ visibilityProperty: true })) target.focus({ preventScroll: true });
+      }
+    }
   }
   function controls() {
     const unavailable = !data || !!data.error;
@@ -36,26 +67,48 @@ export function installCustomAgentSettings({ api, document }) {
     $('agent-copy-prompt').disabled = busy || !data;
     for (const button of $('agents-list').querySelectorAll('button')) {
       const active = button.dataset.agentId === (current?.provider ?? data?.activeId);
-      const connectedBusy = isTaskBusy(current) || current?.connection === 'connecting';
-      button.disabled = busy || unavailable || button.dataset.action === 'remove' && active || button.dataset.action === 'connect' && (connectedBusy || dirty && editing?.id === button.dataset.agentId);
+      const connectedBusy = !current || isTaskBusy(current) || current.connection === 'connecting';
+      // A broken custom config must never prevent returning to a builtin Agent.
+      button.disabled = busy || button.dataset.custom === 'true' && unavailable || button.dataset.action === 'remove' && active || button.dataset.action === 'connect' && (connectedBusy || dirty && editing?.id === button.dataset.agentId);
     }
   }
   function prompt() {
     $('agent-prompt-preview').value = agentSetupPrompt({ file: data?.file, name: $('agent-prompt-target').value });
   }
   function list() {
-    const host = $('agents-list'); host.replaceChildren();
-    const entries = data?.entries ?? [];
-    $('agents-empty').hidden = entries.length > 0;
+    const entries = [
+      ...Object.entries(catalog.AGENTS).filter(([, spec]) => !spec.custom).map(([id, spec]) => ({ id, ...spec })),
+      ...(data?.entries ?? []).map(entry => ({ ...entry, custom: true, experimental: true })),
+    ];
+    const activeId = current?.provider ?? data?.activeId;
+    const key = JSON.stringify([entries, activeId, current?.connection, current?.status, current?.error, current?.loginHelp, data?.needsReconnect]);
+    if (key === listKey) { controls(); return; }
+    listKey = key;
+    const host = $('agents-list'), focused = host.contains(document.activeElement) ? document.activeElement.dataset : null;
+    host.replaceChildren();
+    $('agents-empty').hidden = !!data?.entries?.length;
     for (const entry of entries) {
-      const row = node('div', undefined, 'custom-agent-row'); row.dataset.agentId = entry.id;
-      const description = node('div', undefined, 'custom-agent-description');
-      const active = entry.id === (current?.provider ?? data.activeId);
-      description.append(node('strong', entry.name), node('span', active ? '当前使用' + (data.needsReconnect ? ' · 有新配置，重连后生效' : '') : '自定义 · ACP', 'hint'), node('small', entry.command));
+      const active = entry.id === activeId;
+      const row = node('article', undefined, 'agent-row' + (entry.custom ? ' custom-agent-row' : '')); row.dataset.agentId = entry.id; row.dataset.active = String(active);
+      row.setAttribute('aria-label', entry.name);
+      const description = node('div', undefined, 'agent-description'), heading = node('div', undefined, 'agent-row-heading');
+      heading.append(node('strong', entry.name), node('span', [entry.custom ? '自定义' : '内置', entry.experimental ? '实验' : ''].filter(Boolean).join(' · '), 'agent-kind'));
+      description.append(heading, node('span', entry.custom ? '使用你配置的本机 Agent。' : builtinDescriptions[entry.id], 'hint'));
+      if (active) {
+        const connection = current?.connection;
+        const sessionError = connection === 'ready' && current?.status === 'error';
+        const label = connection === 'ready' ? sessionError ? '当前使用 · 需要处理' : isTaskBusy(current) ? '当前使用 · 工作中' : '当前使用 · 已连接'
+          : connection === 'authentication' ? '当前使用 · 需要认证' : connection === 'error' ? '当前使用 · 连接待处理' : '当前使用 · 连接中';
+        const state = node('span', label, 'agent-row-status'); state.dataset.state = sessionError ? 'error' : connection || 'connecting'; description.append(state);
+        if (entry.custom && data?.needsReconnect) description.append(node('span', '有新配置，重连后生效', 'agent-reconnect-note'));
+        const help = agentConnectionHelp(current);
+        if (help) description.append(node('p', help, 'agent-row-error'));
+      }
       const actions = node('div', undefined, 'custom-agent-actions');
-      for (const [action, label] of [['connect', active ? '重新连接' : '连接'], ['edit', '编辑'], ['remove', '删除']]) {
-        const button = node('button', label, action === 'remove' ? 'quiet' : ''); button.type = 'button';
-        button.dataset.action = action; button.dataset.agentId = entry.id;
+      const choices = [['connect', active ? '重新连接' : '连接'], ...(entry.custom ? [['edit', '编辑'], ['remove', '删除']] : [])];
+      for (const [action, label] of choices) {
+        const button = node('button', label, action === 'connect' ? 'agent-connect' : 'quiet'); button.type = 'button';
+        button.dataset.action = action; button.dataset.agentId = entry.id; button.dataset.custom = String(!!entry.custom);
         button.setAttribute('aria-label', `${label} ${entry.name}`);
         if (action === 'remove' && active) button.title = '先切换到其他 Agent，再删除此配置。';
         button.onclick = () => {
@@ -66,7 +119,8 @@ export function installCustomAgentSettings({ api, document }) {
             await response(entry.id === current?.provider ? api.reconnect() : api.chooseProvider(entry.id));
             current = await response(api.snapshot());
             accept(await response(api.customAgents()));
-            status(current.connection === 'ready' ? `已连接 ${entry.name}。尚未发送任务。` : [current.error, current.loginHelp].filter(Boolean).join(' ') || '连接未就绪，请查看连接帮助。', current.connection !== 'ready');
+            const connected = current.connection === 'ready' && current.status !== 'error';
+            status(connected ? `已连接 ${entry.name}。尚未发送任务。` : agentConnectionHelp(current) || '连接未就绪，请查看连接帮助。', !connected);
           });
         };
         actions.append(button);
@@ -74,9 +128,14 @@ export function installCustomAgentSettings({ api, document }) {
       row.append(description, actions); host.append(row);
     }
     controls();
+    if (focused?.action) for (const button of host.querySelectorAll('button')) {
+      if (button.dataset.agentId === focused.agentId && button.dataset.action === focused.action && !button.disabled) button.focus({ preventScroll: true });
+    }
   }
   function accept(value) {
     data = value;
+    $('agents-config-error').textContent = value.error || '';
+    $('agents-config-error').hidden = !value.error;
     $('agent-config-location').textContent = value.file || '配置位置无效，请检查 VIBE_AGENT_CONFIG。';
     $('agent-config-source').textContent = value.external ? '正在使用环境变量指定的配置文件。' : '配置保存在当前 Rin 数据目录。';
     list(); prompt();
@@ -91,6 +150,7 @@ export function installCustomAgentSettings({ api, document }) {
     return input;
   }
   function openEditor(entry) {
+    editorError();
     editing = { id: entry?.id || 'custom-' + crypto.randomUUID().slice(0, 8), revision: data.revision, creating: !entry };
     $('agent-editor-title').textContent = entry ? `编辑 ${entry.name}` : '添加自定义 Agent';
     $('agent-name').value = entry?.name || '';
@@ -101,7 +161,7 @@ export function installCustomAgentSettings({ api, document }) {
     $('agent-editor').hidden = false; dirty = false; controls();
     $('agent-name').focus(); $('agent-editor').scrollIntoView({ block: 'nearest' });
   }
-  function closeEditor() { editing = null; dirty = false; $('agent-editor').hidden = true; controls(); }
+  function closeEditor() { editing = null; dirty = false; $('agent-editor').hidden = true; editorError(); controls(); }
   function confirm(message, label, action) {
     confirmation = action; $('agent-confirm-message').textContent = message;
     $('agent-confirm-accept').textContent = label; $('agent-confirm').hidden = false;
@@ -132,11 +192,12 @@ export function installCustomAgentSettings({ api, document }) {
     if (!editing || !$('agent-editor').reportValidity()) return;
     const entry = { id: $('agent-id').value.trim(), name: $('agent-name').value.trim(), protocol: 'acp', command: $('agent-command').value.trim(), args: [...$('agent-args').querySelectorAll('input')].map(input => input.value) };
     const auth = $('agent-auth-method').value.trim(); if (auth) entry.authMethodId = auth;
+    editorError();
     run(async () => {
       accept(await response(api.saveCustomAgent(entry, editing.revision, editing.creating)));
       closeEditor();
       status(entry.id === (current?.provider ?? data.activeId) ? '配置已保存，当前连接保持不变。点击“重新连接”使用新配置。' : '已保存，可在列表中点击“连接”。');
-    });
+    }, message => editorError('保存失败：' + message));
   };
   $('agents-reload').onclick = () => discardThen(() => run(async () => {
     const value = await response(api.reloadCustomAgents()); accept(value);
@@ -152,13 +213,13 @@ export function installCustomAgentSettings({ api, document }) {
     if (data) return;
     run(async () => { accept(await response(api.customAgents())); status(data.error || '', !!data.error); });
   });
-  controls(); prompt();
+  list(); prompt();
   return {
     stateChanged(state) {
       const changed = current?.provider !== state.provider;
       current = state;
-      if (data && changed) { data.activeId = state.provider; data.needsReconnect = false; list(); }
-      else controls();
+      if (data && changed) { data.activeId = state.provider; data.needsReconnect = false; }
+      list();
     },
     workspaceChanged(value) {
       if (data && !busy && value.agentConfigRevision !== undefined && value.agentConfigRevision !== data.revision) status('接入配置已更新，请点击“重新读取”。当前未保存输入已保留。');

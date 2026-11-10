@@ -10,6 +10,7 @@ import catalog from '../backend/agent-catalog.cjs';
 import { populateAgentPicker } from './agent-picker.mjs';
 import { installRemoteNavigation } from './remote-ui.mjs';
 import { installComposerControls } from './composer-controls.mjs';
+import { agentConnectionHelp } from './agent-connection-help.mjs';
 
 const $ = id => document.getElementById(id);
 const api = window.companion;
@@ -201,7 +202,7 @@ function render(state) {
   const showLogin = !dots && ['authentication', 'error'].includes(state.connection);
   const loginOpened = $('login-panel').hidden && showLogin;
   $('login-panel').hidden = !showLogin;
-  $('login-help').textContent = state.loginHelp || '使用你自己的 ChatGPT 账户登录 Codex。凭据由官方 CLI 保存在本机。';
+  $('login-help').textContent = agentConnectionHelp(state);
   $('login-title').textContent = `${name} · 连接帮助`;
   $('login-button').hidden = !codex || state.connection !== 'authentication';
   $('login-reconnect').hidden = codex && state.connection === 'authentication';
