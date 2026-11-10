@@ -29,10 +29,10 @@ npm run resources
 
 这条命令按 `tools/release/resource-manifest.json` 下载基础安装包，校验 SHA-256 后以不注册安装项的方式解包到 `work/release-resources/版本号`。不下载语音模型或 CLI。源码树缺失的运行时与 Core 目录会连接到解包目录；壁纸资源递归补齐缺失文件，已有文件保留，且不写入目录联接指向的其他位置。补齐后校验动态媒体的大小与哈希，不能只因目录或清单已存在就跳过视频。请先阅读第三方许可。
 
-当前清单锁定 0.6.3-rc.3 安装包，默认从保留的同版 Release 下载；已有同版安装包时可使用下列命令，仍须通过清单的大小和 SHA-256 校验，不能换成任意安装器。它仅提供锁定的视觉/基础运行资源，不会用安装包中的应用代码覆盖当前源码或 Electron 依赖。使用候选包提供资源不代表其已完成稳定版验收。
+当前清单锁定 0.6.3-rc.4 安装包，默认从保留的同版 Release 下载；已有同版安装包时可使用下列命令，仍须通过清单的大小和 SHA-256 校验，不能换成任意安装器。它仅提供锁定的视觉/基础运行资源，不会用安装包中的应用代码覆盖当前源码或 Electron 依赖。使用候选包提供资源不代表其已完成稳定版验收。
 
 ```powershell
-npm run resources -- --installer="release/test-builds/v0.6.3-rc.3/Rin-Desktop-0.6.3-rc.3-Setup.exe"
+npm run resources -- --installer="release/test-builds/v0.6.3-rc.4/Rin-Desktop-0.6.3-rc.4-Setup.exe"
 ```
 
 资源清单在安装器生成后更新到 `main`。从 Git 标签源码归档构建时，应先使用当前 `main` 的资源清单和本说明；标签保留安装器构建时的源码记录，可能仍包含已删除 Release 的历史资源链接。
