@@ -32,7 +32,10 @@ try {
   session = await launch();
   const { workspace, wallpaper, until } = session;
   const snapshot = async () => (await workspace.evaluate('companion.workspace()')).value;
-  const saved = async () => JSON.parse(await readFile(join(session.storage, 'workspaces.json'), 'utf8')).settings;
+  const saved = async () => {
+    try { return JSON.parse(await readFile(join(session.storage, 'workspaces.json'), 'utf8')).settings; }
+    catch (error) { if (error.code === 'ENOENT') return null; throw error; }
+  };
   const original = async () => {
     assert.equal((await workspace.evaluate("companion.saveSettings({animePlayback:'poses',wallpaperMotion:false})")).ok, true);
     await until(async () => (await snapshot()).wallpaper.model === 'rin-scene' && (await snapshot()).wallpaper.phase === 'ready', 'original renderer');
@@ -40,11 +43,13 @@ try {
   await original();
   await wallpaper.evaluate(faultScript(''));
   async function fail(kind) {
+    const before = await saved();
     await wallpaper.evaluate('recoveryFault=' + JSON.stringify(kind));
     await workspace.evaluate('companion.saveSettings({wallpaperMotion:true})');
     await until(async () => (await snapshot()).wallpaper.phase === 'error', kind + ' failure');
-    assert.equal((await snapshot()).settings.wallpaperMotion, false);
-    assert.equal((await saved()).wallpaperMotion, false);
+    // A fresh profile can keep the default still mode entirely in memory.
+    assert.equal((await snapshot()).settings.wallpaperMotion ?? false, false);
+    assert.deepEqual(await saved(), before, 'failed replacement must not change persisted settings');
     const layers = await wallpaper.evaluate("({original:document.querySelectorAll('.wallpaper-puppet').length,video:document.querySelectorAll('.wallpaper-motion').length,rig:document.getElementById('wallpaper-view').dataset.rig})");
     assert.equal(layers.original, 1); assert.equal(layers.video, 0); assert.equal(layers.rig, 'scene');
     report.checks.push(kind + ': failed candidate disposed, original renderer and persisted settings retained');
