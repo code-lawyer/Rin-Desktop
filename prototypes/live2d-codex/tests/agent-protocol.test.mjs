@@ -213,6 +213,34 @@ for(const provider of ['grok','opencode','custom-fixture']) {
     if(provider==='custom-fixture')assert.throws(()=>agent.extension(ep,'x.ai/ask_user_question',{questions:[]}),/私有扩展/);
     else {assert.deepEqual(agent.extension(ep,'x.ai/ask_user_question',{questions:[]}),{outcome:'cancelled'});assert.equal(agent.extension(ep,'x.ai/hooks/run',{}).decision,'deny');}
   });
+  test(`${provider} titled multi-select forms display labels and enforce wire values and selection limits`,async t=>{
+    const {agent,peer}=await acp(t,provider);
+    await agent.send('fixture');await waitFor(()=>peer.calls.some(c=>c.method==='session/prompt'));
+    const pending=peer.request('elicitation/create',{sessionId:'session',mode:'form',message:'选择目标',requestedSchema:{
+      type:'object',required:['targets','channel'],properties:{
+        targets:{type:'array',title:'目标',minItems:2,maxItems:2,items:{anyOf:[{const:'desktop',title:'桌面'},{const:'wallpaper',title:'壁纸'},{const:'voice',title:'声音'}]}},
+        channel:{type:'string',oneOf:[{const:'test',title:'测试'},{const:'stable',title:'稳定'}]},
+        optional:{type:'array',items:{type:'string',enum:['keep','cache']}},
+      },
+    }});
+    await waitFor(()=>agent.pending.size===1);
+    const approval=agent.state.approvals[0], id=approval.id;
+    assert.equal(approval.questions[0].multiSelect,true);
+    assert.deepEqual(approval.questions.map(q=>q.options),[
+      [{label:'桌面',value:'desktop'},{label:'壁纸',value:'wallpaper'},{label:'声音',value:'voice'}],
+      [{label:'测试',value:'test'},{label:'稳定',value:'stable'}],
+      [{label:'keep',value:'keep'},{label:'cache',value:'cache'}],
+    ]);
+    for(const targets of [['desktop','unknown'],['桌面','wallpaper'],['desktop'],['desktop','wallpaper','voice']]) {
+      await assert.rejects(agent.respond(id,{answers:{targets,channel:'test'}}),/选项/);
+      assert.equal(agent.pending.size,1,'invalid input leaves the same question available for correction');
+    }
+    await assert.rejects(agent.respond(id,{answers:{targets:['desktop','wallpaper'],channel:'测试'}}),/选项/);
+    await assert.rejects(agent.respond(id,{answers:{targets:['desktop','wallpaper'],channel:'test',optional:['unknown']}}),/选项/);
+    await agent.respond(id,{answers:{targets:['desktop','wallpaper'],channel:'test'}});
+    assert.deepEqual(await pending,{action:'accept',content:{targets:['desktop','wallpaper'],channel:'test'}});
+    assert.equal(agent.pending.size,0);
+  });
   test(`${provider} process exit rejects an outstanding prompt and produces no successful completion`,async t=>{
     const {agent,peer}=await acp(t,provider), replies=[];agent.on('reply-completed',r=>replies.push(r));await agent.send('fixture');await waitFor(()=>peer.calls.some(c=>c.method==='session/prompt'));
     const run=agent.run;peer.drop();await run;assert.equal(agent.state.connection,'error');assert.equal(agent.state.messages.at(-1).turnStatus,'failed');assert.equal(replies.length,0);

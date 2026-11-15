@@ -141,15 +141,17 @@ async function confirmWallpaper(info) {
   const requested = wallpaperStatus;
   const rendererKind = info?.wallpaperKind || 'artwork';
   const wallpaperMotion = info?.wallpaperMotion === true;
-  const matches = info?.character === requested.character && info.requestId === requested.requestId && rendererKind === (requested.wallpaperKind || 'artwork') && wallpaperMotion === (requested.wallpaperMotion === true);
+  const animePlayback = info?.animePlayback ?? 'poses';
+  const matches = info?.character === requested.character && info.requestId === requested.requestId && rendererKind === (requested.wallpaperKind || 'artwork') && wallpaperMotion === (requested.wallpaperMotion === true) && animePlayback === 'poses';
   if (info?.error) {
     if (!matches) return false;
     cancelWallpaperCommit();
     wallpaperStatus = { ...requested, phase: 'error', errorFrameRevision: info.frameRevision,
-      error: info.model === 'motion-clips' ? '动态壁纸未能继续播放，已保留当前画面和声线。请重试加载或切换壁纸风格。' : '壁纸未能载入，已保留原画面和声线设置。' };
+      error: info.model === 'motion-clips' ? '动态壁纸未能继续播放，已保留当前画面和声线。请重试加载或切换壁纸风格。' : '壁纸未能载入，已保留原画面和声线设置。请重试加载。' };
     notifyWorkspace(); return false;
   }
   if (info?.ready !== true || !isWallpaperKind(rendererKind) || !isCharacter(info.character) || !Number.isSafeInteger(info.requestId)) return false;
+  if (!matches) return false;
   if (wallpaperCommit) {
     if (wallpaperCommit.requestId === info.requestId) return wallpaperCommit.character === info.character ? wallpaperCommit.promise : false;
     const pending = wallpaperCommit.promise; cancelWallpaperCommit(); await pending;
@@ -162,8 +164,8 @@ async function confirmWallpaper(info) {
   const commit = { requestId: info.requestId, character: info.character, requested, cancelled: false }; wallpaperCommit = commit;
   commit.promise = (async () => {
     try {
-      if (info.character !== store.data.settings.character || rendererKind !== store.data.settings.wallpaperKind || wallpaperMotion !== (store.data.settings.wallpaperMotion === true)) {
-        commit.prepared = await store.prepareSettings({ character: info.character, wallpaperKind: rendererKind, wallpaperMotion });
+      if (info.character !== store.data.settings.character || rendererKind !== store.data.settings.wallpaperKind || wallpaperMotion !== (store.data.settings.wallpaperMotion === true) || animePlayback !== (store.data.settings.animePlayback ?? 'poses')) {
+        commit.prepared = await store.prepareSettings({ character: info.character, wallpaperKind: rendererKind, wallpaperMotion, animePlayback });
       }
       if (commit.cancelled || wallpaperStatus !== requested) { commit.cancelled = true; commit.prepared?.cancel(); return false; }
       commit.ready = true;
@@ -216,7 +218,7 @@ function finishWallpaper(info, accept) {
 function recoverWallpaperRenderer() {
   if (!wallpaperMode || !ambientBarrier.stopped || !avatar || avatar.isDestroyed()) return;
   if (wallpaperStatus.phase === 'error') wallpaperStatus = { phase: 'loading', character: wallpaperStatus.character,
-    wallpaperKind: wallpaperStatus.wallpaperKind || 'artwork', wallpaperMotion: wallpaperStatus.wallpaperMotion, requestId: wallpaperStatus.requestId + 1 };
+    wallpaperKind: wallpaperStatus.wallpaperKind || 'artwork', wallpaperMotion: wallpaperStatus.wallpaperMotion, animePlayback: wallpaperStatus.animePlayback, requestId: wallpaperStatus.requestId + 1 };
   lastPresentation = '';
   avatar.webContents.reload();
 }
@@ -357,7 +359,7 @@ else {
   app.whenReady().then(async () => {
     if (startupStorageError) throw startupStorageError;
     console.info('[companion:startup]', 'ready');
-    if (argument('wallpaper') && argument('wallpaper') !== 'artwork') throw new Error('视频壁纸路线已停用，请使用原画壁纸入口。');
+    if (argument('wallpaper') && argument('wallpaper') !== 'artwork') throw new Error('该壁纸启动参数已停用，请从默认入口启动并在工作台选择播放方式。');
     const { createMotionMedia } = await import(pathToFileURL(join(root, 'backend/motion-media.mjs')).href);
     const motionMedia = await createMotionMedia(join(root, 'assets/motion/female'));
     protocol.handle('app', async request => {
@@ -396,6 +398,7 @@ else {
     wallpaperStatus.character = store.data.settings.character;
     wallpaperStatus.wallpaperKind = store.data.settings.wallpaperKind || 'artwork';
     wallpaperStatus.wallpaperMotion = store.data.settings.wallpaperMotion === true;
+    wallpaperStatus.animePlayback = 'poses';
     const { VoiceResources, MODEL_FOLDERS } = await import(pathToFileURL(join(root, 'backend/voice-resources.mjs')).href);
     const { upstreamProxyEnvironment } = await import(pathToFileURL(join(root, 'backend/voice-runtime.mjs')).href);
     const { activateVoiceResource } = await import(pathToFileURL(join(root, 'backend/voice-activation.mjs')).href);
@@ -640,7 +643,7 @@ else {
       if (choice) cancelWallpaperCommit();
       // Character selection is a load request; a decoded frame must commit its
       // settings before the renderer replaces the currently visible canvas.
-      if (choice) { patch = { ...patch }; delete patch.character; delete patch.wallpaperKind; delete patch.wallpaperMotion; }
+      if (choice) { patch = { ...patch }; delete patch.character; delete patch.wallpaperKind; delete patch.wallpaperMotion; delete patch.animePlayback; }
       const previous = store.data.settings;
       const changesEngine = ['ttsResident','ttsEngine','qwenRoot'].some(key => key in patch && patch[key] !== previous[key]);
       if (voiceResources.active && changesEngine) throw new Error('模型正在准备，请先取消下载或等待载入完成。');

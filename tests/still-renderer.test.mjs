@@ -13,12 +13,12 @@ const source = (await readFile(new URL('../prototypes/live2d-codex/renderer/stil
   .replace(/^import .*;\r?\n/gm, '').replace('export async function', 'async function');
 const tick = () => new Promise(resolve => setImmediate(resolve));
 
-async function fixture(t, { reload = true, pose = 'work' } = {}) {
+async function fixture(t, { reload = true, pose = 'work', legacyVideo = false, realistic = false, motionPreparation = {} } = {}) {
   let receive, release, waiting = true;
-  const ready = [], reports = [], decisions = [], draws = [], requests = [], puppets = [], events = new Map();
+  const ready = [], reports = [], decisions = [], draws = [], requests = [], puppets = [], motions = [], events = new Map();
   const context = { drawImage(...args) { draws.push(args); }, createLinearGradient: () => ({ addColorStop() {} }), fillRect() {} };
   const host = { dataset: {}, clientWidth: 1280, clientHeight: 800, append() {} };
-  const initial = { character: 'female', characterRequest: 0, paused: false, stills: { stillPose: pose, ambienceEnabled: false } };
+  const initial = { character: 'female', characterRequest: 0, paused: false, stills: { stillPose: pose, ambienceEnabled: false, wallpaperMotion: realistic, animePlayback: legacyVideo ? 'video' : 'poses' } };
   const document = { hidden: false, createElement: () => ({ getContext: () => context, remove() {} }), addEventListener: (name, fn) => events.set(name, fn), removeEventListener() {} };
   const api = {
     onPresentation(fn) { receive = fn; return () => {}; }, presentation: async () => ({ ok: true, value: initial }),
@@ -27,6 +27,15 @@ async function fixture(t, { reload = true, pose = 'work' } = {}) {
     finishWallpaper(info, accept) { decisions.push([info.character, accept]); return { ok: true, value: accept }; },
   };
   const runtime = vm.createContext({ StillSequence, characters, stillSettings, stillPose, puppetPose, puppetActivity, createIdleCycle, idleDuration, stillActivity, console, document,
+    loadMotionCatalog: async () => ({ posters: { work: 'app://local/assets/motion/female/work.png' } }),
+    MotionWallpaper: class {
+      static async prepare() {
+        await motionPreparation.wait;
+        if (motionPreparation.error) throw new Error(motionPreparation.error);
+        const layer = new this(); motions.push(layer); return layer;
+      }
+      ready = true; start() { this.started = true; } update() {} close() { this.closed = true; }
+    },
     performance: { now: () => 0 }, setTimeout: () => 1, clearTimeout() {}, window: { devicePixelRatio: 1, addEventListener() {}, removeEventListener() {} },
     Image: class { get naturalWidth() { return this.src.includes('female-v2-4k') ? 3840 : 1586; } get naturalHeight() { return this.src.includes('female-v2-4k') ? 2400 : 992; } decode() { requests.push(this.src); return Promise.resolve(); } },
     ResizeObserver: class { observe() {} disconnect() {} },
@@ -41,10 +50,51 @@ async function fixture(t, { reload = true, pose = 'work' } = {}) {
   vm.runInContext(source, runtime);
   const app = await runtime.startStillWallpaper({ host, api }); t.after(() => app.destroy()); await tick();
   let current = initial;
-  const present = patch => { current = { ...current, ...patch }; receive(current); };
+  const present = patch => { current = { ...current, ...patch, stills: { ...current.stills, ...patch.stills } }; receive(current); };
   if(reload) { present({ character: 'female', characterRequest: 1 }); await tick(); }
-  return { host, ready, reports, draws, requests, decisions, puppets, present, app, release: () => release(), hide(value) { document.hidden = value; events.get('visibilitychange')(); } };
+  return { host, ready, reports, draws, requests, decisions, puppets, motions, present, app, release: () => release(), hide(value) { document.hidden = value; events.get('visibilitychange')(); } };
 }
+
+test('realistic decoder failure cannot commit or close the working original renderer', async t => {
+  const preparation = { error: 'video decode failed' };
+  const h = await fixture(t, { reload: false, motionPreparation: preparation });
+  const committed = h.decisions.length;
+  h.present({ characterRequest: 1, stills: { wallpaperMotion: true } }); await tick();
+  assert.equal(h.decisions.length, committed); assert.equal(h.puppets[0].closed, undefined);
+  assert.equal(h.host.dataset.rig, 'scene'); assert.equal(h.reports.at(-1).ready, false);
+  preparation.error = ''; h.present({ characterRequest: 2 }); await tick(); h.release(); await tick();
+  assert.equal(h.decisions.at(-1)[1], true); assert.equal(h.motions[0].started, true); assert.equal(h.puppets[0].closed, true);
+});
+
+for (const failure of ['video decode failed', 'initial play failed']) test(`saved realistic mode paints its poster after ${failure} on first launch and permits retry`, async t => {
+  const preparation = { error: failure };
+  const h = await fixture(t, { reload: false, realistic: true, motionPreparation: preparation });
+  assert.equal(h.reports.at(-1).ready, false); assert.equal(h.reports.at(-1).wallpaperMotion, true);
+  assert.match(h.requests[0], /motion\/female\/work\.png/);
+  assert.ok(h.draws.length >= 2, 'the decoded poster is composed and painted into the visible canvas');
+  assert.equal(h.decisions.length, 0); assert.equal(h.puppets.length, 0);
+  preparation.error = ''; h.present({ characterRequest: 1 }); await tick(); h.release(); await tick();
+  assert.equal(h.decisions.at(-1)[1], true); assert.equal(h.motions[0].started, true); assert.equal(h.host.dataset.rig, 'motion');
+});
+
+test('a decoded realistic candidate that fails while saving is discarded before commit', async t => {
+  const h = await fixture(t, { reload: false });
+  h.present({ characterRequest: 1, stills: { wallpaperMotion: true } }); await tick();
+  h.motions[0].ready = false; h.release(); await tick();
+  assert.equal(h.decisions.at(-1)[1], false); assert.equal(h.puppets[0].closed, undefined);
+  assert.equal(h.motions[0].closed, true); assert.equal(h.motions[0].started, undefined);
+});
+
+test('a changed style request disposes its late decoded video without saving or playing it', async t => {
+  const preparation = Promise.withResolvers();
+  const h = await fixture(t, { reload: false, motionPreparation: { wait: preparation.promise } });
+  h.present({ characterRequest: 1, stills: { wallpaperMotion: true } }); await tick();
+  assert.equal(h.motions.length, 0); assert.equal(h.puppets[0].closed, undefined);
+  h.present({ characterRequest: 2, stills: { wallpaperMotion: false } }); preparation.resolve(); await tick();
+  assert.equal(h.motions[0].closed, true); assert.equal(h.motions[0].started, undefined);
+  assert.equal(h.decisions.length, 1); h.release(); await tick();
+  assert.equal(h.host.dataset.rig, 'scene');
+});
 
 test('wallpaper fault injection matches actual anime requests and only approved realistic poster routes', async t => {
   const h=await fixture(t);
@@ -52,6 +102,15 @@ test('wallpaper fault injection matches actual anime requests and only approved 
   for(const url of h.requests)assert.equal(isCharacterImageRequest(url,'anime'),true);
   assert.equal(isCharacterImageRequest('app://local/assets/motion/female/work.png?attempt=1','realistic'),true);
   for(const url of ['app://local/assets/stills/male/work.png','https://local/assets/stills/female-v2-4k/work.png','app://local/assets/ambience/rain.mp3'])for(const style of ['anime','realistic'])assert.equal(isCharacterImageRequest(url,style),false);
+});
+
+test('legacy anime video input loads original poses without requesting the withdrawn media', async t => {
+  const h = await fixture(t, { reload: false, legacyVideo: true, pose: 'window' });
+  assert.equal(h.reports.at(-1).ready, true); assert.equal(h.reports.at(-1).animePlayback, 'poses');
+  assert.equal(h.reports.at(-1).model, 'rin-scene'); assert.equal(h.reports.at(-1).pose, 'window');
+  assert.match(h.requests[0], /female-v2-4k\/attention\.png/);
+  assert.equal(h.requests.some(url => url.includes('/motion/anime/')), false);
+  assert.equal(h.decisions.at(-1)[1], true); assert.equal(h.puppets.length, 1); assert.equal(h.motions.length, 0);
 });
 
 test('anime states reuse one scene and preserve its full-size original loading fallback', async t => {

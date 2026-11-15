@@ -2,6 +2,27 @@
 
 Windows x64，Node.js 24 或更高，npm，Inno Setup 6.7.3。安装器构建使用官方 Inno Setup 编译器；通过 `INNO_ISCC` 指定 `ISCC.exe` 的绝对路径。
 
+## 目录约定
+
+| 目录 | 用途 |
+| --- | --- |
+| `prototypes/live2d-codex` | 当前主应用，路径为兼容现有入口保留；本机 `models`、`runtime`、`vendor` 与依赖保持原位 |
+| `prototypes/video-companion` | 主应用仍在复用的播放器及媒体预览 |
+| `prototypes/live2d-halfbody` | 保留的半身预览源码 |
+| `prototypes/qwen-tts-evaluation`、`prototypes/dots-bridge` | 本机语音环境与私人桥接，保持原位，不进入公开源码 |
+| `docs` | 当前维护的使用、构建、隐私、许可与支持说明 |
+| `tools`、`tests` | 维护中的构建、素材制作、验证工具及回归测试 |
+| `artwork` | 原始美术与制作输入，保持原位 |
+| `work/runtime` | 源码运行数据与设备环境，主应用数据仍为 `work/runtime/avatar` |
+| `work/qa` | 源码验证输出，默认按类别与独立运行分层。支持 `--output` 的命令可指定其下的新目录。报告和素材输入不能视作通用缓存删除 |
+| `work/release-build/tools`、`work/release-resources` | 打包编译器及锁定的基础运行资源 |
+| `work/archive` | 本机历史文档、研究、旧安装器与构建产物；归档脚本仅供追溯，操作使用当前根命令 |
+| `release` | 当前候选安装包与第三方对应源码；旧安装器集中保存在本机归档中 |
+
+清理时可移除已保留安装器的重复展开包及可重建缓存；先确认没有运行进程、目录联接或资源引用。模型、运行环境、用户数据、原始美术和私人 Dots 保持原位。
+
+## 准备与验证
+
 ```powershell
 npm ci
 npm --prefix prototypes/live2d-codex ci
@@ -11,17 +32,23 @@ npm test
 npm run build
 ```
 
-单元测试和前端构建不需要语音模型。Windows 设备组件可执行 `npm run qa:remote-component` 编译并检查管道，不访问设备。源码初次连接时自动准备组件；打包脚本预编译到 runtime，使用 Windows 自带 .NET Framework 4.8 和 WinMetadata，不依赖 Python 或 Windows SDK。用户自行安装所选 Agent 的 Windows 原生 CLI：Codex、Claude Code、Grok Build 或 OpenCode V2。新版协议依赖锁定在应用目录的 `package-lock.json`；发布脚本收集 SDK 及必要依赖，不打包 CLI 程序或账号。新增 Agent 的使用和手动验收见 [CLI Agent 说明](../prototypes/live2d-codex/CLI-AGENTS.md)；基础构建通过不等于新增后端完成主应用验收，当前范围见[项目状态](project-status.md)。应用的 Node 运行时、默认女性壁纸与 Cubism Core 从锁定的基础安装包获取。当前壁纸使用 `assets/scene/rin-poses` 完整姿态、`assets/motion/female` 真人视频，并保留 `assets/stills` 兼容素材与回退图；男士资源已删除，旧安装包恢复工具会过滤它们，打包保留兼容女生素材并明确排除男士资源。
+单元测试和前端构建不需要语音模型。Windows 设备组件可执行 `npm run qa:remote-component` 编译并检查管道，不访问设备。源码初次连接时自动准备组件；打包脚本预编译到 runtime，使用 Windows 自带 .NET Framework 4.8 和 WinMetadata，不依赖 Python 或 Windows SDK。用户自行安装所选 Agent 的 Windows 原生 CLI：Codex、Claude Code、Grok Build 或 OpenCode V2。新版协议依赖锁定在应用目录的 `package-lock.json`；发布脚本收集 SDK 及必要依赖，不打包 CLI 程序或账号。新增 Agent 的使用和手动验收见 [CLI Agent 说明](../prototypes/live2d-codex/CLI-AGENTS.md)；基础构建通过不等于新增后端完成主应用验收，当前范围见[项目状态](project-status.md)。应用的 Node 运行时、默认女性壁纸与 Cubism Core 从锁定的基础安装包获取。正式壁纸仅使用 `assets/scene/rin-poses` 动漫原画姿态与 `assets/motion/female` 真人视频，并保留 `assets/stills` 兼容素材与回退图；男士资源已删除，旧安装包恢复工具会过滤它们，打包保留兼容女生素材并明确排除男士资源。
 
 RC003 输入层还使用锁定的 Koffi 3.3.3 和 `@koromix/koffi-win32-x64` 预编译包，通过上述 npm 安装。不要省略 Windows 本平台的 optional dependency。打包脚本显式复制该原生包及许可，并在输出目录加载输入模块；组件检查还在独立副本中用 Electron 的 Node 模式核对加载。连接、按钮设置、麦克风和待验收范围见 [项目状态](project-status.md)。
 
-动漫动态角色使用自有 WebGL2 完整姿态渲染器。运行素材位于 `assets/scene/rin-poses`，已经随源码提供，普通构建不需要生成工具或在线账户。维护者重建素材可使用 `npm run art:pose-avatar -- --run`；检查输出后加 `--install` 写入运行资源目录。输入与素材条款见[完整姿态说明](../prototypes/live2d-codex/assets/scene/rin-poses/README.md)。Sharp 仅用于构建素材，不随应用运行。旧 `rin` 目录和骨骼制作工具保留作为源文件，不在当前主应用中加载或打包。
+`assets/motion/anime` 的动漫动作视频仅保留为本地实验素材；正式入口不加载它们，打包不要求或复制这些媒体及实验播放器。已有原图、视频、提示词和通用模型输入包保持原位。详见[实验素材说明](../prototypes/live2d-codex/assets/motion/anime/README.md)。
+
+动漫原画姿态使用自有 WebGL2 渲染器，`assets/scene/rin-poses` 素材随源码提供并继续打包。维护者重建可使用 `npm run art:pose-avatar -- --run`，检查后加 `--install`；输入与条款见[完整姿态说明](../prototypes/live2d-codex/assets/scene/rin-poses/README.md)。Sharp 仅用于制作素材。旧 `rin` 目录和骨骼制作工具保留作为源文件，不在主应用加载。
+
+构建后运行 `npm run qa:wallpaper-modes -- --run`，在隔离 Electron 中核对旧动漫视频设置兼容、五姿态、真人视频切换与暂停、新进程恢复及声线/项目/草稿保留。输出进入 `work/qa/wallpaper-modes`，使用实际素材与合成后端，不连接账户或挂载日用桌面。
 
 执行 `npm run test:puppet` 与 `npm run test:poses` 验证口型包络、播放所有权、素材完整性、全部姿态组合、唤醒中断和快速改选。`npm run qa:poses -- --run` 生成约 22 秒切换样片和表情帧，在真实 WebGL 中检查固定背景、身体像素不受表情影响、零透明度时完全退场，以及像素转场的原画端点、完全消隐、背景固定和可见马赛克差异；需要本机 FFmpeg。加 `--stills` 只生成检查帧，不需要 FFmpeg。构建后执行 `npm run qa:puppet -- --run`，在隔离 Electron 中操作五个姿态按钮，检查唤醒与恢复、暂停、减少动态效果、合成 PCM 口型、素材失败、反复重载及 WebGL 丢失恢复。输出位于 `work/qa/pose-visual` 与 `work/qa/puppet-desktop`，还需观看实际效果，不能用测试通过代替美术验收。这些检查不调用账户、摄像头、麦克风或真实语音模型。打包入口校验原画、完整人物贴图和表情区域，拒绝缺失、路径越界、无效配置、尺寸及哈希不符；仅复制运行文件白名单与素材条款。
 
 需要比较切换节奏时，运行 `npm run qa:pose-options -- --run`。它使用相同原画渲染四种候选淡化，输出单独视频与同步四格对照至 `work/qa/pose-transition-options`。增加 `--cyber` 可生成像素、竖条、点阵和故障效果的 Canvas2D 转场原型，输出至 `work/qa/pose-cyber-options`。应用使用已选定的 A 像素重组，默认 1.1 秒分解、0.1 秒停顿、1.6 秒聚合；对照工具不会更改这些参数。这是独立视觉对照工具，需要本机 FFmpeg。
 
 构建内部测试包后，运行 `npm run qa:release-package -- --package=<包目录>` 核对全部字节、源码与许可，再运行 `npm run qa:puppet-package -- --run --package=<包目录>`。后者启动真正的测试包主程序，使用隔离数据与明确不可用的 CLI，不连接账户、不把测试壁纸挂到日用桌面；验证两种风格、声线、正常退出与新进程恢复。安装器可用 `/PORTABLE=1` 解包到新验证目录后再运行这些检查；这不等于新机器注册安装、卸载或物理显示验收。
+
+真人视频的切换失败回退使用 `npm run qa:wallpaper-recovery -- --run --package=<测试包目录>`：在隔离渲染器中分别注入真实解码错误和首次播放失败，确认原画面与已保存设置不变，再验证显式重试和新进程恢复。测试不改写实际媒体，不连接账户或设备，输出在 `work/qa/wallpaper-recovery-package`。
 
 ```powershell
 npm run resources

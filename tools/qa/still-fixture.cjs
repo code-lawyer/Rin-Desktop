@@ -11,6 +11,7 @@ if(!output || !resolve(output).startsWith(join(root,'work','qa')+sep))throw new 
 const actualMotion=process.argv.includes('--actual-motion');
 const puppetRun=process.argv.includes('--puppet');
 const characterRestore=process.argv.includes('--character-restore');
+const modesRun=process.argv.includes('--wallpaper-modes'), modesRestore=process.argv.includes('--wallpaper-modes-restore');
 mkdirSync(output,{recursive:true});app.setPath('userData',join(output,'profile'));
 // Asset preparation itself has a 15s bound. Give the real renderer enough
 // time to report that failure even when other QA windows occupy the GPU.
@@ -25,7 +26,7 @@ let wallpaperStatus={phase:'loading',character:'female',requestId:0};
 const state={provider:'codex',connection:'ready',status:'idle',cwd:output,projectName:'Example',threadId:'fixture-thread',threadName:'本地验证',models:[],messages:[{role:'assistant',text:'这是离线验证的完整回复。',complete:true}],approvals:[],activity:''};
 const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 const js=(win,code)=>win.webContents.executeJavaScript(code);
-const sendPresentation=()=>{present.stills={...store.data.settings,wallpaperMotion:wallpaperStatus.wallpaperMotion ?? store.data.settings.wallpaperMotion===true};if(wallpaper&&!wallpaper.isDestroyed()&&!wallpaper.webContents.isCrashed())wallpaper.webContents.send('companion:presentation',present);};
+const sendPresentation=()=>{present.stills={...store.data.settings,wallpaperMotion:wallpaperStatus.wallpaperMotion ?? store.data.settings.wallpaperMotion===true,animePlayback:wallpaperStatus.animePlayback ?? store.data.settings.animePlayback};if(wallpaper&&!wallpaper.isDestroyed()&&!wallpaper.webContents.isCrashed())wallpaper.webContents.send('companion:presentation',present);};
 let remote;
 const snapshot=()=>({...store.snapshot(),version,speech:{phase:'ready',asr:true,engine:'qwen',engines:{qwen:true,kokoro:true}},remote,wallpaper:wallpaperStatus,ambience:ambient,wallpaperPaused:present.paused,resources:{phase:'idle',packs:[]},shortcutErrors:[]});
 const notify=()=>{version++;sendPresentation();for(const w of [chat,workbench])if(w&&!w.isDestroyed())w.webContents.send('workbench:state',snapshot());};
@@ -42,9 +43,17 @@ app.whenReady().then(async()=>{
   const {remoteSettings}=await import(pathToFileURL(join(application,'backend/remote-config.mjs')).href);
   remote={phase:'disconnected',audio:'idle',config:remoteSettings(),devices:[],keysAvailable:false};
   store=new WorkspaceStore(join(output,'data'),{io:{...fs,open:async(path,...args)=>{if(prepareGate&&path.endsWith('workspaces.json.tmp'))await prepareGate;return fs.open(path,...args);},renameSync:(from,to)=>{if(persistFault&&to.endsWith('workspaces.json'))throw Object.assign(new Error('fixture disk full'),{code:'ENOSPC'});renameSync(from,to);},rename:async(from,to)=>{if(persistFault&&to.endsWith('workspaces.json'))throw Object.assign(new Error('fixture disk full'),{code:'ENOSPC'});return fs.rename(from,to);}}});await store.load();
-  if(!characterRestore) { await store.add(output);await store.updateSettings({ttsResident:true,ttsEngine:'qwen',qwenVoice:'Vivian',voice:48,playbackVolume:.8}); }
+  if(!characterRestore && !modesRestore) { await store.add(output);await store.updateSettings({ttsResident:true,ttsEngine:'qwen',qwenVoice:'Vivian',voice:48,playbackVolume:.8}); }
+  if(modesRun) {
+    await store.saveDraft({cwd:output,provider:'codex',threadId:null}, 'Preserve the rollback draft');
+    await store.updateSettings({stillPose:'window'});
+    const legacy=JSON.parse(await fs.readFile(store.file,'utf8'));legacy.settings.animePlayback='video';
+    const bytes=JSON.stringify(legacy);await fs.writeFile(store.file,bytes);await store.load();
+    assert.equal(store.data.settings.animePlayback,'poses');assert.equal(await fs.readFile(store.file,'utf8'),bytes);
+    checks.push('legacy anime video selection loads original poses without rewriting the saved file');
+  }
   present.character=store.data.settings.character;present.stills=store.data.settings;
-  wallpaperStatus={phase:'loading',character:present.character,wallpaperMotion:store.data.settings.wallpaperMotion===true,requestId:0};
+  wallpaperStatus={phase:'loading',character:present.character,wallpaperMotion:store.data.settings.wallpaperMotion===true,animePlayback:store.data.settings.animePlayback,requestId:0};
   const mainSource=readFileSync(join(application,'main.cjs'),'utf8');
   const commitContext=vm.createContext({store,appliedWallpaperRequest:-1,wallpaperCommit:null,setTimeout,clearTimeout,presentation:()=>present,
     isCharacter:require(join(application,'backend/character-profiles.cjs')).isCharacter,
@@ -56,6 +65,7 @@ app.whenReady().then(async()=>{
   const barrier=new AmbientBarrier({publish(revision){present.ambientRevision=revision;sendPresentation();}});
   const {createMotionMedia}=await import(pathToFileURL(join(application,'backend/motion-media.mjs')).href);
   const motionMedia=await createMotionMedia(join(output,'media'));
+  const withdrawnRequests=[];
   const {isCharacterImageRequest}=await import(pathToFileURL(join(__dirname,'character-asset-probe.mjs')).href);
   protocol.handle('app',async request=>{
     const path=decodeURIComponent(new URL(request.url).pathname);
@@ -66,6 +76,7 @@ app.whenReady().then(async()=>{
       return new Response('',{status:404});
     }
     if(blocked&&path.includes(blocked))return new Response('',{status:404});
+    if(path.startsWith('/assets/motion/anime/')){withdrawnRequests.push(path);return new Response('',{status:404});}
     if(process.argv.includes('--motion')&&path.startsWith('/assets/motion/'))return motionMedia.respond(request);
     const file=resolve(application,'.'+path);if(!file.startsWith(application+sep))return new Response('',{status:403});
     return net.fetch(pathToFileURL(file).href);
@@ -80,12 +91,12 @@ app.whenReady().then(async()=>{
   vm.runInContext(mainSource.slice(mainSource.indexOf('    let lastMouthAt ='),mainSource.indexOf("    handler('wallpaper:control'")),mouthContext);
   handler('speech:capture',async(_e,target)=>{present.capturing=!!target;if(target)await barrier.wait();else sendPresentation();});
   handler('companion:window',(_e,action)=>{if(action==='show-chat'||action==='recall-chat'){present.chatVisible=true;chat.show();}else if(action==='workbench'){present.chatVisible=false;chat.hide();workbench.show();}sendPresentation();});
-  handler('wallpaper:control',(_e,action,value)=>{if(action==='pause')present.paused=value;else if(action==='gesture')throw Error('单次骨骼动作已停用');else{present.ambientRetry++;commitContext.recoverWallpaperRenderer();}notify();return snapshot();});
+  handler('wallpaper:control',(_e,action,value)=>{if(action==='pause')present.paused=value;else if(action==='gesture')throw Error('单次骨骼动作已停用');else if(action==='retry-audio'){present.ambientRetry++;commitContext.recoverWallpaperRenderer();}else throw Error('壁纸操作无效');notify();return snapshot();});
   handler('wallpaper:commit',async(_e,info)=>{const result=await commitContext.confirmWallpaper(info);if(commitReplyGate)await commitReplyGate;return result;});
   ipcMain.on('wallpaper:finish',(event,info,accept)=>{event.returnValue={ok:true,value:commitContext.finishWallpaper(info,accept)};});
   handler('workbench:settings',async(_e,patch)=>{
     const choice=require(join(application,'backend/wallpaper-choice.cjs')).wallpaperChoice(patch,store.data.settings);
-    if(choice){commitContext.cancelWallpaperCommit();present.character=choice.character;present.characterRequest++;wallpaperStatus={phase:'loading',...choice,requestId:present.characterRequest};patch={...patch};delete patch.character;delete patch.wallpaperKind;delete patch.wallpaperMotion;}
+    if(choice){commitContext.cancelWallpaperCommit();present.character=choice.character;present.characterRequest++;wallpaperStatus={phase:'loading',...choice,requestId:present.characterRequest};patch={...patch};delete patch.character;delete patch.wallpaperKind;delete patch.wallpaperMotion;delete patch.animePlayback;}
     if(Object.keys(patch).length)await store.updateSettings(patch);notify();return snapshot();
   });
   ipcMain.on('wallpaper:ambient-applied',(_e,revision)=>{acknowledgements.push(revision);barrier.acknowledge(revision);});
@@ -104,6 +115,12 @@ app.whenReady().then(async()=>{
   vm.runInContext(mainSource.slice(mainSource.indexOf('function recoverWallpaperRenderer('),mainSource.indexOf('function switchAllowed()')),commitContext);
   const host="document.getElementById('wallpaper-view')";
   await until(wallpaper,host+".dataset.ready==='true'");
+  if(modesRun || modesRestore) {
+    await require('./wallpaper-modes-cases.cjs')({wallpaper,chat,workbench,host,store,present,checks,js,until,delay,capture,notify,restore:modesRestore,withdrawnRequests,output});
+    assert.deepEqual(errors,[]);
+    writeFileSync(join(output,modesRestore?'modes-restore.json':'modes.json'),JSON.stringify({checks,errors,actualMedia:true,accounts:false,hardware:false},null,2));
+    barrier.close();for(const win of windows)win.destroy();app.exit(0);return;
+  }
   if(puppetRun) {
     chat.webContents.setAudioMuted(true);
     wallpaper.webContents.setAudioMuted(true);

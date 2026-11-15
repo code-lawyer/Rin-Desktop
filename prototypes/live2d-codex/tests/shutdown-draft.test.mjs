@@ -64,7 +64,7 @@ async function fixture({ autoFlush = true, hasRenderer = true, crashed = false }
     api: { onDraftFlush: fn => rendererEvents.set('draft:flush', fn), onDraftFlushCancelled: fn => rendererEvents.set('draft:flush-cancelled', fn),
       draftFlushed: (id, result) => ipcEvents.get('draft:flushed')(event, id, result) },
     speechControls: { cancelCapture: async () => events.push('capture-cancelled') }, composerControls: { refresh() {} },
-    error: message => errors.push(message), growPrompt() {}, saveDraft: () => drafts.save(),
+    error: message => errors.push(message), refreshComposer() {}, saveDraft: () => drafts.save(),
     setTimeout: callback => { const id = ++timerId; inputTimers.set(id, callback); return id; }, clearTimeout: id => inputTimers.delete(id),
   });
   vm.runInContext(rendererSource + '\ninstallDraftShutdown();\n' + inputSource, renderer);

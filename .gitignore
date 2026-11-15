@@ -37,6 +37,10 @@ prototypes/live2d-codex/assets/motion/*
 prototypes/live2d-codex/assets/motion/female/*
 !prototypes/live2d-codex/assets/motion/female/manifest.json
 !prototypes/live2d-codex/assets/motion/female/README.md
+!prototypes/live2d-codex/assets/motion/anime/
+prototypes/live2d-codex/assets/motion/anime/*
+!prototypes/live2d-codex/assets/motion/anime/manifest.json
+!prototypes/live2d-codex/assets/motion/anime/README.md
 prototypes/live2d-codex/vendor/
 prototypes/live2d-codex/README.md
 prototypes/live2d-codex/THIRD_PARTY.md

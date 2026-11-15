@@ -71,9 +71,9 @@ export class SubmissionGuard extends EventEmitter {
       await this.store.add(target.cwd);
       await this.store.transaction(data => {
         data.submissions ??= {};
-        // Save before invoking any Agent code, even if the renderer has not
-        // delivered its debounced draft write yet.
-        this.store.setDraft(data, target, text);
+        // The renderer may already have saved newer input before this call, or
+        // while the project check was pending. Preserve that draft slot; the
+        // independent journal retains the submitted text before dispatch.
         data.submissions[provider] = { id, status: 'pending', text, target, originalTarget: target, createdAt: Date.now() };
       });
       this.publish(provider);

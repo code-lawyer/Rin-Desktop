@@ -1,13 +1,17 @@
 # 验证工具
 
-普通回归运行 `npm test`，不连接真实账户或硬件。下表标有 `--run` 的入口默认帮助，需要显式运行；其余验证命令会直接执行，数据恢复命令则默认只预览。输出统一写入新的 `work/qa` 子目录，不覆盖既有运行。先按 [构建说明](../../docs/build.md) 准备所需资源。视觉检查同时验证紧凑审批中的操作与目录可见性、前文展开和恢复；扩展模式还检查窄工作台的导航开关、焦点恢复和宽窗口恢复。
+普通回归运行 `npm test`，不连接真实账户或硬件。下表标有 `--run` 的入口默认帮助，需要显式运行；其余验证命令会直接执行，数据恢复命令则默认只预览。先按 [构建说明](../../docs/build.md) 准备所需资源。视觉检查验证最小气泡的输入区可见、审批中的操作和目录可见，以及前文展开、恢复和停止。扩展模式还检查 200% 缩放时设置分类可见、窄工作台导航与焦点恢复。
+
+源码验证默认将输出保存在 `work/qa/<类别>/<独立运行>`。界面、动态壁纸和安装验证分别使用 `interface`、`motion-desktop`、`installer` 类别。支持 `--output` 的命令可显式指定 `work/qa` 下的新目录。历史日志位于 `work/qa/logs`，旧审查输出位于 `work/archive/qa`。
 
 | 命令 | 范围与条件 |
 | --- | --- |
+| `npm run qa:wallpaper-modes -- --run` | 正式两种壁纸入口、旧动漫视频设置兼容、原画五姿态、真人视频播放与暂停、风格往返、新进程恢复和数据保留；隔离数据、实际素材与合成后端，无账户与桌面挂载。先构建 |
 | `npm run qa:inventory -- --run` | 只读文件元数据与目录占用，不跟随目录联接；不自动删除 |
 | `npm run qa:known-issues` | 合成数据/协议复现已知业务边界 |
 | `npm run qa:interface` | 隔离 Electron 界面与工作台，无账户或硬件 |
 | `npm run qa:puppet-package -- --run --package="<测试包目录>"` | 实际包的主进程、设置 IPC、自定义 Agent 添加/编辑/重连/删除与数据保留；启动本地合成 ACP 子进程，随后检查壁纸切换、退出及重启恢复。不连接真实账户或硬件，不改系统剪贴板 |
+| `npm run qa:wallpaper-recovery -- --run --package="<测试包目录>"` | 实际包的真人视频解码及首次播放失败，检查原画面/设置保留、候选资源释放、显式重试和新进程恢复；不改写媒体，不连接账户或设备 |
 | `npm run qa:visual -- --run [--extended]` | 隔离页面、布局、长内容、缩放与完整姿态截图；扩展模式增加最小窗口的 125%–200% 页面缩放、控件可达性与 Chromium 无障碍名称检查。页面缩放不代表系统 DPI，无障碍树检查不代替读屏实测 |
 | `npm run qa:shutdown -- --run` | 隔离桌面退出与子进程清理 |
 | `npm run qa:stills -- --character-switch` | 生产 renderer/preload + 合成后端，验证失败重试、切换与重启恢复 |
@@ -22,7 +26,7 @@
 | `npm run qa:agent-interactions -- --run --package="<测试包目录>" --provider=codex` | 真实 UI 审批、问题卡、仅本测试拥有的 CLI 断线与重连、未确认记录恢复；问题工具能否触发取决于原生 CLI/模式。未确认记录为明确标注的故障注入，不宣称观察到真实丢回执 |
 | `npm run qa:local-speech -- --run --package="<测试包目录>" --models="<已有模型目录>"` | 包内 CPU 语音依赖真实合成和识别固定语句，不录音、不播放、不下载。可加 `--qwen-port=<调试端口>` 使用空闲应用中已就绪的 Qwen，并等待该请求结束；不改变设置或全局停止用户任务 |
 | `npm run qa:prerequisites -- --run --package="<测试包目录>"` | 缺 CLI/模型、仅本机代理故障下的下载取消/失败、WebGL 上下文丢失/重试失败；可加 `--qwen-root="<已有运行环境>"` 隐藏该子进程的 CUDA。属于故障注入，不代替无 GPU 新机器验收 |
-| `npm run data:recover -- --source="<副本>" --out="<新目录>"` | 默认预览，增加 `--run` 才复制恢复；拒绝覆盖 |
+| `npm run data:recover -- --source="<副本>" --out="<新目录>"` | 默认预检与预览，增加 `--run` 才复制恢复；拒绝覆盖，遇到内部目录链接/符号链接时在创建输出前拒绝 |
 
 真实窗口操作入口见 [GUI 说明](gui/README.md)，真实 CLI 探针见 [探针说明](../probes/cli-agents/README.md)。硬件、模型、账户、安装与卸载须按 [验收清单](../release/TEST-ACCEPTANCE.md) 单独执行。普通测试、组件自检或截图均不能替代这些验收。
 

@@ -12,8 +12,9 @@ if ($Setup) {
 } else { $setup = Join-Path $repoRoot "release/v$version/Rin-Desktop-$version-Setup.exe" }
 if (-not (Test-Path -LiteralPath $setup -PathType Leaf)) { throw 'Build the installer first.' }
 if ($PreviousSetup) { $PreviousSetup = (Resolve-Path -LiteralPath $PreviousSetup).Path }
-$qaRoot = Join-Path $repoRoot 'work/qa'
-$runRoot = Join-Path $qaRoot ('installer-' + [guid]::NewGuid().ToString('N'))
+$qaRoot = Join-Path $repoRoot 'work/qa/installer'
+New-Item -ItemType Directory -Path $qaRoot -Force | Out-Null
+$runRoot = Join-Path $qaRoot ([guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $runRoot | Out-Null
 
 function Install-Isolated([string]$Binary, [string]$Destination, [string]$Log) {

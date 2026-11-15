@@ -2,6 +2,7 @@ import { spawn } from 'node:child_process';
 import { mkdir, writeFile, copyFile } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
 import { copyMotionAssets } from '../release/motion-assets.mjs';
+import { createRunDirectory } from './run-output.mjs';
 if (!process.argv.includes('--run') || process.argv.includes('--help') || process.argv.includes('-h')) {
   console.log('Usage: npm run qa:motion -- --run [--media=<validated-runtime-directory>]\nChecks the production wallpaper, dialogue, workbench, voices and ambience in isolated Electron. Without --media, creates four tiny synthetic clips. With --media, copies the six hash-checked runtime assets and enables the normal GPU path for 4K video; records the actual OS-assigned viewport. No account or remote/microphone hardware acceptance. Default: help only; no files or processes.');
   process.exit(0);
@@ -9,7 +10,7 @@ if (!process.argv.includes('--run') || process.argv.includes('--help') || proces
 const root = resolve(import.meta.dirname, '../..');
 const args = process.argv.slice(2), mediaArgs = args.filter(arg => arg.startsWith('--media='));
 if (args.some(arg => arg !== '--run' && !arg.startsWith('--media=')) || mediaArgs.length > 1 || mediaArgs.some(arg => !arg.slice(8))) throw new Error('Use --run and at most one nonempty --media directory.');
-const output = join(root, 'work/qa/motion-desktop-' + new Date().toISOString().replace(/[:.]/g, '-')), media = join(output, 'media');
+const output = await createRunDirectory('motion-desktop'), media = join(output, 'media');
 if (mediaArgs.length) await copyMotionAssets(resolve(root, mediaArgs[0].slice(8)), media);
 else {
 await mkdir(media, { recursive: true });

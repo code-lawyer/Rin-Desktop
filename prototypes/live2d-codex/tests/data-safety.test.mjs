@@ -163,6 +163,49 @@ test('recovery previews first, copies a valid backup into a new directory and ne
   await assert.rejects(recoverDataCopy(join(store.file, '..'), join(store.file, '../nested'), { run: true }), /之外/);
 });
 
+test('recovery rejects a linked Agent directory before creating output and can retry after an independent copy is prepared', async t => {
+  const { root, store, target } = await fixture(t), source = join(store.file, '..');
+  await store.saveDraft(target, 'recover me'); await store.saveDraft(target, 'latest');
+  const records = join(root, 'agent-records'), link = join(source, 'agents'), output = join(root, 'recovered');
+  await fs.mkdir(join(records, 'grok'), { recursive: true });
+  const session = JSON.stringify({ format: 1, provider: 'grok', cwd: root });
+  await fs.writeFile(join(records, 'grok', 'session.json'), session);
+  await fs.symlink(records, link, process.platform === 'win32' ? 'junction' : 'dir');
+  assert.equal(await validateDataDirectory(source), await fs.realpath(source));
+  await fs.writeFile(store.file, 'damaged');
+  const backup = await fs.readFile(store.file + '.bak');
+  for (const run of [false, true]) {
+    await assert.rejects(recoverDataCopy(source, output, { run }), /链接.*agents/);
+    await assert.rejects(fs.lstat(output), { code: 'ENOENT' });
+    assert.equal(await fs.readFile(store.file, 'utf8'), 'damaged');
+    assert.deepEqual(await fs.readFile(store.file + '.bak'), backup);
+    assert.equal(await fs.readFile(join(records, 'grok', 'session.json'), 'utf8'), session);
+  }
+  await fs.unlink(link);
+  await fs.cp(records, link, { recursive: true });
+  await recoverDataCopy(source, output, { run: true });
+  const recovered = new WorkspaceStore(output); await recovered.load();
+  assert.equal(recovered.draft(target), 'recover me');
+  await fs.writeFile(join(output, 'agents', 'grok', 'session.json'), 'edited copy');
+  assert.equal(await fs.readFile(join(records, 'grok', 'session.json'), 'utf8'), session);
+  assert.equal(await fs.readFile(join(link, 'grok', 'session.json'), 'utf8'), session);
+});
+
+for (const kind of ['nested', 'dangling', 'cycle']) test(`recovery preflight rejects ${kind} directory links without output`, async t => {
+  const { root, store, target } = await fixture(t), source = join(store.file, '..');
+  await store.saveDraft(target, 'backup'); await store.saveDraft(target, 'latest');
+  const parent = join(source, 'archives'); await fs.mkdir(parent);
+  const linked = kind === 'cycle' ? source : join(root, 'records');
+  if (kind === 'nested') await fs.mkdir(linked);
+  await fs.symlink(linked, join(parent, 'linked'), process.platform === 'win32' ? 'junction' : 'dir');
+  const output = join(root, 'recovered'), before = await fs.readFile(store.file);
+  for (const run of [false, true]) {
+    await assert.rejects(recoverDataCopy(source, output, { run }), /链接.*archives/);
+    await assert.rejects(fs.lstat(output), { code: 'ENOENT' });
+  }
+  assert.deepEqual(await fs.readFile(store.file), before);
+});
+
 test('test build storage is isolated and broken adopted-directory pointers cannot silently open empty data', async t => {
   const { root } = await fixture(t);
   const normal = storage.dataHome(root), testing = storage.dataHome(root, { testBuild: { id: 'data-agent-01' } });

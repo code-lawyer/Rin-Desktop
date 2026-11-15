@@ -11,11 +11,15 @@ export function questionAnswers(questions, answer, arrays = false) {
   }
   return result;
 }
+function formOptions(field) {
+  const choices = field.type === 'array' ? field.items : field;
+  return choices?.anyOf ?? choices?.oneOf ?? choices?.enum?.map(value => ({ const: value }));
+}
 export function formView(schema) {
   return Object.entries(schema.properties ?? {}).map(([id, field]) => ({
     id, header: field.title || id, question: [field.title || id, field.description].filter(Boolean).join(' · '),
     required: (schema.required ?? []).includes(id), multiSelect: field.type === 'array', fieldType: field.type,
-    options: (field.oneOf ?? field.items?.oneOf ?? (field.enum ?? field.items?.enum ?? []).map(value => ({ const: value }))).map(v => ({ label: String(v.title ?? v.const), value: String(v.const) })),
+    options: (formOptions(field) ?? []).map(v => ({ label: String(v.title ?? v.const), value: String(v.const) })),
   }));
 }
 export function formAnswer(schema, answer) {
@@ -27,6 +31,7 @@ export function formAnswer(schema, answer) {
       continue;
     }
     let value = raw;
+    const allowed = formOptions(field)?.map(option => option.const);
     if (field.type === 'boolean') {
       if (!['true', 'false'].includes(raw)) throw new Error(`${field.title || key} 需填写 true 或 false。`);
       value = raw === 'true';
@@ -35,11 +40,9 @@ export function formAnswer(schema, answer) {
       if (!Number.isFinite(value) || field.type === 'integer' && !Number.isInteger(value) || field.minimum != null && value < field.minimum || field.maximum != null && value > field.maximum) throw new Error(`${field.title || key} 数值无效。`);
     } else if (field.type === 'array') {
       value = Array.isArray(raw) ? raw : [raw];
-      const allowed = field.items?.enum ?? field.items?.oneOf?.map(v => String(v.const));
       if (allowed && value.some(v => !allowed.includes(v)) || field.minItems != null && value.length < field.minItems || field.maxItems != null && value.length > field.maxItems) throw new Error(`${field.title || key} 选项无效。`);
     } else if (field.type && field.type !== 'string') throw new Error('此表单字段类型暂不支持，请停止本轮并在原生 CLI 中处理。');
-    const allowed = field.enum ?? field.oneOf?.map(v => v.const);
-    if (allowed && !allowed.some(v => v === value)) throw new Error(`请为 ${field.title || key} 选择提供的选项。`);
+    if (field.type !== 'array' && allowed && !allowed.includes(value)) throw new Error(`请为 ${field.title || key} 选择提供的选项。`);
     if (typeof value === 'string' && (value.length > (field.maxLength ?? 8000) || value.length < (field.minLength ?? 0))) throw new Error(`${field.title || key} 长度无效。`);
     content[key] = value;
   }

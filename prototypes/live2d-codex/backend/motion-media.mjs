@@ -3,13 +3,12 @@ import { resolve } from 'node:path';
 import { respondMediaFile } from './local-media.mjs';
 import { motionCatalog } from '../renderer/motion-catalog.mjs';
 
-const prefix = '/assets/motion/female/';
-export async function createMotionMedia(directory) {
+export async function createMotionMedia(directory, { prefix = '/assets/motion/female/', parse = motionCatalog } = {}) {
   async function inspect() {
     try {
       const manifest = JSON.parse(await readFile(resolve(directory, 'manifest.json'), 'utf8'));
-      const catalog = motionCatalog(manifest), files = new Set();
-      for (const name of [...catalog.clips.values()].map(clip => clip.file).concat(manifest.posters.work, manifest.posters.user)) {
+      const catalog = parse(manifest), files = new Set();
+      for (const name of catalog.files || [...catalog.clips.values()].map(clip => clip.file).concat(manifest.posters.work, manifest.posters.user)) {
         if (!(await stat(resolve(directory, name))).isFile()) throw new Error('Missing motion media');
         files.add(name);
       }

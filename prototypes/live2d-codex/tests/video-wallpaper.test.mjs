@@ -31,8 +31,8 @@ test('video anchor uses uniform scaling and remains a valid bubble anchor on wid
 test('wallpaper requests are validated before they can change character or voices', () => {
   const settings={character:'female',wallpaperKind:'artwork'};
   assert.throws(()=>choices.wallpaperChoice({wallpaperKind:'video'},settings));
-  assert.deepEqual(choices.wallpaperChoice({wallpaperKind:'artwork'},settings),{character:'female',wallpaperKind:'artwork',wallpaperMotion:false});
-  assert.deepEqual(choices.wallpaperChoice({wallpaperMotion:true},settings),{character:'female',wallpaperKind:'artwork',wallpaperMotion:true});
+  assert.deepEqual(choices.wallpaperChoice({wallpaperKind:'artwork'},settings),{character:'female',wallpaperKind:'artwork',wallpaperMotion:false,animePlayback:'poses'});
+  assert.deepEqual(choices.wallpaperChoice({wallpaperMotion:true},settings),{character:'female',wallpaperKind:'artwork',wallpaperMotion:true,animePlayback:'poses'});
   assert.throws(()=>choices.wallpaperChoice({character:'male'},settings));
   assert.throws(()=>choices.wallpaperChoice({wallpaperMotion:'true'},settings));
   assert.throws(()=>choices.wallpaperChoice({wallpaperMotion:null},settings));

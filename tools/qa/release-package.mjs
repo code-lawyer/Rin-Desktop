@@ -43,6 +43,7 @@ for (const entry of manifest.files) {
   assert.equal(await hash(file), entry.sha256, entry.file);
   bytes += entry.bytes;
   const local = entry.file.replace(/^resources\/app\//, '');
+  assert.ok(!/^(assets\/motion\/anime\/|renderer\/anime-(catalog|player|wallpaper)\.mjs$)/.test(local), 'Experimental anime video must not be packaged: ' + entry.file);
   assert.ok(!/^assets\/livliv\//.test(local), 'Rejected split character must not be packaged: ' + entry.file);
   assert.ok(!retiredWallpaperAsset(local.replace(/^assets\//, '')), 'Retired wallpaper in package: ' + entry.file);
   if (entry.file !== local && (/^(main\.cjs|preload\.cjs|voice-resources\.json|backend\/|renderer\/|dist\/)/.test(local) || revisedAssetMetadata.has(local))) {
@@ -73,12 +74,13 @@ if (option('baseline')) {
   const previous = await json(join(resolve(option('baseline')), 'manifest.json'));
   for (const entry of previous.files.filter(item => /^resources\/app\/(assets\/|node_modules\/sherpa-onnx|backend\/speech-worker\.cjs$)/.test(item.file)
     && !retiredWallpaperAsset(item.file.replace(/^resources\/app\/assets\//, ''))
+    && !item.file.startsWith('resources/app/assets/motion/anime/')
     && !revisedAssetMetadata.has(item.file.replace(/^resources\/app\//, '')))) {
     assert.equal(await hash(join(directory,entry.file)), entry.sha256, 'Changed artwork or CPU speech component: ' + entry.file);
     preserved++;
   }
   assert.ok(preserved > 10);
 }
-const report = {version:manifest.version,files:names.size,bytes,sourceMatches,motionMediaFiles:motion.names.length,puppetFiles:puppet.names.length,preservedArtworkAndCpuFiles:preserved,noModelsCredentialsOrCli:true,accounts:false,hardware:false,passed:true};
+const report = {version:manifest.version,files:names.size,bytes,sourceMatches,motionMediaFiles:motion.names.length,animeVideoExcluded:true,puppetFiles:puppet.names.length,preservedArtworkAndCpuFiles:preserved,noModelsCredentialsOrCli:true,accounts:false,hardware:false,passed:true};
 await writeRunReport(output,report);
 console.log(JSON.stringify({output,...report}));

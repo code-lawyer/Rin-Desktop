@@ -175,7 +175,7 @@ export async function packagedSession({
     });
     if (wallpaperReady)
       await until(
-        async () => (await workspace.evaluate('companion.workspace()'))?.value?.wallpaper?.phase === 'ready',
+        async () => (await workspace.evaluate("typeof companion === 'undefined' ? null : companion.workspace()"))?.value?.wallpaper?.phase === 'ready',
         'ready wallpaper',
       );
     return { child, workspace, wallpaper, chat, until, close, errors, storage, project, portable };

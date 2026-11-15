@@ -184,7 +184,7 @@ function updateCharacterStatus() {
   const animated = status?.phase === 'loading' ? status.wallpaperMotion : workspace.settings.wallpaperMotion;
   for (const radio of document.querySelectorAll('[name="wallpaper-style"]')) radio.checked = radio.value === (animated ? 'realistic' : 'anime');
   $('character-status').dataset.phase = status?.phase || '';
-  $('character-status').textContent = status?.phase === 'error' ? status.error : status?.phase === 'loading' ? '正在载入壁纸…' : '当前风格：' + (animated ? '真人动态' : '动漫动态');
+  $('character-status').textContent = status?.phase === 'error' ? status.error : status?.phase === 'loading' ? '正在载入壁纸…' : '当前风格：' + (animated ? '真人视频' : '动漫静态');
   $('retry-character').hidden = status?.phase !== 'error';
 }
 async function saveWallpaperStyle(wallpaperMotion) {
@@ -296,9 +296,10 @@ function fillStills() {
   if(stillSaving) return;
   const s=stills.stillSettings(workspace.settings);
   const animated=s.wallpaperMotion;
+  const allowed=animated?['auto','work','attention']:['auto',...stills.POSES];
   $('still-pose').value=s.stillPose;
-  for(const option of $('still-pose').options) option.disabled=animated && !['auto','work','attention'].includes(option.value);
-  if(animated && !['auto','work','attention'].includes(s.stillPose)) $('still-pose').value='auto';
+  for(const option of $('still-pose').options) option.disabled=!allowed.includes(option.value);
+  if(!allowed.includes(s.stillPose)) $('still-pose').value='auto';
   const character='female';
   $('still-help').textContent=animated
       ? '点击小图可固定朝向；选择“自动”随工作与对话切换。工作与看向你各自循环播放，在动作接点转身。'
