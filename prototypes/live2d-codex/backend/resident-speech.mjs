@@ -24,6 +24,15 @@ export class ResidentSpeech extends EventEmitter {
       phase: this.phase, error: this.error };
   }
   update(phase, error = '') { this.phase = phase; this.error = error; this.emit('state', this.status()); }
+  retire(worker) {
+    const closing = this.teardown.then(() => worker.close());
+    this.teardown = closing;
+    closing.catch(() => {
+      // A shutdown deadline is not proof of exit. Only a later process close
+      // event may release this failed barrier and permit a fresh worker.
+      worker.exited?.then(() => { if (this.teardown === closing) this.teardown = Promise.resolve(); }, () => {});
+    });
+  }
   configure(settings) {
     const engine = settings.ttsEngine ?? 'qwen', root = settings.qwenRoot || this.qwenRoot;
     const same = this.settings.ttsEngine === engine && (this.settings.qwenRoot || this.qwenRoot) === root;
@@ -32,23 +41,33 @@ export class ResidentSpeech extends EventEmitter {
     const revision = ++this.revision, previous = this.worker; this.worker = null;
     if (previous) {
       this.update('unloading');
-      this.teardown = this.teardown.then(() => previous.close());
+      this.retire(previous);
     }
     const task = (async () => {
+      // A failed teardown rejects service close/reload instead of reporting
+      // successful release of a child whose exit is still unconfirmed.
+      try { await this.teardown; }
+      catch (error) { if (revision === this.revision) this.update('error', error.message); throw error; }
+      if (revision !== this.revision) return;
+      if (settings.ttsResident !== true) { this.update('unloaded'); return; }
+      let worker;
       try {
-        await this.teardown;
-        if (revision !== this.revision) return;
-        if (settings.ttsResident !== true) { this.update('unloaded'); return; }
         if (!['qwen', 'kokoro'].includes(engine)) throw new Error('未知播报引擎。');
-        const worker = this.factory(engine, root); this.worker = worker;
-        worker.onExit = error => { if (this.worker === worker) { this.worker = null; this.update('error', error.message); } };
+        worker = this.factory(engine, root); this.worker = worker;
+        // Qwen also reports watchdog failures here, before its child exits.
+        // Keep ownership so configure/close can await its idempotent shutdown.
+        worker.onExit = error => { if (this.worker === worker) this.update('error', error.message); };
         this.update('loading');
         await worker.load();
         if (revision === this.revision && this.worker === worker) this.update('ready');
       } catch (error) {
         if (revision !== this.revision) return;
-        const worker = this.worker; this.worker = null;
-        if (worker) await Promise.resolve().then(() => worker.close()).catch(() => {});
+        this.worker = null;
+        if (worker) {
+          this.retire(worker);
+          try { await this.teardown; }
+          catch (closingError) { if (revision === this.revision) this.update('error', closingError.message); throw closingError; }
+        }
         if (revision === this.revision) this.update('error', error.message);
       }
     })();

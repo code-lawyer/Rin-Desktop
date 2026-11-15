@@ -49,16 +49,22 @@ export async function startStillWallpaper({ host, api }) {
   }
   const sequence = new StillSequence({
     accept: key => typeof key === 'string',
-    discard: frame => frame.puppet?.close(),
+    discard: frame => { frame.puppet?.close(); frame.motion?.close(); },
     async load(key) {
       const revision = frameRevision;
-      const [requestId, character, pose, animated] = JSON.parse(key);
-      let catalog, image;
+      const [requestId, character, pose, animated, animePlayback] = JSON.parse(key);
+      let catalog, image, motionLayer;
       if (animated) {
         catalog = await loadMotionCatalog(); image = await loadImage(pose, catalog.posters.work);
+        try {
+          motionLayer = await MotionWallpaper.prepare({ host, catalog, changed(info) { if (motion === motionLayer) motionChanged(info); } });
+        } catch (error) {
+          if (!shown) error.fallback = compose(image);
+          throw error;
+        }
       }
       image ??= await loadImage('attention');
-      const frame = { frame: compose(image), frameRevision: revision, requestId, character, pose, animated, catalog, sourceWidth: image.naturalWidth, sourceHeight: image.naturalHeight };
+      const frame = { frame: compose(image), frameRevision: revision, requestId, character, pose, animated, animePlayback, motion: motionLayer, catalog, sourceWidth: image.naturalWidth, sourceHeight: image.naturalHeight };
       if (!animated) {
         try {
           frame.puppet = await PuppetWallpaper.prepare({ host, activityChanged() { updateAudio(); report(); }, changed(error) {
@@ -71,7 +77,7 @@ export async function startStillWallpaper({ host, api }) {
     },
     async show(frame, key) {
       if (frame.requestId !== committedRequest) {
-        const info = { ready: true, wallpaperKind: 'artwork', character: frame.character, wallpaperMotion: frame.animated, requestId: frame.requestId, initial: !shown };
+        const info = { ready: true, wallpaperKind: 'artwork', character: frame.character, wallpaperMotion: frame.animated, animePlayback: frame.animePlayback, requestId: frame.requestId, initial: !shown };
         let result = await api.commitWallpaper(info);
         if (closed || key !== desiredKey || (shown && (presentation.paused || document.hidden))) {
           api.finishWallpaper(info, false); return false;
@@ -79,6 +85,10 @@ export async function startStillWallpaper({ host, api }) {
         if (frame.puppet?.failed || frame.puppet?.player?.contextLost) {
           api.finishWallpaper(info, false);
           throw new Error('角色在准备期间失去绘图能力，已保留当前画面。请重试。');
+        }
+        if (frame.motion && !frame.motion.ready) {
+          api.finishWallpaper(info, false);
+          throw new Error('视频在准备期间失去解码能力，已保留当前画面。请重试。');
         }
         // No await between the final commit and paint: pause/selection events
         // cannot replace this frame's intent after its settings are published.
@@ -90,22 +100,13 @@ export async function startStillWallpaper({ host, api }) {
         }
         committedRequest = frame.requestId;
       }
-      motion?.close(); motion = null; motionInfo = null; puppet?.close(); puppet = frame.puppet; puppetError = null;
+      motion?.close(); motion = frame.motion; motionInfo = null; puppet?.close(); puppet = frame.puppet; puppetError = null;
       shown = frame; fallbackFrame = null; fit(); host.dataset.ready = 'true'; host.dataset.loading = 'false'; delete host.dataset.error;
       host.dataset.character = frame.character; host.dataset.pose = frame.pose; host.dataset.rig = 'static';
       host.dataset.sourceWidth = frame.sourceWidth;
       host.dataset.sourceHeight = frame.sourceHeight;
-      if (frame.catalog) {
-        motion = new MotionWallpaper({ host, catalog: frame.catalog, changed(info) {
-          if (closed || shown !== frame) return;
-          motionInfo = info; host.dataset.motionPhase = info.phase; host.dataset.motionClip = info.clip || '';
-          host.dataset.motionPlayCount = String(info.playCount);
-          host.dataset.rig = 'motion'; host.dataset.pose = info.state === 'user' ? 'attention' : 'work';
-          host.dataset.typing = String(info.typing);
-          if (info.error) host.dataset.error = '动态壁纸未能继续播放，已保留画面。请在工作台重试加载。';
-          else delete host.dataset.error;
-          report(info.phase === 'loop' || info.phase === 'transition'); updateAudio();
-        } });
+      if (motion) {
+        host.dataset.rig = 'motion';
         motion.start(backend, presentation, document.hidden);
       } else {
         delete host.dataset.motionPhase; delete host.dataset.motionClip;
@@ -115,19 +116,29 @@ export async function startStillWallpaper({ host, api }) {
       updateAudio();
     },
     failed(error, key) {
-      const [requestId, character, , wallpaperMotion] = JSON.parse(key);
+      const [requestId, character, , wallpaperMotion, animePlayback] = JSON.parse(key);
       if (!shown && error.fallback) { fallbackFrame = error.fallback; fit(); }
       host.dataset.loading = 'false'; host.dataset.error = '壁纸素材未能载入，已保留可用画面。请在工作台重试加载。';
-      api.renderReady({ ready: false, kind: 'wallpaper', wallpaperKind: 'artwork', character, wallpaperMotion, requestId, frameRevision, error: host.dataset.error });
+      api.renderReady({ ready: false, kind: 'wallpaper', wallpaperKind: 'artwork', character, wallpaperMotion, animePlayback, requestId, frameRevision, error: host.dataset.error });
       console.error('[wallpaper:still]', error.message);
     },
   });
+  function motionChanged(info) {
+    if (closed || !shown?.motion) return;
+    motionInfo = info; host.dataset.motionPhase = info.phase; host.dataset.motionClip = info.clip || '';
+    host.dataset.motionPlayCount = String(info.playCount);
+    host.dataset.rig = 'motion'; host.dataset.pose = info.state === 'user' ? 'attention' : 'work';
+    host.dataset.typing = String(info.typing);
+    if (info.error) host.dataset.error = '动态壁纸未能继续播放，已保留画面。请在工作台重试加载。';
+    else delete host.dataset.error;
+    report(info.phase === 'loop' || info.phase === 'transition'); updateAudio();
+  }
   function report(painted = false) {
     if (!shown) return;
     const error = motionInfo?.error || puppetError;
     const pose = shown.animated ? (motionInfo?.state === 'user' ? 'attention' : 'work') : puppet.frame?.pose || puppet.pose;
     host.dataset.pose = pose;
-    const info = { ready: true, kind: 'wallpaper', wallpaperKind: 'artwork', character: shown.character, wallpaperMotion: shown.animated, requestId: shown.requestId,
+    const info = { ready: true, kind: 'wallpaper', wallpaperKind: 'artwork', character: shown.character, wallpaperMotion: shown.animated, animePlayback: shown.animePlayback, requestId: shown.requestId,
       pose,
       activity: (shown.animated ? stillActivity : puppetActivity)(backend, presentation, document.hidden), model: shown.animated ? 'motion-clips' : 'rin-scene',
       motionPhase: shown.animated ? motionInfo?.phase || null : puppet.transitioning?.() ? 'transition' : 'loop',
@@ -176,7 +187,8 @@ export async function startStillWallpaper({ host, api }) {
     const character = characters.characterProfile(presentation.character).id;
     const animated = presentation.stills?.wallpaperMotion === true;
     const pose = animated ? 'work' : 'puppet';
-    const key = JSON.stringify([presentation.characterRequest ?? 0, character, pose, animated]);
+    const animePlayback = stillSettings.stillSettings(presentation.stills).animePlayback;
+    const key = JSON.stringify([presentation.characterRequest ?? 0, character, pose, animated, animePlayback]);
     host.dataset.paused = String(!!presentation.paused);
     motion?.update(backend, presentation, document.hidden);
     puppet?.update(puppetPose(backend, presentation, idle), presentation, document.hidden);

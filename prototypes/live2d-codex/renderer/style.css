@@ -58,9 +58,9 @@ button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-
 .drag-handle:hover, .drag-handle:focus-visible { opacity: 1; }
 .avatar-error { position: absolute; top: 45%; left: 20px; right: 20px; max-height:45%;overflow:auto;overflow-wrap:anywhere;padding: 15px; border-radius: 12px; background: #fff6f3ee; font-size: 12px; line-height: 1.6; }
 
-.bubble-shell { position: relative; width: 100%; height: 100%; padding: 10px 18px 12px; --tail-y: 78px; }
+.bubble-shell { position: relative; width: 100%; height: 100%; padding: var(--bubble-inset); --bubble-inset: 10px 18px 12px; --tail-y: 78px; }
 .bubble-surface { position: absolute; inset: 0; opacity: var(--surface-opacity); pointer-events: none; }
-.bubble-backdrop { position: absolute; inset: 10px 18px 12px; background: #f6fafd; border-radius: var(--radius); box-shadow: 0 7px 20px #142f3d20; }
+.bubble-backdrop { position: absolute; inset: var(--bubble-inset); background: #f6fafd; border-radius: var(--radius); box-shadow: 0 7px 20px #142f3d20; }
 /* When the work area cannot fit the fixed controls, keep them reachable by
    scrolling the card. The usual reply-only scroll remains at normal sizes. */
 .bubble-card { position: relative; height: 100%; display: flex; flex-direction: column; padding: 12px 20px 16px; border: 1px solid transparent; border-radius: var(--radius); overflow-x: hidden; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #647f8b80 transparent; }
@@ -84,7 +84,9 @@ button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-
 .reading-button { gap: 5px; padding: 0 7px; font-size: 11px; white-space: nowrap; }
 .reading-icon { width: 15px; height: 15px; flex-basis: 15px; }
 .bubble-shell[data-reading=true] .reading-icon { transform: rotate(180deg); }
-.bubble-content { flex:1;min-height:64px;overflow:auto;overscroll-behavior:contain;padding:3px;margin:-3px -3px 0;scrollbar-width:thin;scrollbar-color:#647f8b80 transparent; }
+.bubble-body { display:flex; flex-direction:column; flex:1; min-height:0; }
+.bubble-content { flex:1; min-height:0; overflow:auto; padding:3px; margin:-3px -3px 0; }
+.bubble-body, .bubble-content { overflow-anchor:none; overscroll-behavior:contain; scrollbar-width:thin; scrollbar-color:#647f8b80 transparent; }
 .reply-scroll { min-height: 44px; margin: 0 0 16px; padding: 0 4px 0 0; }
 .welcome { margin: 0; color: var(--muted); font-size: 15px; line-height: 1.8; padding: 3px 0; }
 .message { margin: 0; }
@@ -121,7 +123,7 @@ button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-
 #stop-button:hover:not(:disabled) { background:#faeeeb;text-decoration:none; }
 .composer { flex: 0 0 auto; border: 1px solid var(--input-line); border-radius: 12px; padding: 12px; background: #ffffff60; }
 .composer:focus-within { border-color: var(--focus); }
-.composer textarea { display: block; width: 100%; border: 0; background: transparent; resize: none; color: var(--ink); font-size: 13px; line-height: 1.7; min-height: 38px; max-height: 140px; outline: none; padding: 0; caret-color: var(--accent); }
+.composer textarea { display: block; width: 100%; border: 0; background: transparent; resize: none; field-sizing: content; color: var(--ink); font-size: 13px; line-height: 1.7; min-height: 38px; max-height: 140px; outline: none; padding: 0; caret-color: var(--accent); }
 .composer textarea::placeholder { color: #536975; opacity: 1; }
 .composer textarea:focus-visible { outline: none; }
 .composer:has(textarea:focus-visible) { outline: 2px solid var(--focus); outline-offset: 2px; }
@@ -169,8 +171,9 @@ button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-
 #session-label { font-size: 10px; font-variant-numeric: tabular-nums; }
 .approval { display:flex;flex-direction:column;flex: 0 0 auto; margin: 8px 0 12px; padding: 14px; background: var(--approval-surface); border-radius: 12px; font-size: 12px; overflow-wrap:anywhere; }
 .approval h3, .login-panel h3 { flex:0 0 auto;font-size: 13px; line-height:1.6;margin: 0 0 8px; font-weight: 650; }
-.bubble-card:has(.approval:not([hidden])) .bubble-content { flex:0 0 auto;min-height:0;overflow:visible; }
-.approval-heading { display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:8px; }
+.bubble-body:has(.approval:not([hidden])) { flex:0 0 auto; }
+.bubble-body:has(.approval:not([hidden])) .bubble-content { flex:0 0 auto; overflow:visible; }
+.approval-heading { display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:0 12px;margin-bottom:8px; }
 .approval-heading h3 { margin:0; }
 .approval-heading button { flex:0 0 auto; }
 .approval-body { min-height:0; }
@@ -225,6 +228,27 @@ button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-
 }
 @media (max-width: 520px) { #reading-label { display: none; } }
 @media (max-height: 480px) { .bubble-header { margin-bottom:4px; } .current-target { margin-bottom:6px; } .composer { padding-top:10px; } .bubble-card { padding-top:8px;padding-bottom:10px; } .activity-line { margin-bottom:6px; } .approval { margin:6px 0 8px; } }
+@media (max-height: 330px) {
+  .bubble-body:not(:has(.approval:not([hidden]))) { overflow:auto; padding-inline:5px; margin-inline:-5px; }
+  .bubble-body .bubble-content { flex:0 0 auto; overflow:visible; margin-top:0; }
+  .bubble-body .reply-player { padding-bottom:8px; }
+  .composer { padding:8px; }
+  .composer textarea { max-height:64px; }
+}
+@media (max-height: 240px) {
+  .bubble-shell { --bubble-inset:6px 18px 8px; }
+  .bubble-card { padding-block:6px; }
+  .bubble-header { min-height:32px; margin-bottom:2px; }
+  .current-target { min-height:24px; margin-bottom:2px; }
+  .composer { padding:6px 8px; }
+  .composer textarea { min-height:26px; max-height:42px; }
+  .composer-footer { margin-top:4px; }
+  .composer-feedback { margin-top:4px; }
+  .composer-feedback:not(:has(.voice-status:not([hidden]))) { display:none; }
+  .bubble-body:not(:has(.approval:not([hidden]))) { padding-bottom:4px; }
+  .bubble-body .bubble-content { padding-block:0; }
+  .reply-scroll { margin-bottom:4px; }
+}
 @keyframes breathe { 50% { opacity: .45; } }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
 /* Wallpaper artwork owns the complete desktop canvas. Desktop input passes through. */

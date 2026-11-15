@@ -196,7 +196,7 @@ try {
   await checkCustomAgents();
   assert.equal((await snapshot()).wallpaper.model, 'rin-scene');
   assert.equal(await wallpaper.evaluate('document.hidden'), false);
-  checks.push('actual packaged main/preload/renderer load our complete pose set without an installed CLI');
+  checks.push('actual packaged main/preload/renderer default to original anime poses without an installed CLI');
   await workspace.evaluate("companion.saveSettings({stillPose:'window',qwenVoice:'Vivian',voice:48})");
   await until(() => wallpaper.evaluate(host + ".dataset.pose==='window'"), 'saved gaze');
   for (const [motion, rig] of [
@@ -227,6 +227,7 @@ try {
   await launch();
   const restored = await snapshot();
   assert.equal(restored.wallpaper.model, 'rin-scene');
+  assert.equal(restored.settings.animePlayback, 'poses');
   assert.equal(restored.settings.stillPose, 'window');
   assert.equal(restored.settings.qwenVoice, 'Vivian');
   assert.equal(restored.settings.voice, 48);

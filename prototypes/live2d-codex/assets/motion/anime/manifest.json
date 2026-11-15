@@ -1,0 +1,133 @@
+{
+  "format": 1,
+  "canvas": [
+    1024,
+    640
+  ],
+  "fps": 24,
+  "clips": [
+    {
+      "id": "work-loop",
+      "file": "assets/01-work-idle.mp4",
+      "frames": 158
+    },
+    {
+      "id": "work-attention",
+      "file": "assets/02-work-to-attention.mp4",
+      "frames": 124
+    },
+    {
+      "id": "attention-nod",
+      "file": "assets/03-attentive-nod.mp4",
+      "frames": 124
+    },
+    {
+      "id": "attention-wave",
+      "file": "assets/04-greeting-wave.mp4",
+      "frames": 114
+    },
+    {
+      "id": "attention-work",
+      "file": "assets/05-attention-to-work.mp4",
+      "frames": 124
+    },
+    {
+      "id": "work-cup",
+      "file": "assets/06-work-to-cup.mp4",
+      "frames": 158
+    },
+    {
+      "id": "cup-sip",
+      "file": "assets/07-cup-sip.mp4",
+      "frames": 158
+    },
+    {
+      "id": "cup-work",
+      "file": "assets/08-cup-to-work.mp4",
+      "frames": 158
+    },
+    {
+      "id": "attention-loop",
+      "file": "assets/09-attention-idle.mp4",
+      "frames": 97
+    },
+    {
+      "id": "cup-loop",
+      "file": "assets/10-cup-idle.mp4",
+      "frames": 107
+    }
+  ],
+  "posters": {
+    "work": "anchors/A.png",
+    "attention": "anchors/B.png",
+    "cup": "anchors/C.png"
+  },
+  "window": {
+    "file": "window-layer.webm",
+    "placement": [
+      0,
+      0,
+      610,
+      528
+    ],
+    "frames": 768
+  },
+  "integrity": {
+    "assets/01-work-idle.mp4": {
+      "bytes": 634880,
+      "sha256": "f5cf7ab697c7dd59f202d6620650b810b498b2c5dd731afdb116d51907200df4"
+    },
+    "assets/02-work-to-attention.mp4": {
+      "bytes": 1655987,
+      "sha256": "0d6cc0fbe7e0790c767adeb66f5bb3288ff53ff07fa0261ce49bea53b495718c"
+    },
+    "assets/03-attentive-nod.mp4": {
+      "bytes": 856705,
+      "sha256": "c44a5995bf2da0f36fd6de74cb96cab5bb24cfe4ea66e0af3c4506f8474dda2d"
+    },
+    "assets/04-greeting-wave.mp4": {
+      "bytes": 849812,
+      "sha256": "f2508787309573d7930d9f8146ea360a6744a7e70dce59568a7c64fa5f10bac1"
+    },
+    "assets/05-attention-to-work.mp4": {
+      "bytes": 1533104,
+      "sha256": "69715348139d4f227d188944f2f38296f6531ca6c9b8d18aa57e401a78605391"
+    },
+    "assets/06-work-to-cup.mp4": {
+      "bytes": 2380736,
+      "sha256": "1be8788612f523350333356b2be9b8850a0adb06c53d2c76e869f071fff1212d"
+    },
+    "assets/07-cup-sip.mp4": {
+      "bytes": 1578892,
+      "sha256": "2bf9432c97ef3c3f521facb36decdc999bcf6bf2e51fffe42f4f3cd660be57f6"
+    },
+    "assets/08-cup-to-work.mp4": {
+      "bytes": 2448440,
+      "sha256": "505a4312a04815aeec6e5d6dbc18e6af22e8b7607907fb24e4e1f8dc7e73d58d"
+    },
+    "assets/09-attention-idle.mp4": {
+      "bytes": 397543,
+      "sha256": "aff1704eeeefd4492c2a2f824920ad16fb1ca1c68218f1192b233bdb3aac702a"
+    },
+    "assets/10-cup-idle.mp4": {
+      "bytes": 368687,
+      "sha256": "7b8736c56f477617d7c4a53583dc563f9883d49de91682eadbc66be26071b001"
+    },
+    "anchors/A.png": {
+      "bytes": 1517464,
+      "sha256": "2ef816df0ae88167516eb1aae5a12ce42dc686a5bb09f58adf43ba20a6f70cf3"
+    },
+    "anchors/B.png": {
+      "bytes": 1525365,
+      "sha256": "dcdd42d7a533bf1879a717b268c95162d77243974ed483c309ec4083cfb0cae8"
+    },
+    "anchors/C.png": {
+      "bytes": 1512964,
+      "sha256": "2910472f21ec5c1c43cb172ac4a541b8530f71d97088dc6615f949121326fbe7"
+    },
+    "window-layer.webm": {
+      "bytes": 1471423,
+      "sha256": "6c73a712bfb3a850a6a8c7ff92ad0ab117b907ad5954a356d26a844cf03a273c"
+    }
+  }
+}

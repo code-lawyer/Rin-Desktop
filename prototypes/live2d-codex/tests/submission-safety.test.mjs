@@ -7,6 +7,7 @@ import { WorkspaceStore } from '../backend/workspace-store.mjs';
 import { SubmissionGuard, submissionBaseline, matchesSubmission } from '../backend/submission-guard.mjs';
 import { CodexCompanion } from '../backend/codex.mjs';
 import { NativeAgent } from '../backend/native-agent.mjs';
+import { createDraftSession } from '../renderer/draft-session.mjs';
 
 const deferred = () => { let resolve, reject; const promise = new Promise((a,b) => { resolve=a; reject=b; }); return { promise, resolve, reject }; };
 async function fixture(t, io) {
@@ -18,9 +19,49 @@ async function fixture(t, io) {
   return { root, project, store, agent, guard, target: { provider: 'codex', cwd: root, threadId: 'thread' } };
 }
 
+for (const waitingFor of ['project lookup', 'draft acknowledgement']) for (const followup of ['next saved draft', '']) for (const accepted of [true, false]) {
+  test(`draft saved during ${waitingFor} survives ${accepted ? 'confirmation' : 'lost receipt'}, exit and restart (${followup ? 'edit' : 'clear'})`, async t => {
+    const { root, store, agent, guard, target } = await fixture(t);
+    const reached = deferred(), release = deferred();
+    let editor = '', writes = 0;
+    const drafts = createDraftSession({
+      request: async (to, text) => {
+        if (text === undefined) return { ok: true, value: store.draftSnapshot(to) };
+        writes++; await store.saveDraft(to, text);
+        if (waitingFor === 'draft acknowledgement' && text === 'original request') { reached.resolve(); await release.promise; }
+        return { ok: true };
+      }, getText: () => editor, setText: value => { editor = value; }, error: message => assert.fail(message),
+    });
+    await drafts.restore(target); editor = 'original request'; drafts.edited();
+    const saving = drafts.save();
+    if (waitingFor === 'project lookup') {
+      await saving;
+      const add = store.add.bind(store);
+      store.add = async cwd => { reached.resolve(); await release.promise; return add(cwd); };
+    }
+    agent.rpc.request = async method => {
+      if (method === 'thread/read') return { thread: { cwd: root, turns: [] } };
+      if (!accepted) throw new Error('receipt lost');
+      return { turn: { id: 'accepted' } };
+    };
+    const sending = saving.then(() => guard.send(agent, 'codex', 'original request', target));
+    const rejected = accepted ? null : assert.rejects(sending, /receipt lost/);
+    await reached.promise; editor = followup; drafts.edited(); await drafts.save();
+    release.resolve();
+    if (accepted) await drafts.consume((await sending).submission); else await rejected;
+    const savedWrites = writes; await drafts.flush();
+    const restored = new WorkspaceStore(root); await restored.load();
+    assert.equal(editor, followup); assert.equal(writes, savedWrites);
+    assert.equal(restored.draft(target), followup);
+    assert.equal(restored.data.submissions.codex.text, 'original request');
+    assert.equal(restored.data.submissions.codex.status, accepted ? 'confirmed' : 'unknown');
+  });
+}
+
 test('accepted request with lost receipt survives restart; reconciliation reads history and never resends', async t => {
   const { root, store, agent, guard, target } = await fixture(t); let sends = 0;
   const rows = [];
+  await store.saveDraft(target, 'do once');
   agent.rpc.request = async method => {
     if (method === 'thread/read') return { thread: { cwd: root, turns: structuredClone(rows) } };
     assert.equal(method, 'turn/start'); sends++;
@@ -60,6 +101,7 @@ test('an accepted notification before a lost RPC reply cannot regress a confirme
 
 test('new thread identity reaches disk before its prompt, and restart retains the original draft', async t => {
   const { root, store, agent, guard } = await fixture(t); agent.state.threadId = null;
+  await store.saveDraft({ cwd: root }, 'new request');
   agent.rpc.request = async method => {
     if (method === 'thread/start') return { thread: { id: 'created' } };
     if (method === 'thread/read') return { thread: { cwd: root, turns: [] } };
@@ -84,6 +126,7 @@ test('failure to persist before dispatch prevents any Agent submission', async t
 test('pending receipt is recovered as unknown and a failed confirmation retains the original', async t => {
   let fail = false;
   const { root, store, agent, guard, target } = await fixture(t, { ...fs, rename: async (a,b) => { if (fail && b.endsWith('workspaces.json')) throw new Error('locked'); return fs.rename(a,b); } });
+  await store.saveDraft(target, 'saved first');
   agent.rpc.request = async method => {
     if (method === 'thread/read') return { thread: { cwd: root, turns: [] } };
     fail = true; return { turn: { id: 'accepted' } };
@@ -101,6 +144,7 @@ for (const provider of ['claude', 'grok', 'opencode']) test(`${provider}: local 
   agent.readSubmissionHistory = async () => [];
   agent.promptNative = async () => { started.resolve(); await gate.promise; agent.appendText('remote reply'); return {}; };
   const target = { provider, cwd: root, threadId: 'native' };
+  await store.saveDraft(target, 'sent text');
   const result = await guard.send(agent, provider, 'sent text'); await started.promise;
   assert.equal(result.pending, true); assert.equal(store.draft(target), 'sent text');
   await store.saveDraft(target, 'next draft'); gate.resolve(); await agent.run; await store.queue;

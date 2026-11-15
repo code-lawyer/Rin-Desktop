@@ -202,30 +202,39 @@ test('more than 100 unsent drafts survive cross-provider saves and a disk reload
   assert.equal(restored.draft(original), 'unsent original'); assert.equal(Object.keys(restored.data.drafts).length, 105);
 });
 
-for (const mode of ['sync', 'sync-throw', 'async', 'async-reject']) test(`failed speech load cleans up a ${mode} worker and can retry`, async () => {
+for (const mode of ['sync', 'sync-throw', 'async', 'async-reject']) test(`failed speech load owns ${mode} cleanup before permitting retry`, async () => {
   let attempts = 0, closed = 0;
   const speech = new ResidentSpeech('unused', { factory: () => ({
     load() { if (++attempts === 1) throw new Error('model unavailable'); },
     close() { closed++; if (mode === 'sync-throw') throw new Error('close failed'); if (mode === 'async-reject') return Promise.reject(new Error('close failed')); if (mode === 'async') return Promise.resolve(); },
   }) });
-  await speech.configure({ ttsEngine: 'kokoro', ttsResident: true });
+  const settings = { ttsEngine: 'kokoro', ttsResident: true };
+  if (mode === 'sync-throw' || mode === 'async-reject') {
+    await assert.rejects(speech.configure(settings), /close failed/);
+    assert.equal(speech.phase, 'error'); assert.match(speech.error, /close failed/);
+    await assert.rejects(speech.configure(settings), /close failed/);
+    await assert.rejects(speech.close(), /close failed/);
+    assert.equal(attempts, 1); assert.equal(closed, 1); return;
+  }
+  await speech.configure(settings);
   assert.equal(speech.phase, 'error'); assert.equal(speech.worker, null); assert.equal(closed, 1);
   assert.match(speech.error, /model unavailable/);
   await speech.configure({ ttsEngine: 'kokoro', ttsResident: true }); assert.equal(speech.phase, 'ready');
-  // Teardown failures are surfaced as state; this test never owns a real worker.
   await speech.close(); assert.equal(closed, 2);
 });
 
-test('late failed-worker cleanup cannot replace a newer ready speech state', async () => {
+test('a replacement waits for failed-worker cleanup and keeps its own ready state', { timeout: 2000 }, async t => {
   const cleaning = deferred(), cleaned = deferred(); let count = 0;
+  t.after(() => cleaned.resolve());
   const speech = new ResidentSpeech('unused', { factory: () => ++count === 1 ? {
     load() { throw new Error('old model failed'); }, close() { cleaning.resolve(); return cleaned.promise; }
   } : { load() {}, close() {} } });
   const first = speech.configure({ ttsEngine: 'kokoro', ttsResident: true });
   await cleaning.promise;
-  await speech.configure({ ttsEngine: 'qwen', ttsResident: true });
-  const readyWorker = speech.worker; assert.equal(speech.phase, 'ready');
-  cleaned.resolve(); await first;
+  const replacement = speech.configure({ ttsEngine: 'qwen', ttsResident: true });
+  await new Promise(resolve => setImmediate(resolve)); assert.equal(count, 1); assert.equal(speech.worker, null);
+  cleaned.resolve(); await Promise.all([first, replacement]);
+  const readyWorker = speech.worker; assert.equal(count, 2);
   assert.equal(speech.phase, 'ready'); assert.equal(speech.worker, readyWorker); assert.equal(speech.error, '');
   await speech.close();
 });

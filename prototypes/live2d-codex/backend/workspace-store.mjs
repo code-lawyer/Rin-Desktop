@@ -14,7 +14,7 @@ const { isCliAgent, isStoredCliAgent } = catalog;
 
 export const { DEFAULT_SHORTCUTS, DEFAULT_REMOTE_KEYS } = actions;
 const { DEFAULT_CHARACTER, characterProfile, isCharacter, isQwenVoice, isChineseVoice } = characters;
-const defaults = () => ({ format: 1, projects: [], drafts: {}, settings: { character: DEFAULT_CHARACTER, wallpaperKind: 'artwork', completionSound: true, ttsResident: false, ttsEngine: 'qwen', qwenVoice: 'Serena', qwenRoot: '', autoSpeak: false, prepareSpeech: false, voice: 3, speed: 1, microphone: '', shortcuts: { ...DEFAULT_SHORTCUTS }, remoteEnabled: false, remoteKeys: { ...DEFAULT_REMOTE_KEYS } } });
+const defaults = () => ({ format: 1, projects: [], drafts: {}, settings: { character: DEFAULT_CHARACTER, wallpaperKind: 'artwork', animePlayback: 'poses', completionSound: true, ttsResident: false, ttsEngine: 'qwen', qwenVoice: 'Serena', qwenRoot: '', autoSpeak: false, prepareSpeech: false, voice: 3, speed: 1, microphone: '', shortcuts: { ...DEFAULT_SHORTCUTS }, remoteEnabled: false, remoteKeys: { ...DEFAULT_REMOTE_KEYS } } });
 export const draftKey = target => {
   if (!target || typeof target.cwd !== 'string') throw new Error('草稿目标无效。');
   const provider = target?.provider ?? 'codex';

@@ -26,6 +26,7 @@
       <button id="close-chat" class="icon-button" title="收起气泡" aria-label="收起气泡"><svg class="ui-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="m5 5 10 10M15 5 5 15"/></svg></button>
     </header>
     <div id="current-target" class="current-target"><button id="workbench-button" type="button"><span id="target-label">本地项目 / 新对话</span><svg class="ui-icon context-chevron" viewBox="0 0 20 20" aria-hidden="true"><path d="m6 8 4 4 4-4"/></svg></button></div>
+    <div id="bubble-body" class="bubble-body">
     <div id="bubble-content" class="bubble-content">
     <section id="context-panel" class="context-panel" hidden aria-label="项目与对话设置">
     <div class="provider-bar"><label for="provider-select">Agent</label><select id="provider-select"></select><button id="open-dot" class="text-button" type="button" hidden>打开凛 ↗</button><button id="reconnect-dot" class="text-button" type="button">重连</button></div>
@@ -69,8 +70,9 @@
       <span id="playback-status" class="playback-status" role="status" hidden></span>
       <label class="playback-volume" title="播报音量；遥控器音量键也可调节"><svg class="ui-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M4 8h3l4-4v12l-4-4H4Zm10-1a5 5 0 0 1 0 6m2-8a8 8 0 0 1 0 10"/></svg><input id="playback-volume" type="range" min="0" max="100" step="10" value="100" aria-label="播报音量"><output id="playback-volume-value" for="playback-volume">100%</output></label>
     </section>
+    </div>
     <form id="composer" class="composer">
-      <textarea id="prompt" rows="1" maxlength="64000" placeholder="告诉我你的任务，或继续追问…" aria-label="给 Codex 的任务"></textarea>
+      <textarea id="prompt" rows="1" maxlength="64000" placeholder="输入任务或追问" aria-label="给 Codex 的任务"></textarea>
       <div class="composer-feedback"><span id="voice-status" class="voice-status" aria-live="polite" hidden></span><span id="composer-hint" class="composer-hint">Enter 发送 · Shift + Enter 换行</span></div>
       <div class="composer-footer"><div class="voice-actions"><button id="record-button" class="voice-button" type="button" aria-pressed="false" title="使用电脑麦克风听写 · Ctrl+Alt+V">电脑听写</button><button id="cancel-recording" class="text-button" type="button" hidden>取消听写</button><button id="clear-draft" class="text-button" type="button" hidden>清空</button></div><button id="send-button" type="submit"><span>发送</span><svg class="ui-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 15V5m-4 4 4-4 4 4"/></svg></button></div>
     </form>

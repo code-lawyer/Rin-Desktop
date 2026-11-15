@@ -1,14 +1,13 @@
 // Real renderer/layout checks with a synthetic preload. No Agent or hardware.
 import {spawn} from 'node:child_process';
-import {mkdir} from 'node:fs/promises';
 import {join,resolve} from 'node:path';
+import {createRunDirectory} from './run-output.mjs';
 if (process.argv.includes('--help') || process.argv.includes('-h')) {
   console.log('Usage: npm run qa:interface\nChecks the interface in isolated Electron windows. --help: help only, no files or processes.');
   process.exit(0);
 }
 const root=resolve(import.meta.dirname,'../..');
-const output=join(root,'work/qa/interface-'+new Date().toISOString().replace(/[:.]/g,'-'));
-await mkdir(output,{recursive:true});
+const output=await createRunDirectory('interface');
 const env={...process.env};delete env.ELECTRON_RUN_AS_NODE;
 const child=spawn(join(root,'prototypes/live2d-codex/node_modules/electron/dist/electron.exe'),[join(import.meta.dirname,'interface-fixture.cjs'),output],{env,windowsHide:true,stdio:'inherit'});
 const code=await new Promise((resolve,reject)=>{child.once('error',reject);child.once('exit',resolve);});

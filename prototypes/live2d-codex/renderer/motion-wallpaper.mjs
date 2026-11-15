@@ -14,17 +14,30 @@ export async function loadMotionCatalog() {
 }
 
 export class MotionWallpaper {
+  static async prepare(options) {
+    const layer = new MotionWallpaper(options), first = layer.decks[0];
+    try {
+      await first.prepare(options.catalog.clips.get('work-loop'), 0, layer.controller.signal);
+      await first.play();
+      await first.present(layer.controller.signal, () => false);
+      first.pause(); await first.seek(0, layer.controller.signal);
+      return layer;
+    } catch (error) { layer.close(); throw error; }
+  }
   constructor({ host, catalog, changed }) {
+    this.controller = new AbortController(); this.closed = false;
     this.elements = Array.from({ length: 2 }, () => {
       const element = document.createElement('video'); element.className = 'wallpaper-motion';
       element.setAttribute('aria-hidden', 'true'); element.disablePictureInPicture = true; host.append(element); return element;
     });
-    this.player = new MotionPlayer({ decks: this.elements.map(element => new VideoDeck(element)), catalog, changed });
+    this.decks = this.elements.map(element => new VideoDeck(element));
+    this.player = new MotionPlayer({ decks: this.decks, catalog, changed });
   }
+  get ready() { return !this.closed && this.decks[0].ready && !this.player.error; }
   start(backend, presentation, hidden) { this.update(backend, presentation, hidden); this.player.start(); }
   update(backend, presentation, hidden) {
     this.player.setPaused(!!presentation.paused || hidden);
     this.player.setTarget(motionTarget(backend, presentation));
   }
-  close() { this.player.close(); this.elements.forEach(element => element.remove()); }
+  close() { if (this.closed) return; this.closed = true; this.controller.abort(); this.player.close(); this.elements.forEach(element => element.remove()); }
 }

@@ -96,6 +96,26 @@ test('style changes do not interrupt narration and post-commit notification fail
   assert.equal(h.store.data.settings.wallpaperMotion,true);assert.equal(h.store.data.settings.qwenVoice,'Vivian');
 });
 
+test('original pose recovery rejects stale anime video acknowledgements and preserves settings on failed persistence', async t => {
+  const h = await characterFixture(t);
+  await h.store.updateSettings({ wallpaperMotion: true });
+  h.context.wallpaperStatus = { phase: 'loading', character: 'female', wallpaperKind: 'artwork', wallpaperMotion: false, animePlayback: 'poses', requestId: 1 };
+  const info = { ...h.info(1), animePlayback: 'poses' };
+  assert.equal(await h.context.confirmWallpaper({ ...info, animePlayback: 'video' }), false);
+  assert.equal(await h.context.confirmWallpaper(info), true);
+  assert.equal(h.store.data.settings.wallpaperMotion, true, 'preparation cannot publish a preference');
+  assert.equal(await h.context.confirmWallpaper({ ...info, animePlayback: 'video' }), false, 'a pending commit cannot acknowledge a different renderer mode');
+  h.fail(true); assert.equal(h.context.finishWallpaper(info, true), false);
+  assert.equal(h.store.data.settings.wallpaperMotion, true);
+  h.fail(false); h.context.wallpaperStatus = { ...h.context.wallpaperStatus, phase: 'loading', requestId: 2 };
+  assert.equal(await h.apply({ ...info, requestId: 2 }), true);
+  assert.equal(h.store.data.settings.animePlayback, 'poses');
+  assert.equal(h.store.data.settings.wallpaperMotion, false);
+  assert.equal(h.store.data.settings.qwenVoice, 'Vivian'); assert.equal(h.store.data.settings.voice, 48);
+  const restored = new WorkspaceStore(join(h.store.file, '..')); await restored.load();
+  assert.equal(restored.data.settings.animePlayback, 'poses');
+});
+
 function playbackFixture() {
   const handlers = new Map(), waits = [], notices = [];
   const chat = { webContents: { send() {} } };

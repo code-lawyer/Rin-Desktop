@@ -22,12 +22,13 @@ let wallpaper;
 $(isWallpaper ? 'wallpaper-view' : isAvatar ? 'avatar-view' : 'chat-view').hidden = false;
 let current, sending = false, composing = false, approvalKey = '', modelKey = '';
 let pendingReply = false, previousUserId = null, replyKey = '', replyText = null, replyComplete = null;
+let replyScroller;
 let measureTimer, lastMeasurement = '';
 let draftTimer, speechControls, composerControls;
 let quitRequest = null;
 const seenSubmissions = new Set();
 const drafts = createDraftSession({ request: (...args) => api.draft(...args), getText: () => $('prompt').value,
-  setText: text => { $('prompt').value = text; growPrompt(); }, error });
+  setText: text => { $('prompt').value = text; refreshComposer(); }, error });
 function saveDraft() { clearTimeout(draftTimer); return drafts.save(); }
 function installDraftShutdown() {
   api.onDraftFlush?.(async id => {
@@ -65,9 +66,23 @@ async function call(promise) {
 }
 const element = (tag, className, text) => { const node = document.createElement(tag); if (className) node.className = className; if (text !== undefined) node.textContent = text; return node; };
 
+function updateReplyScroller() {
+  const body = $('bubble-body');
+  const content = $('bubble-content');
+  const host = getComputedStyle(body).overflowY === 'auto' ? body : content;
+  if (host !== replyScroller) {
+    // Chromium can carry the old offset across a change of scroll container.
+    body.scrollTop = 0;
+    content.scrollTop = 0;
+    replyScroller = host;
+  }
+  return host;
+}
+
 function renderMessages(messages) {
-  const host = $('bubble-content');
-  const atBottom = host.scrollHeight - host.scrollTop - host.clientHeight < 90;
+  const host = updateReplyScroller();
+  const remainingReply = () => $('reply-content').getBoundingClientRect().bottom - host.getBoundingClientRect().bottom;
+  const atBottom = remainingReply() < 90;
   const reply = currentReply(messages);
   const finishedAtBottom = replyComplete === false && reply.complete && atBottom;
   if (pendingReply && reply.userId !== previousUserId) pendingReply = false;
@@ -76,14 +91,15 @@ function renderMessages(messages) {
   $('welcome').hidden = !!text;
   $('welcome').textContent = busy() ? '正在为你处理…' : reply.userId ? '可以接着问我。' : '想一起做点什么？';
   $('current-message').hidden = !text; $('current-message').dataset.messageId = reply.messageId ?? '';
-  if (replyText !== text || replyComplete !== reply.complete) {
+  const replyChanged = replyText !== text || replyComplete !== reply.complete;
+  if (replyChanged) {
     renderReply($('reply-body'), text, href => call(api.openLink(href)));
     if (text && !reply.complete) $('reply-body').append(element('span', 'stream-caret'));
     replyText = text; replyComplete = reply.complete;
   }
   replyKey = reply.key;
   if (changedTurn || finishedAtBottom) host.scrollTop = 0;
-  else if (atBottom) host.scrollTop = host.scrollHeight;
+  else if (replyChanged && atBottom) host.scrollTop += Math.max(0, remainingReply());
   scheduleMeasure();
 }
 function scheduleMeasure() {
@@ -107,8 +123,8 @@ function measureBubble() {
   const key = JSON.stringify(size);
   if (key !== lastMeasurement) { lastMeasurement = key; api.resizeBubble(size); }
 }
-function growPrompt() {
-  $('prompt').style.height = '0px'; $('prompt').style.height = Math.min(140, Math.max(38, $('prompt').scrollHeight)) + 'px'; scheduleMeasure();
+function refreshComposer() {
+  scheduleMeasure();
   composerControls?.refresh();
 }
 function renderApproval(approvals) {
@@ -164,22 +180,27 @@ function renderApproval(approvals) {
       label.append(field); body.append(label);
     }
   }
-  function action(label, answer, primary = false) {
+  function action(label, submit, primary = false, disabled = false) {
     const button = element('button', primary ? 'primary' : '', label); button.type = 'button';
-    if (request.allowDisabled && answer?.decision === 'accept') button.disabled = true;
+    button.disabled = disabled;
     button.addEventListener('click', async () => {
-      const buttons = [...actions.querySelectorAll('button')]; buttons.forEach(b => b.disabled = true);
-      await call(api.respond(request.id, typeof answer === 'function' ? answer() : answer));
-      buttons.forEach(b => b.disabled = false);
-      if (request.allowDisabled) actions.querySelector('.primary')?.setAttribute('disabled', '');
+      const buttons = [...actions.querySelectorAll('button:enabled')];
+      buttons.forEach(button => button.disabled = true);
+      try { await call(submit()); }
+      finally { buttons.forEach(button => button.disabled = false); }
     }); actions.append(button);
   }
-  if (request.kind === 'questions') action('提交回答', () => ({ answers: Object.fromEntries(Object.entries(fields).map(([id, input]) => [id, input.selected ? [...input.selected.selectedOptions].map(o => o.value).concat(input.field.value.trim() ? [input.field.value.trim()] : []) : input.field.value])) }), true);
-  else if (request.kind === 'permissions') { action('本次允许', { allow: true }, true); action('拒绝', { allow: false }); }
-  else { action(request.kind === 'files' && request.details.includes('本会话') ? '允许所示目录范围' : '允许这次', { decision: 'accept' }, true); action('拒绝', { decision: 'decline' }); action('停止任务', { decision: 'cancel' }); }
-  if (request.kind === 'questions' || request.kind === 'permissions') {
-    const stop = element('button', '', '停止任务'); stop.type = 'button'; stop.addEventListener('click', () => call(api.interrupt())); actions.append(stop);
+  const respond = answer => api.respond(request.id, answer);
+  if (request.kind === 'questions') {
+    action('提交回答', () => respond({ answers: Object.fromEntries(Object.entries(fields).map(([id, input]) => [id, input.selected ? [...input.selected.selectedOptions].map(o => o.value).concat(input.field.value.trim() ? [input.field.value.trim()] : []) : input.field.value])) }), true);
+  } else if (request.kind === 'permissions') {
+    action('本次允许', () => respond({ allow: true }), true);
+    action('拒绝', () => respond({ allow: false }));
+  } else {
+    action(request.kind === 'files' && request.details.includes('本会话') ? '允许所示目录范围' : '允许这次', () => respond({ decision: 'accept' }), true, !!request.allowDisabled);
+    action('拒绝', () => respond({ decision: 'decline' }));
   }
+  action('停止任务', () => api.interrupt());
   host.append(actions);
 }
 function render(state) {
@@ -197,7 +218,7 @@ function render(state) {
   $('connection-signal').className = `signal ${signal}`;
   $('speaker-name').textContent = dots ? '凛 · DOT' : name;
   $('prompt').setAttribute('aria-label', dots ? '给凛的消息' : `给 ${name} 的任务`);
-  $('prompt').placeholder = dots ? '和凛说点什么，或继续追问…' : '告诉我你的任务，或继续追问…';
+  $('prompt').placeholder = dots ? '发消息给凛' : '输入任务或追问';
   $('prompt').disabled = dots && !state.threadId;
   const showLogin = !dots && ['authentication', 'error'].includes(state.connection);
   const loginOpened = $('login-panel').hidden && showLogin;
@@ -239,14 +260,14 @@ function render(state) {
   $('submission-release').hidden = !submission?.checkedAt;
   $('submission-release').disabled = active || sending;
   $('send-button').disabled = unresolved || active || sending || state.connection !== 'ready' || state.status === 'error';
-  $('stop-button').hidden = !active || state.status === 'configuring'; $('stop-button').disabled = state.status === 'stopping';
+  $('stop-button').hidden = !active || state.status === 'configuring' || state.approvals.length > 0; $('stop-button').disabled = state.status === 'stopping';
   $('stop-button').textContent = dots ? '打开凛 ↗' : '停止';
   $('activity-label').textContent = state.activity; $('session-label').textContent = state.threadId ? `${state.restored ? '已恢复' : '会话'} · ${state.threadId.slice(-8)}` : '新对话';
   $('activity-label').title = state.activity || '';
   $('session-label').hidden = !state.threadId;
-  $('activity-line').hidden = !active && state.connection === 'ready';
+  $('activity-line').hidden = $('stop-button').hidden && (!state.activity || state.status === 'waiting' || !active && state.connection === 'ready');
   $('session-label').title = state.threadId ?? '';
-  renderMessages(state.messages); renderApproval(state.approvals); error(state.error);
+  renderApproval(state.approvals); renderMessages(state.messages); error(state.error);
   if (loginOpened) requestAnimationFrame(() => $('login-panel').scrollIntoView({ block: 'start' }));
   speechControls?.refresh();
   composerControls?.refresh();
@@ -276,7 +297,7 @@ if (isWallpaper) {
   };
   api.workspace().then(r => { if (r.ok) showAgentChoices(r.value); });
   api.onWorkspace(showAgentChoices);
-  speechControls = installSpeech({ api, state: () => current, isBusy: () => busy() || sending || pendingReply, error, measure: () => {scheduleMeasure();composerControls?.refresh();}, insert: text => { const prompt = $('prompt'); prompt.value += (prompt.value && !/\s$/.test(prompt.value) ? ' ' : '') + text; drafts.edited(); growPrompt(); saveDraft(); prompt.focus(); } });
+  speechControls = installSpeech({ api, state: () => current, isBusy: () => busy() || sending || pendingReply, error, measure: refreshComposer, insert: text => { const prompt = $('prompt'); prompt.value += (prompt.value && !/\s$/.test(prompt.value) ? ' ' : '') + text; drafts.edited(); refreshComposer(); saveDraft(); prompt.focus(); } });
   composerControls = installComposerControls({api,drafts,submit:submitDraft,readReply:()=>speechControls.readReply(),isLocked:()=>quitRequest !== null || sending || ['pending','unknown'].includes(current?.submission?.status) || ! $('approval').hidden,isCapturing:()=>speechControls.isCapturing(),error,measure:scheduleMeasure});
   installDraftShutdown();
   api.onInputAction(action => {
@@ -335,7 +356,7 @@ if (isWallpaper) {
     $('reading-button').setAttribute('aria-label', layout.fullscreen ? '返回气泡' : '展开阅读');
     scheduleMeasure();
   });
-  window.addEventListener('resize', () => { positionTail(); scheduleMeasure(); });
+  window.addEventListener('resize', () => { updateReplyScroller(); positionTail(); scheduleMeasure(); });
   $('reading-button').addEventListener('click', () => api.windowAction('toggle-reading'));
   $('settings-button').addEventListener('click', () => {
     $('context-panel').hidden = !$('context-panel').hidden;
@@ -379,7 +400,7 @@ if (isWallpaper) {
     catch { restore = true; failure = '与桌面窗口的连接已断开。请重启桌面伙伴，草稿已保留。'; }
     finally {
       if (restore) pendingReply = false;
-      sending = false; render(current); growPrompt(); saveDraft(); $('prompt').focus();
+      sending = false; render(current); refreshComposer(); saveDraft(); $('prompt').focus();
       if (failure) reject(failure);
     }
   }
@@ -396,7 +417,7 @@ if (isWallpaper) {
   $('prompt').addEventListener('keydown', event => {
     if (event.key === 'Enter' && !event.shiftKey && !event.ctrlKey && !event.altKey && !event.metaKey && !event.isComposing && event.keyCode !== 229) { event.preventDefault(); if (!event.repeat) $('composer').requestSubmit(); }
   });
-  $('prompt').addEventListener('input', () => { drafts.edited(); growPrompt(); clearTimeout(draftTimer); draftTimer = setTimeout(saveDraft,180); });
+  $('prompt').addEventListener('input', () => { drafts.edited(); refreshComposer(); clearTimeout(draftTimer); draftTimer = setTimeout(saveDraft,180); });
   window.addEventListener('beforeunload',saveDraft);
   const resizeObserver = new ResizeObserver(scheduleMeasure);
   for (const id of ['reply-content', 'composer', 'context-panel', 'approval', 'login-panel']) resizeObserver.observe($(id));

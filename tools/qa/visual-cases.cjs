@@ -8,6 +8,12 @@ module.exports=async function visualCases({open,evaluate,delay,output,extended=f
     const end=Date.now()+15000;
     while(!await evaluate(win,condition)){if(Date.now()>end)throw new Error('Timed out: '+condition);await delay(60);}
   };
+  const replyStartsInView=`(()=>{
+    const reply=document.querySelector('#reply-body > :first-child');
+    const firstLine=document.createRange();firstLine.selectNodeContents(reply);
+    const line=firstLine.getClientRects()[0],hit=document.elementFromPoint(line.left+4,(line.top+line.bottom)/2);
+    return line.bottom<=document.getElementById('composer').getBoundingClientRect().top&&reply.contains(hit);
+  })()`;
   async function verify(win,name,condition) {
     checks.push(name);
     if(!await evaluate(win,condition))failures.push({name,condition});
@@ -63,9 +69,15 @@ module.exports=async function visualCases({open,evaluate,delay,output,extended=f
     captures.push({name,window:{width,height},zoom,pixels:shot.getSize(),...metrics,...(accessibility?{accessibility}:{})});
     if(metrics.clipped.length||metrics.bodyOverflow)failures.push({name,clipped:metrics.clipped,bodyOverflow:metrics.bodyOverflow});
   }
-  async function reachable(win,name,selectors) {
+  async function reachable(win,name,selectors,{withoutScrolling=false}={}) {
     for(const selector of selectors) {
-      const visibility=await evaluate(win,`(()=>{const el=document.querySelector(${JSON.stringify(selector)});el.scrollIntoView({block:'center'});el.focus();const r=el.getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return {visible:r.top>=0&&r.bottom<=innerHeight+1&&(el===hit||el.contains(hit)),viewport:{width:innerWidth,height:innerHeight},rect:{x:r.x,y:r.y,width:r.width,height:r.height},hit:hit?.id||hit?.className,focused:document.activeElement===el}})()`);
+      const visibility=await evaluate(win,`(()=>{
+        const el=document.querySelector(${JSON.stringify(selector)});
+        if(!${withoutScrolling}){el.scrollIntoView({block:'center'});el.focus();}
+        const r=el.getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);
+        return {visible:r.top>=0&&r.bottom<=innerHeight+1&&r.left>=0&&r.right<=innerWidth+1&&(el===hit||el.contains(hit)),
+          viewport:{width:innerWidth,height:innerHeight},rect:{x:r.x,y:r.y,width:r.width,height:r.height},hit:hit?.id||hit?.className,focused:document.activeElement===el};
+      })()`);
       if(!visibility.visible) {
         await delay(150);
         const screenshot='unreachable-'+String(failures.length+1)+'.png';
@@ -79,15 +91,23 @@ module.exports=async function visualCases({open,evaluate,delay,output,extended=f
   await capture(chat,'bubble-standard',440,420);
   await capture(chat,'bubble-narrow',360,390);
   await capture(chat,'bubble-minimum',280,190);
-  await reachable(chat,'minimum actions remain reachable',['#record-button','#send-button']);
-  await capture(chat,'bubble-minimum-actions',280,190);
-  await evaluate(chat,`document.getElementById('bubble-card').scrollTop=0`);
+  const composerSelectors=['#prompt','#record-button','#send-button'];
+  await reachable(chat,'minimum composer is visible on opening',composerSelectors,{withoutScrolling:true});
+  await reachable(chat,'minimum bubble can scroll to playback',['#replay-reply','#playback-volume']);
   await evaluate(chat,`(()=>{const p=document.getElementById('prompt');p.value='请整理今天的开发进展，并列出接下来需要确认的事项。\\n保留桌面原有的语音和遥控器功能。\\n给我可以逐项执行的计划。';p.dispatchEvent(new Event('input',{bubbles:true}));p.focus();interfaceFixture.emit('remoteAction','down')})()`);
   await capture(chat,'bubble-draft-focus',360,390);
   await evaluate(chat,`(()=>{const p=document.getElementById('prompt');p.value='';p.dispatchEvent(new Event('input',{bubbles:true}))})()`);
   const longReply='# 今天的进展\n\n已保留原有的 **对话、工作台、语音与遥控器**。以下内容用于检查长回复的阅读体验。\n\n## 下一步\n\n- 查看人物画面与窗口的衔接\n- 核对中文、数字及英文路径\n\n| 状态 | 项目 | 备注 |\n| --- | --- | --- |\n| 已完成 | 静态姿态 | 保持原有雨夜场景 |\n| 待验收 | 真实设备 | 需要在目标显示器和遥控器上确认 |\n\n```text\nC:/Projects/Example/long-path/renderer/workbench.html\n```\n\n'+('较长的说明应当留在阅读区内滚动，输入框和播放按钮仍然可以操作。\n\n'.repeat(8));
-  await emit(chat,'state',{messages:[{role:'assistant',text:longReply,complete:true}],projectName:'中文项目 · 工作台视觉与遥控体验',threadName:'很长的对话标题用于确认截断和完整信息提示'});
+  const longReplyMessage={role:'assistant',turnId:'visual-long-reply',text:longReply,complete:true};
+  await emit(chat,'state',{messages:[longReplyMessage],projectName:'中文项目 · 工作台视觉与遥控体验',threadName:'很长的对话标题用于确认截断和完整信息提示'});
   await capture(chat,'bubble-long-reply',560,620);
+  if(extended) {
+    await capture(chat,'bubble-long-reply-minimum',280,190);
+    await verify(chat,'a new long reply begins in view at minimum size',replyStartsInView);
+    await reachable(chat,'minimum composer is visible with a long reply',composerSelectors,{withoutScrolling:true});
+    await reachable(chat,'playback remains reachable below the long reply',['#replay-reply']);
+    await reachable(chat,'composer stays visible after scrolling the reply',composerSelectors,{withoutScrolling:true});
+  }
   await emit(chat,'layout',{fullscreen:true});await capture(chat,'reading-view',1040,760);
   await emit(chat,'layout',{fullscreen:false,side:'left',tailY:78});
   await emit(chat,'state',{status:'waiting',approvals:[{id:'visual-approval',kind:'command',reason:'需要你确认以下操作。较长的路径和命令应可滚动查看，审批按钮应始终可达。',cwd:'C:/Projects/Example/设计与前端视觉检查',command:'npm run build && npm run check:project',details:'仅展示合成审批，不执行命令。'}]});
@@ -97,6 +117,7 @@ module.exports=async function visualCases({open,evaluate,delay,output,extended=f
     const visible=el=>{const r=el.getBoundingClientRect();return r.top>=0&&r.bottom<=innerHeight&&r.left>=0&&r.right<=innerWidth};
     return document.getElementById('messages').hidden&&operation.textContent==='npm run build && npm run check:project'&&visible(operation)&&visible(directory)&&visible(actions)&&operation.getBoundingClientRect().bottom<=actions.getBoundingClientRect().top;
   })()`);
+  await verify(chat,'approval shows a single task stop',`document.getElementById('stop-button').hidden&&[...document.querySelectorAll('.approval-actions button')].filter(el=>el.textContent==='停止任务').length===1`);
   await evaluate(chat,`document.querySelector('.approval-context summary').click()`);
   await verify(chat,'approval explanation remains available',`document.querySelector('.approval-context').open&&document.querySelector('.approval-context').textContent.includes('仅展示合成审批')`);
   await evaluate(chat,`document.querySelector('.approval-context summary').click();document.querySelector('.approval-heading button').click()`);
@@ -106,14 +127,16 @@ module.exports=async function visualCases({open,evaluate,delay,output,extended=f
   await capture(chat,'approval-compact-actions',440,390);
   await evaluate(chat,`document.getElementById('bubble-card').scrollTop=0`);
   await capture(chat,'approval-standard',560,620);
-  await emit(chat,'state',{approvals:[{id:'visual-question',kind:'questions',reason:'确认本次检查的范围',questions:[{id:'scope',header:'检查范围',question:'你希望保留哪些已有功能？',options:[{label:'保留全部功能',description:'对话、工作台、语音和遥控器都保留'}]},{id:'notes',header:'补充',question:'还有其他视觉要求吗？',required:false,options:[]}]}]});
+  await evaluate(chat,`document.querySelector('.approval-actions button:last-child').click()`);
+  await verify(chat,'approval stop interrupts the task',`interfaceFixture.stats().interruptions===1&&document.getElementById('approval').hidden`);
+  await emit(chat,'state',{status:'waiting',approvals:[{id:'visual-question',kind:'questions',reason:'确认本次检查的范围',questions:[{id:'scope',header:'检查范围',question:'你希望保留哪些已有功能？',options:[{label:'保留全部功能',description:'对话、工作台、语音和遥控器都保留'}]},{id:'notes',header:'补充',question:'还有其他视觉要求吗？',required:false,options:[]}]}]});
   await capture(chat,'question-compact',440,420);
   await reachable(chat,'compact question fields and actions remain reachable',['.approval select','.approval label:last-child input','.approval-actions button:first-child','#send-button']);
   await evaluate(chat,`document.getElementById('bubble-card').scrollTop=0`);
   await emit(chat,'state',{status:'idle',approvals:[],connection:'error',error:'连接暂时中断。请检查本地 Agent 状态后重试。',messages:[]});
   await verify(chat,'reply is restored after approval finishes',`!document.getElementById('messages').hidden`);
   await capture(chat,'bubble-error',440,420);
-  await emit(chat,'state',{connection:'ready',error:null,messages:[{role:'assistant',text:'可以用，中文显示和回复都正常。',complete:true}]});
+  await emit(chat,'state',{connection:'ready',error:null,messages:[{role:'assistant',turnId:'visual-ready-reply',text:'可以用，中文显示和回复都正常。',complete:true}]});
   await capture(chat,'bubble-zoom-125',560,620,1.25);
   await capture(chat,'bubble-zoom-150',560,620,1.5);
   const workbench=await open('workbench.html',1120,760);
@@ -174,12 +197,17 @@ module.exports=async function visualCases({open,evaluate,delay,output,extended=f
       await reachable(workbench,'voice controls at minimum window and '+Math.round(zoom*100)+'%',['#tts-engine','#qwen-voice','#preview-voice','#save-settings']);
       await evaluate(workbench,`document.querySelector('[data-setting-target="wallpaper-settings"]').click();document.querySelector('.settings-scroll').scrollTop=0`);
       await capture(workbench,'wallpaper-minimum-zoom-'+Math.round(zoom*100),760,540,zoom);
+      if(zoom===2) {
+        await reachable(workbench,'all settings categories are visible at 200%',groups.map(group=>`[data-setting-target="${group}"]`),{withoutScrolling:true});
+        await reachable(workbench,'both wallpaper styles remain reachable at 200%',['[name="wallpaper-style"][value="anime"]','[name="wallpaper-style"][value="realistic"]']);
+      }
       await reachable(workbench,'wallpaper controls at minimum window and '+Math.round(zoom*100)+'%',['#still-pose','#pause-stills']);
       await capture(workbench,'wallpaper-controls-minimum-zoom-'+Math.round(zoom*100),760,540,zoom);
     }
     await evaluate(workbench,`document.getElementById('toggle-sidebar').click()`);
     await capture(workbench,'navigation-minimum-zoom-200',760,540,2);
     await verify(workbench,'narrow navigation opens and keeps the content behind it inactive',`document.getElementById('toggle-sidebar').getAttribute('aria-expanded')==='true'&&document.querySelector('main').inert&&document.getElementById('workbench-sidebar').contains(document.activeElement)`);
+    await verify(workbench,'narrow navigation has one scroll area',`getComputedStyle(document.getElementById('projects')).overflowY==='visible'`);
     await reachable(workbench,'narrow navigation settings remain reachable',['#agent-select','#settings-tab']);
     await evaluate(workbench,`interfaceFixture.emit('remoteAction','down')`);
     await verify(workbench,'remote navigation skips the inactive content behind the sidebar',`document.activeElement.id==='toggle-sidebar'`);
@@ -192,7 +220,8 @@ module.exports=async function visualCases({open,evaluate,delay,output,extended=f
     await capture(workbench,'navigation-restored-wide',1120,760);
     await verify(workbench,'widening restores the sidebar and active content',`document.getElementById('toggle-sidebar').getAttribute('aria-expanded')==='false'&&!document.querySelector('main').inert&&document.getElementById('workbench-sidebar').checkVisibility()`);
     await capture(chat,'bubble-zoom-200',560,620,2);
-    await reachable(chat,'bubble actions at 200%',['#record-button','#send-button']);
+    await verify(chat,'short reply begins in view after zooming to 200%',replyStartsInView);
+    await reachable(chat,'composer is visible at 200%',composerSelectors,{withoutScrolling:true});
   }
   return {captures,checks,failures,wallpaperStyles,extended,synthetic:true,accounts:false,hardware:false,pageZoomOnly:true,screenReaderAcceptance:false};
 };

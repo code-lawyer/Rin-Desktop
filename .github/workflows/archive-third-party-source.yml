@@ -3,12 +3,20 @@ name: Archive third-party source
 on:
   workflow_dispatch:
     inputs:
-      version:
-        description: Application version, for example 0.3.1
+      source_release_tag:
+        description: Release currently holding the archive, for example v0.6.3-rc.4
+        required: true
+        type: string
+      source_version:
+        description: CPU source archive version, for example 0.3.1
         required: true
         type: string
       destination_release_id:
-        description: Existing developer source release ID
+        description: Existing destination release ID
+        required: true
+        type: string
+      destination_release_tag:
+        description: Expected destination tag, for example v0.6.4-rc.1 or third-party-source-v0.3.1
         required: true
         type: string
 
@@ -21,33 +29,14 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
-      VERSION: ${{ inputs.version }}
+      SOURCE_RELEASE_TAG: ${{ inputs.source_release_tag }}
+      SOURCE_VERSION: ${{ inputs.source_version }}
       DESTINATION_ID: ${{ inputs.destination_release_id }}
+      DESTINATION_RELEASE_TAG: ${{ inputs.destination_release_tag }}
     steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
       - name: Copy and verify the corresponding source archive
-        shell: bash
-        run: |
-          set -euo pipefail
-          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
-          [[ "$DESTINATION_ID" =~ ^[0-9]+$ ]]
-          archive="Third-Party-Corresponding-Source-$VERSION.zip"
-          source_tag="v$VERSION"
-          destination_tag="third-party-source-v$VERSION"
-          source_release=$(gh api "repos/$GH_REPO/releases/tags/$source_tag")
-          source_asset=$(jq -ce --arg name "$archive" '.assets[] | select(.name == $name and .state == "uploaded")' <<< "$source_release")
-          digest=$(jq -r '.digest' <<< "$source_asset")
-          size=$(jq -r '.size' <<< "$source_asset")
-          [[ "$digest" =~ ^sha256:[a-f0-9]{64}$ ]]
-          destination=$(gh api "repos/$GH_REPO/releases/$DESTINATION_ID")
-          [[ $(jq -r '.tag_name' <<< "$destination") == "$destination_tag" ]]
-          existing=$(jq -c --arg name "$archive" '[.assets[] | select(.name == $name)]' <<< "$destination")
-          if [[ $(jq 'length' <<< "$existing") == 0 ]]; then
-            temporary=$(mktemp -d)
-            trap 'rm -rf -- "$temporary"' EXIT
-            gh release download "$source_tag" --repo "$GH_REPO" --pattern "$archive" --dir "$temporary"
-            printf '%s  %s\n' "${digest#sha256:}" "$temporary/$archive" | sha256sum --check -
-            gh release upload "$destination_tag" "$temporary/$archive" --repo "$GH_REPO"
-          fi
-          gh api "repos/$GH_REPO/releases/$DESTINATION_ID" | jq -e \
-            --arg name "$archive" --arg digest "$digest" --argjson size "$size" \
-            'any(.assets[]; .name == $name and .digest == $digest and .size == $size and .state == "uploaded")'
+        run: npm run source:archive -- --run

@@ -22,6 +22,7 @@ export class MotionPlayer {
     return this.current.from === this.target ? `${this.target}-loop` : `${this.current.from}-${this.target}`;
   }
   start() { this.prepare(); }
+  didStart() {}
   setTarget(value) {
     if (!['work', 'user'].includes(value)) throw new Error('Unknown motion state.');
     if (this.closed || this.target === value) return;
@@ -80,6 +81,7 @@ export class MotionPlayer {
       this.unwatch?.(); deck.show(true);
       if (old >= 0) { this.decks[old].pause(); this.decks[old].show(false); }
       this.active = job.index; this.current = job.clip; this.pending = null; this.atBoundary = false;
+      this.didStart(job.clip);
       this.playCount++;
       this.lastTime = -1; this.progressAt = this.now();
       this.unwatch = deck.watch(time => {
