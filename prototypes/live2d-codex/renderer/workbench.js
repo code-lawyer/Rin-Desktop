@@ -36,12 +36,21 @@ let workspace = { projects: [], settings: {} }, current, projectId, selected, th
 let settingsRevision = 0;
 function markSettingsDirty(dirty) {
   settingsDirty = dirty;
-  if (dirty) settingsRevision++;
+  if (dirty) {
+    settingsRevision++;
+    if ($('notice').dataset.confirmation === 'true') notice('');
+  }
   $('save-settings').hidden = !dirty;
 }
 const node = (tag, text, cls) => { const n = document.createElement(tag); if (text !== undefined) n.textContent = text; if (cls) n.className = cls; return n; };
 for (const [id, voice] of Object.entries(characters.QWEN_VOICES)) $('qwen-voice').append(Object.assign(node('option', voice.label), { value: id }));
-function notice(text) { clearTimeout(noticeTimer); $('notice').textContent = text; $('notice').hidden = !text; if (text) noticeTimer = setTimeout(() => $('notice').hidden = true, 10000); }
+function notice(text, confirmation = false) {
+  clearTimeout(noticeTimer);
+  $('notice').dataset.confirmation = String(confirmation);
+  $('notice').textContent = text;
+  $('notice').hidden = !text;
+  if (text) noticeTimer = setTimeout(() => $('notice').hidden = true, 10000);
+}
 async function run(promise) { try { const r = await promise; if (!r?.ok) throw new Error(r?.error || '操作未完成。'); return r.value; } catch (e) { notice(e.message); throw e; } }
 const act = action => event => { Promise.resolve().then(() => action(event)).catch(() => {}); };
 // A completed unload event may arrive before the older IPC save response.
@@ -278,7 +287,8 @@ async function saveSettings() {
   const saved = await run(api.saveSettings({voice:Number($('voice').value),speed:Number($('speed').value),microphone:$('microphone').value,remoteEnabled:$('remote-enabled').checked,shortcuts:values('shortcuts'),remoteKeys:values('remote-keys')}));
   if (revision === settingsRevision) markSettingsDirty(false);
   acceptWorkspace(saved);
-  notice(workspace.shortcutErrors?.join(' ') || '设置已保存。');
+  const warning = workspace.shortcutErrors?.join(' ');
+  if (warning || revision === settingsRevision) notice(warning || '设置已保存。', !warning);
 }
 async function refreshWorkspace() {
   acceptWorkspace(await run(api.workspace()));
