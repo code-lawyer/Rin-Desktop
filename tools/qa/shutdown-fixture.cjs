@@ -71,7 +71,7 @@ if (!process.argv.includes('--run') || process.argv.includes('--help') || proces
     } };
     context = vm.createContext({ app: appFacade, ipcMain, URL, avatar: null, chat, workbench: null, store,
       closing: false, quitting: false, draftFlushRequest: null, draftFlushSerial: 0, pendingRelaunch: null, pendingDataSelection: null,
-      changingData: false, changingProvider: false, provider: 'codex', submissions: { active: new Set() },
+      changingData: false, changingProvider: false, changingAgentConfig: false, provider: 'codex', submissions: { active: new Set() },
       remote: null, voiceResources: null, speech: null, wallpaperHost: null, backend: { close: async () => checks.push('owned backend cleanup occurred') }, providerChange: null,
       globalShortcut: { unregisterAll() {} }, registerShortcuts() {}, tray: null, captureTimer: null, ambientBarrier: { close() {} }, cancelWallpaperCommit() {}, characterBox: null,
       showChat: () => checks.push('failed quit retained the editable window'), dialog: { showErrorBox: (title, message) => dialogs.push({ title, message }) },

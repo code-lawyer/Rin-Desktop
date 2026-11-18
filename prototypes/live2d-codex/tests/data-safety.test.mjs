@@ -38,7 +38,7 @@ test('source and installed data selections use different restart records', async
   const source=join(root,'source'), installed=join(root,'installed'), imported=join(store.file,'..');
   const sourcePointer=storage.dataPointer(source);
   await selectDataDirectory(imported,sourcePointer);
-  assert.equal(storage.storageLocation({sourceStorage:source,defaultStorage:installed,packaged:false}),imported);
+  assert.equal(storage.storageLocation({sourceStorage:source,defaultStorage:installed,packaged:false}),await fs.realpath(imported));
   assert.equal(storage.storageLocation({sourceStorage:source,defaultStorage:installed,packaged:true}),installed);
   await assert.rejects(fs.access(storage.dataPointer(installed)));
 });
