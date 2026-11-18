@@ -18,7 +18,7 @@ mkdirSync(output,{recursive:true});app.setPath('userData',join(output,'profile')
 const waitAttempts=600;
 protocol.registerSchemesAsPrivileged([{scheme:'app',privileges:{standard:true,secure:true,supportFetchAPI:true,stream:true}}]);
 let windows=[],wallpaper,chat,workbench,version=0,store,ambient={phase:'off'},blocked='',expectedFailure=false,persistFault=false,prepareGate,commitReplyGate;
-const errors=[],checks=[],acknowledgements=[];
+const errors=[],checks=[],acknowledgements=[],windowActions=[];
 let characterFault, playbackRevision=0;
 const characterRequests=[];
 const present={mode:'wallpaper',wallpaperKind:'artwork',character:'female',characterRequest:0,chatVisible:false,paused:false,stills:{stillPose:'auto',ambienceEnabled:false},capturing:false,speaking:false,ambientRevision:0,ambientRetry:0};
@@ -39,7 +39,9 @@ const notify=()=>{version++;sendPresentation();for(const w of [chat,workbench])i
 const handler=(name,fn)=>ipcMain.handle(name,async(event,...args)=>{try{return{ok:true,value:await fn(event,...args)};}catch(error){return{ok:false,error:error.message};}});
 async function until(win,expression){for(let i=0;i<waitAttempts;i++){if(await js(win,expression))return;await delay(50);}const detail=await js(win,"({hidden:document.hidden,host:{...document.getElementById('wallpaper-view')?.dataset},error:document.getElementById('wallpaper-error')?.textContent})");throw new Error('Timed out: '+expression+' / '+JSON.stringify(detail));}
 async function open(file,width,height){
-  const win=new BrowserWindow({width,height,show:false,frame:false,webPreferences:{preload:join(application,'preload.cjs'),contextIsolation:true,nodeIntegration:false,sandbox:true,backgroundThrottling:false,autoplayPolicy:'no-user-gesture-required'}});windows.push(win);
+  // The puppet probe drives input over IPC while the wallpaper needs a visible surface.
+  const win=new BrowserWindow({width,height,show:false,frame:false,focusable:!puppetRun,webPreferences:{preload:join(application,'preload.cjs'),contextIsolation:true,nodeIntegration:false,sandbox:true,backgroundThrottling:false,autoplayPolicy:'no-user-gesture-required'}});windows.push(win);
+  if (puppetRun) win.setIgnoreMouseEvents(true);
   win.webContents.on('console-message',event=>{const {level,message}=event;if((level==='error'||level===3)&&!message.includes('Electron Security Warning')&&message!=='[wallpaper:still] The source image cannot be decoded.'&&!(expectedFailure&&(message.includes('404')||message.startsWith('[wallpaper:still]'))))errors.push(message);});
   await win.loadURL('app://local/renderer/'+file);return win;
 }
@@ -101,7 +103,17 @@ app.whenReady().then(async()=>{
   });
   vm.runInContext(mainSource.slice(mainSource.indexOf("    ipcMain.on('speech:reply-settled'"),mainSource.indexOf("    handler('wallpaper:control'")),playbackContext);
   handler('speech:capture',async(_e,target)=>{present.capturing=!!target;if(target)await barrier.wait();else sendPresentation();});
-  handler('companion:window',(_e,action)=>{if(action==='show-chat'||action==='recall-chat'){present.chatVisible=true;chat.show();}else if(action==='workbench'){present.chatVisible=false;chat.hide();workbench.show();}sendPresentation();});
+  handler('companion:window',(event,action)=>{
+    windowActions.push({action,sender:event.sender.getURL()});
+    if (action==='show-chat'||action==='recall-chat') {
+      present.chatVisible=true;
+      if (!puppetRun) chat.show();
+    } else if (action==='workbench') {
+      present.chatVisible=false;
+      if (!puppetRun) { chat.hide();workbench.show(); }
+    }
+    sendPresentation();
+  });
   handler('wallpaper:control',(_e,action,value)=>{if(action==='pause')present.paused=value;else if(action==='gesture')throw Error('单次骨骼动作已停用');else if(action==='retry-audio'){present.ambientRetry++;commitContext.recoverWallpaperRenderer();}else throw Error('壁纸操作无效');notify();return snapshot();});
   handler('wallpaper:commit',async(_e,info)=>{const result=await commitContext.confirmWallpaper(info);if(commitReplyGate)await commitReplyGate;return result;});
   ipcMain.on('wallpaper:finish',(event,info,accept)=>{event.returnValue={ok:true,value:commitContext.finishWallpaper(info,accept)};});
@@ -506,4 +518,4 @@ app.whenReady().then(async()=>{
   assert.deepEqual(errors,[]);
   writeFileSync(join(output,'summary.json'),JSON.stringify({checks,errors,acknowledgements,synthetic:true,accounts:false,hardware:false},null,2));
   barrier.close();for(const win of windows)win.destroy();app.exit(0);
-}).catch(error=>{console.error(error.stack);writeFileSync(join(output,'failure.json'),JSON.stringify({error:error.stack,checks,errors},null,2));for(const win of windows)win.destroy();app.exit(1);});
+}).catch(error=>{console.error(error.stack);writeFileSync(join(output,'failure.json'),JSON.stringify({error:error.stack,checks,errors,windowActions,chatVisible:present.chatVisible},null,2));for(const win of windows)win.destroy();app.exit(1);});

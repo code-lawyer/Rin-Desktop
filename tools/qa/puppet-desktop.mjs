@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process';
+import { readFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { createRunDirectory, requireLiveRun } from './run-output.mjs';
 requireLiveRun('npm run qa:puppet -- --run [--record-dialogue]', 'isolated Electron, our local artwork and synthetic PCM; no accounts, camera or microphone');
@@ -9,4 +10,5 @@ await new Promise((resolveRun, reject) => {
     [join(import.meta.dirname, 'still-fixture.cjs'), output, '--puppet', ...process.argv.slice(2).filter(arg => arg === '--record-dialogue')], { env, windowsHide: true, stdio: 'inherit' });
   child.once('error', reject); child.once('exit', code => code === 0 ? resolveRun() : reject(new Error(`Puppet checks exited ${code}; evidence: ${output}`)));
 });
-console.log(JSON.stringify({ output }));
+const report = JSON.parse(await readFile(join(output, 'report.json'), 'utf8'));
+console.log(JSON.stringify({ output, checks: report.checks.length }));
