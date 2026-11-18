@@ -1,5 +1,7 @@
-export const POSE_IDS = Object.freeze(['attention', 'cup', 'work', 'thinking', 'window']);
+export const REPLY_THINKING_POSE = 'reply-thinking';
+export const POSE_IDS = Object.freeze(['attention', 'cup', 'work', 'thinking', 'window', REPLY_THINKING_POSE]);
 export const POSE_SIZE = Object.freeze([1586, 992]);
+export const poseTextureSize = (name) => /-(?:blink|halfBlink|mouth)$/.test(name) ? [512, 512] : POSE_SIZE;
 export const POSE_FILES = Object.freeze([
   'background.png',
   'foreground.png',

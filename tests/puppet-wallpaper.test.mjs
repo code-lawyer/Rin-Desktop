@@ -91,6 +91,14 @@ test('packaging rejects corrupt or escaped assets and copies only the runtime al
   const file=join(source,'manifest.json'),original=await readFile(file,'utf8'),manifest=JSON.parse(original);
   manifest.assets[0].file='../private-generation.json';await writeFile(file,JSON.stringify(manifest));
   await assert.rejects(inspectPuppetAssets(source),/Invalid Rin asset/);
-  await writeFile(file,original);await writeFile(join(source,'scene.png'),'broken');
+  await writeFile(file,original);
+  await writeFile(join(source,'reply-thinking.png'),'replaceable');
+  await inspectPuppetAssets(source,{replacingReplyArt:true});
+  await assert.rejects(inspectPuppetAssets(source),/integrity mismatch: reply-thinking.png/);
+  const previous=await readFile(join(source,'work.png'));
+  previous[100]^=1;
+  await writeFile(join(source,'work.png'),previous);
+  await assert.rejects(inspectPuppetAssets(source,{replacingReplyArt:true}),/integrity mismatch: work.png/);
+  await writeFile(join(source,'scene.png'),'broken');
   await assert.rejects(inspectPuppetAssets(source),/integrity mismatch/);
 });

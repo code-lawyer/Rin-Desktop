@@ -1,5 +1,5 @@
-import { readFile, lstat } from 'node:fs/promises';
-import { join } from 'node:path';
+import { readFile, lstat, mkdir } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
 
 export async function releaseVersion(root) {
   const read = async file => JSON.parse(await readFile(join(root, file), 'utf8')).version;
@@ -13,4 +13,13 @@ export async function requireFreshDirectory(directory) {
   try { await lstat(directory); }
   catch (error) { if (error.code === 'ENOENT') return; throw error; }
   throw new Error(`Output already exists; previous artifacts are preserved: ${directory}`);
+}
+
+export async function reserveFreshDirectory(directory) {
+  await mkdir(dirname(directory), { recursive: true });
+  try { await mkdir(directory); }
+  catch (error) {
+    if (error.code === 'EEXIST') throw new Error(`Output already exists; previous artifacts are preserved: ${directory}`);
+    throw error;
+  }
 }

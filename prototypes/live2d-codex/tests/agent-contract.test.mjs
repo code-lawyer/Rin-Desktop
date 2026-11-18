@@ -51,7 +51,7 @@ for (const outcome of [undefined, 'completed', 'interrupted', 'failed']) test(`c
 
 for (const provider of ['claude', 'grok', 'opencode']) test(`${provider}: new/resume/send cannot overlap a pending conversation switch`, async t => {
   const path = await directory(t), c = new FakeNative({ provider, projectRoot: path, storageDir: path });
-  c.known.set('saved', { id: 'saved', cwd: path });
+  c.rememberList([{ id: 'saved', cwd: path }]);
   const first = c.newConversation(path);
   await assert.rejects(c.newConversation(path), /停止|切换/);
   await assert.rejects(c.resumeConversation('saved', path), /停止|切换/);
@@ -137,16 +137,19 @@ test('Codex closed during initialization rejects late protocol work and emits no
   assert.equal(c.state.turnId, null);
 });
 
-test('native completion text is exactly the visible final answer after tool commentary', async t => {
-  const path = await directory(t), c = new FakeNative({ provider: 'claude', projectRoot: path, storageDir: path }), replies = [];
+test('native completion publishes the visible final answer before the idle snapshot', async t => {
+  const path = await directory(t), c = new FakeNative({ provider: 'claude', projectRoot: path, storageDir: path }), replies = [], order = [];
   c.promptNative = async () => {
     c.appendText('检查项目。'); c.state.messages.at(-1).complete = true; c.state.messages.at(-1).phase = 'commentary';
     c.appendText('最终结果。');
   };
-  c.on('reply-completed', reply => replies.push(reply));
+  c.on('reply-completed', reply => { replies.push(reply); order.push('reply'); });
+  c.on('state', state => { if (state.status === 'idle') order.push('idle'); });
   await c.send('fixture request'); await c.run;
   assert.equal(replies.length, 1); assert.equal(replies[0].text, currentReply(c.state.messages).text);
-  assert.equal(replies[0].text, '最终结果。'); await c.close();
+  assert.equal(replies[0].text, '最终结果。');
+  assert.deepEqual(order, ['reply', 'idle']);
+  await c.close();
 });
 
 const transcript = (status, phase = null) => [

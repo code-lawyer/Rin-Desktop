@@ -44,7 +44,7 @@ app
     for (let i = 0; i < 200 && !(await run('!!window.preview')); i++)
       await new Promise((r) => setTimeout(r, 50));
     assert.ok(await run('!!window.preview'), 'pose renderer initialized');
-    const poses = ['attention', 'cup', 'work', 'thinking', 'window'];
+    const poses = await run('preview.player.config.poses.map(pose => pose.id)');
     async function capture(name, state) {
       const data = await run(`preview.render(0,${JSON.stringify(state)})`);
       writeFileSync(join(output, name + '.png'), Buffer.from(data, 'base64'));
@@ -107,7 +107,7 @@ app
     for (const [pose, count] of Object.entries(invariants.pixelDifferences))
       assert.ok(count > 1000, pose + ' uses visible pixel reassembly rather than a plain fade');
     assert.equal(invariants.glError, 0);
-    assert.equal(invariants.textures, 14);
+    assert.equal(invariants.textures, poses.length * 2 + 4);
     for (const [pose, changed] of Object.entries(invariants.expressions))
       assert.ok(changed > 100, pose + ' has visible facial animation');
     for (const [pose, edge] of Object.entries(invariants.bottomCoverage))

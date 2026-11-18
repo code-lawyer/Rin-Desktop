@@ -148,9 +148,9 @@ export class ClaudeCompanion extends NativeAgent {
     const offset = Number(cursor || 0); if (!Number.isSafeInteger(offset) || offset < 0) throw new Error('分页参数无效。');
     return { data: data.slice(offset, offset + 50), nextCursor: offset + 50 < data.length ? String(offset + 50) : null };
   }
-  async history(id, cursor = null) {
-    this.assertReady(); const item = this.session(id);
-    const turns = historyTurns(restoreHistory(messagesOf(await this.sdk.getSessionMessages(id, { dir: item.cwd })), this.index[id]?.messages));
+  async history(id, cursor = null, cwd) {
+    this.assertReady(); const item = this.session(id, cwd);
+    const turns = historyTurns(restoreHistory(messagesOf(await this.sdk.getSessionMessages(id, { dir: item.cwd })), this.cachedSession(item.cwd, id)?.messages));
     const end = cursor === null ? turns.length : Number(cursor); if (!Number.isSafeInteger(end) || end < 0 || end > turns.length) throw new Error('分页参数无效。');
     const start = Math.max(0, end - 20); return { turns: turns.slice(start, end), nextCursor: start ? String(start) : null };
   }

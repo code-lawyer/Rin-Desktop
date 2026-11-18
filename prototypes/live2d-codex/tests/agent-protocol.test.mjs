@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
-import { mkdtemp, rm, readFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, rm, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { ClaudeCompanion, claudeAuthentication } from '../backend/claude-agent.mjs';
@@ -149,7 +149,7 @@ function acpPeer(cwd, initialization = {}, restore = {}) {
     if(['session/load','session/resume'].includes(message.method)){restoreRequest=message;restore.onRequest?.(message);if(!restore.pending)finishRestore();return;}
     const result=message.method==='initialize'?{protocolVersion:1,agentCapabilities:{loadSession:true,sessionCapabilities:{list:{}}},authMethods:[{id:'cached_token',name:'Cached'}],agentInfo:{name:'fixture',version:'bridge-1'},...initialization}:
       message.method==='session/new'?session:
-      message.method==='session/list'?{sessions:[{sessionId:'session',cwd,title:'Fixture',updatedAt:'2026-10-21T00:00:00Z'}]}:{};
+      message.method==='session/list'?{sessions:[{sessionId:'session',cwd:message.params?.cwd ?? cwd,title:'Fixture',updatedAt:'2026-10-21T00:00:00Z'}]}:{};
     send({id:message.id,result});
   });
   child.stdin.on('data',chunk=>decoder.push(chunk));
@@ -286,6 +286,41 @@ const cachedConversation = () => ['completed','interrupted','failed','unknown'].
   {id:`answer-${n}`,turnId:`turn-${n}`,role:'assistant',text:`保存的回复 ${n}`,complete:true,phase:'final_answer',turnStatus},
 ]);
 
+test('ACP tool preambles stay visible as progress and only a post-tool answer can trigger narration', async t => {
+  const {agent,peer}=await acp(t,'grok'),replies=[];
+  agent.on('reply-completed',reply=>replies.push(reply.text));
+  for(const final of [false,true]){
+    const prompts=peer.calls.filter(call=>call.method==='session/prompt').length;
+    await agent.send('fixture');
+    await waitFor(()=>peer.calls.filter(call=>call.method==='session/prompt').length>prompts);
+    peer.update({sessionUpdate:'agent_message_chunk',content:{type:'text',text:'我先检查。'}});
+    peer.update({sessionUpdate:'tool_call',toolCallId:'tool',title:'检查',status:'completed'});
+    if(final)peer.update({sessionUpdate:'agent_message_chunk',content:{type:'text',text:'已检查。'}});
+    const run=agent.run;
+    peer.finish();
+    await run;
+    assert.ok(agent.state.messages.some(message=>message.text==='我先检查。'&&message.phase==='commentary'));
+    assert.deepEqual(replies,final?['已检查。']:[]);
+  }
+});
+
+test('ACP history and aliases remain separate when two projects assign the same native ID', async t => {
+  const f=await acp(t,'grok',{initialization:{agentCapabilities:resumeCapabilities}});
+  const {agent,root}=f, other=join(root,'another-project');
+  await mkdir(other);
+  const first=cachedConversation(), second=first.map(message=>({...message,text:'B '+message.text}));
+  agent.state.messages=first;await agent.persist();
+  await agent.newConversation(other);
+  agent.state.messages=second;await agent.persist();
+  await agent.renameConversation('session','First alias',root);
+  const restored=await f.restart();
+  const [a,b]=await Promise.all([restored.history('session',null,root),restored.history('session',null,other)]);
+  assert.equal(a.turns[0].items[0].content[0].text,first[0].text);
+  assert.equal(b.turns[0].items[0].content[0].text,second[0].text);
+  assert.equal((await restored.listThreads(root)).data[0]?.name,'First alias');
+  assert.notEqual((await restored.listThreads(other)).data[0]?.name,'First alias');
+});
+
 for(const provider of ['grok','opencode','custom-restore']) for(const [kind,capabilities,method] of [
   ['load only',{loadSession:true},'session/load'],
   ['resume only',resumeCapabilities,'session/resume'],
@@ -298,7 +333,7 @@ for(const provider of ['grok','opencode','custom-restore']) for(const [kind,capa
     assert.equal(agent.state.connection,'ready',agent.state.error);assert.equal(agent.state.threadId,'session');
     assert.equal(agent.state.canResume,true);assert.equal(agent.state.restored,true);assert.equal(agent.state.model,'fixture');
     assert.equal(agent.state.historyLocalOnly,method==='session/resume');assert.deepEqual(agent.state.messages,messages);
-    assert.deepEqual(JSON.parse(await readFile(join(agent.storageDir,'index.json'),'utf8')).sessions.session.messages,messages);
+    assert.deepEqual(Object.values(JSON.parse(await readFile(join(agent.storageDir,'index.json'),'utf8')).sessions).find(entry=>entry.id==='session').messages,messages);
     const restoration=f.peer.calls.find(call=>call.method===method);
     assert.deepEqual(restoration.params,{sessionId:'session',cwd:f.root,mcpServers:[],_meta:agent.sessionMeta()});
     if(provider==='grok'){

@@ -3,13 +3,15 @@ import { createHash } from 'node:crypto';
 import { constants } from 'node:fs';
 import { join } from 'node:path';
 import { requireFreshDirectory } from './release-inputs.mjs';
-import { POSE_FILES, POSE_SIZE, validatePoses } from '../../prototypes/live2d-codex/renderer/pose-assets.mjs';
+import { POSE_FILES, POSE_SIZE, REPLY_THINKING_POSE, poseTextureSize, validatePoses } from '../../prototypes/live2d-codex/renderer/pose-assets.mjs';
 
 const hash = (bytes) => createHash('sha256').update(bytes).digest('hex');
 const required = new Set(POSE_FILES);
+const replyArt = new Set([REPLY_THINKING_POSE + '.png', REPLY_THINKING_POSE + '-blink.png']);
 
 // Gate the shipped files, independently of artwork quality and device acceptance.
-export async function inspectPuppetAssets(directory) {
+export async function inspectPuppetAssets(directory, { replacingReplyArt = false } = {}) {
+  const replacing = file => replacingReplyArt && replyArt.has(file);
   const manifest = JSON.parse(await readFile(join(directory, 'manifest.json'), 'utf8'));
   if (
     manifest.format !== 4 ||
@@ -32,14 +34,15 @@ export async function inspectPuppetAssets(directory) {
     )
       throw new Error('Invalid Rin asset: ' + entry.file);
     names.add(entry.file);
+    if (replacing(entry.file)) continue;
     const file = join(directory, entry.file),
       info = await lstat(file);
     if (!info.isFile() || info.size !== entry.bytes || hash(await readFile(file)) !== entry.sha256)
       throw new Error('Rin asset integrity mismatch: ' + entry.file);
   }
   validatePoses(JSON.parse(await readFile(join(directory, 'poses.json'), 'utf8')));
-  for (const file of POSE_FILES.filter((file) => file.endsWith('.png'))) {
-    const size = file === 'scene.png' ? [3840, 2400] : file.includes('-') ? [512, 512] : POSE_SIZE;
+  for (const file of POSE_FILES.filter(file => file.endsWith('.png') && !replacing(file))) {
+    const size = file === 'scene.png' ? [3840, 2400] : poseTextureSize(file.slice(0, -4));
     const bytes = await readFile(join(directory, file));
     if (
       bytes.length < 24 ||

@@ -110,14 +110,15 @@ export class RemoteController extends EventEmitter {
     }
   }
   async startCapture(trigger='bluetooth') {
-    if(this.session || this.blockedUntilRelease || this.config.buttons.voice!=='dictate' || !this.caps || this.busy || this.closed || this.suspended || this.state.phase!=='connected')return;
+    if(this.session || this.captureStop || this.blockedUntilRelease || this.config.buttons.voice!=='dictate' || !this.caps || this.busy || this.closed || this.suspended || this.state.phase!=='connected')return;
     const session={generation:this.generation,id:randomUUID(),streamId:0,trigger};this.session=session;
     this.captureUpdate(session,'opening',{audio:'starting',notice:''});
     try {
       session.target=await this.begin(session.id);
       if(this.session!==session){this.end(session.id);return;}
       this.limit=setTimeout(()=>this.cancel('已达到 60 秒上限，本次听写已取消，请分段说话。','failed'),60000);
-      this.armSilence();await this.write([0x0c,0]);
+      session.start = this.write([0x0c,0],session.generation);
+      this.armSilence();await session.start;
     } catch(error) {if(this.session===session)await this.cancel(error.message,'failed');}
   }
   armSilence() {
@@ -128,16 +129,25 @@ export class RemoteController extends EventEmitter {
   }
   release() {
     this.blockedUntilRelease=false;
-    if(!this.session || this.session.recognizing || this.releaseTimer)return;
+    const session=this.session;
+    if(!session || session.recognizing || this.releaseTimer)return;
     // Preserve the final notification packets, but release raw-key ownership now.
-    this.keys.held.delete('voice');this.releaseTimer=setTimeout(()=>{this.releaseTimer=null;this.finish();},100);
+    this.keys.held.delete('voice');
+    if(!session.start) {
+      session.released=true;
+      return this.cancel('准备完成前已松开，请按住语音键说话。');
+    }
+    this.releaseTimer=setTimeout(()=>{this.releaseTimer=null;this.finish();},100);
   }
   clearCaptureTimers() {for(const name of ['limit','silence','releaseTimer']){clearTimeout(this[name]);this[name]=null;}}
   async finish() {
     const session=this.session;if(!session || session.recognizing)return;
+    if(!session.start){this.release();return;}
     session.recognizing=true;this.clearCaptureTimers();this.captureUpdate(session,'closing');
     try {
-      await this.write([0x0d,session.streamId]);
+      await session.start;
+      if(this.session!==session)return;
+      await this.stopCapture(session);
       if(this.session!==session)return;
       if(!session.audio)throw new Error('没有收到遥控器声音，请按住语音键说话后再松开。');
       const data=session.audio.finish();session.audio=null;
@@ -153,10 +163,23 @@ export class RemoteController extends EventEmitter {
   }
   async cancel(notice='',stage='cancelled') {
     const session=this.session;this.session=null;this.clearCaptureTimers();
+    const stop=session?.start ? this.stopCapture(session) : null;
     const patch={audio:'idle',...(notice?{notice}:{})};
-    if(session){this.blockedUntilRelease=!session.recognizing;this.captureUpdate(session,stage,patch);session.audio=null;this.end(session.id);}
+    if(session){this.blockedUntilRelease=!session.recognizing&&!session.released;this.captureUpdate(session,stage,patch);session.audio=null;this.end(session.id);}
     else this.update(patch);
-    if(session){try{await this.write([0x0d,session.streamId],session.generation);}catch{}}
+    if(stop){try{await stop;}catch{}}
+  }
+  stopCapture(session) {
+    if(session.stop)return session.stop;
+    const native=this.native;
+    const stop=session.stop=session.start.catch(()=>{}).then(()=>{
+      if(this.native===native && native)
+        return this.write([0x0d,session.streamId],session.generation);
+    });
+    this.captureStop=stop;
+    const clear=()=>{if(this.captureStop===stop)this.captureStop=null;};
+    stop.then(clear,clear);
+    return stop;
   }
   lost(notice) {
     const native=this.native;this.native=null;++this.generation;this.keys.clear();this.ready?.reject(new Error(notice));

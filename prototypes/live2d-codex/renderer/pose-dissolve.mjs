@@ -1,6 +1,7 @@
 import { POSE_IDS } from './pose-assets.mjs';
 
 export const POSE_TRANSITION = Object.freeze({ fadeOut: 1.1, hold: 0.1, fadeIn: 1.6 });
+const CONVERSATION_TRANSITION = Object.freeze({ fadeOut: 0.08, hold: 0, fadeIn: 0.16 });
 
 // One visible pose at a time. No skeletal interpolation or two-pose overlap.
 export class PoseDissolve {
@@ -21,13 +22,16 @@ export class PoseDissolve {
     this.pose = this.target = pose;
     this.level = 1;
     this.phase = 'steady';
-    this.fadeOut = fadeOut;
-    this.hold = hold;
+    this.normal = { fadeOut, hold, fadeIn };
+    this.timing = this.normal;
     this.holdRemaining = 0;
-    this.fadeIn = fadeIn;
   }
-  request(pose) {
+  request(pose, quick = false) {
     if (!POSE_IDS.includes(pose)) throw new Error('Unknown pose');
+    if (quick || pose !== this.target) {
+      this.timing = quick ? CONVERSATION_TRANSITION : this.normal;
+      if (quick) this.holdRemaining = 0;
+    }
     this.target = pose;
     if (this.phase === 'hold') {
       // Invisible already: replace only the pending painting, without restarting the gap.
@@ -45,12 +49,12 @@ export class PoseDissolve {
       this.phase = 'steady';
       this.holdRemaining = 0;
     } else if (this.phase === 'out') {
-      const remaining = this.level * this.fadeOut;
-      this.level = Math.max(0, this.level - dt / this.fadeOut);
+      const remaining = this.level * this.timing.fadeOut;
+      this.level = Math.max(0, this.level - dt / this.timing.fadeOut);
       if (this.level < 1e-9) {
         this.level = 0;
         this.pose = this.target;
-        this.holdRemaining = Math.max(0, this.hold - Math.max(0, dt - remaining));
+        this.holdRemaining = Math.max(0, this.timing.hold - Math.max(0, dt - remaining));
         this.phase = this.holdRemaining > 1e-9 ? 'hold' : 'in';
       }
     } else {
@@ -61,7 +65,7 @@ export class PoseDissolve {
         if (this.holdRemaining < 1e-9) this.phase = 'in';
       }
       if (this.phase === 'in') {
-        this.level = Math.min(1, this.level + dt / this.fadeIn);
+        this.level = Math.min(1, this.level + dt / this.timing.fadeIn);
         if (this.level > 1 - 1e-9) {
           this.level = 1;
           this.phase = 'steady';
@@ -78,7 +82,7 @@ export class PoseDissolve {
       opacity,
       phase: this.phase,
       amount: opacity,
-      effect: 'pixels',
+      effect: this.timing === CONVERSATION_TRANSITION ? 'fade' : 'pixels',
     };
   }
 }

@@ -112,6 +112,7 @@ module.exports=async function visualCases({open,evaluate,delay,output,extended=f
   await emit(chat,'layout',{fullscreen:false,side:'left',tailY:78});
   await emit(chat,'state',{status:'waiting',approvals:[{id:'visual-approval',kind:'command',reason:'需要你确认以下操作。较长的路径和命令应可滚动查看，审批按钮应始终可达。',cwd:'C:/Projects/Example/设计与前端视觉检查',command:'npm run build && npm run check:project',details:'仅展示合成审批，不执行命令。'}]});
   await capture(chat,'approval-compact',440,390);
+  await verify(chat,'approval operation and directory remain at least 13 CSS pixels',`['.approval-operation','.approval-directory'].every(selector=>parseFloat(getComputedStyle(document.querySelector(selector)).fontSize)>=13)`);
   await verify(chat,'compact approval shows operation and directory before accepting',`(()=>{
     const operation=document.querySelector('.approval-operation'),directory=document.querySelector('.approval-directory'),actions=document.querySelector('.approval-actions');
     const visible=el=>{const r=el.getBoundingClientRect();return r.top>=0&&r.bottom<=innerHeight&&r.left>=0&&r.right<=innerWidth};
@@ -151,6 +152,12 @@ module.exports=async function visualCases({open,evaluate,delay,output,extended=f
   }
   await evaluate(workbench,`document.querySelector('[data-setting-target="wallpaper-settings"]').click();document.querySelector('[name="wallpaper-style"]').focus();interfaceFixture.emit('remoteAction','down')`);
   await capture(workbench,'character-focus',1120,760);
+  await verify(workbench,'an unchanged wallpaper page has no save button',"document.getElementById('save-settings').hidden");
+  await evaluate(workbench,`document.querySelector('[data-setting-target="playback-settings"]').click();const speed=document.getElementById('speed');speed.value='1.1';speed.dispatchEvent(new Event('change',{bubbles:true}));`);
+  await verify(workbench,'editing a deferred setting exposes save',"!document.getElementById('save-settings').hidden");
+  await evaluate(workbench,"document.getElementById('save-settings').click()");
+  await wait(workbench,"document.getElementById('save-settings').hidden");
+  await evaluate(workbench,`document.querySelector('[data-setting-target="wallpaper-settings"]').click()`);
   await evaluate(workbench,`document.getElementById('still-previews').scrollIntoView({block:'center'})`);
   await capture(workbench,'pose-previews-standard',1120,760);
   await capture(workbench,'pose-previews-compact',760,540);
@@ -193,8 +200,11 @@ module.exports=async function visualCases({open,evaluate,delay,output,extended=f
   if(extended) {
     for(const zoom of [1.25,1.5,2]) {
       await evaluate(workbench,`document.querySelector('[data-setting-target="playback-settings"]').click();document.querySelector('.settings-scroll').scrollTop=0`);
+      await evaluate(workbench,`(()=>{const speed=document.getElementById('speed');speed.value=speed.value==='1.1'?'1':'1.1';speed.dispatchEvent(new Event('change',{bubbles:true}));})()`);
       await capture(workbench,'voice-minimum-zoom-'+Math.round(zoom*100),760,540,zoom);
       await reachable(workbench,'voice controls at minimum window and '+Math.round(zoom*100)+'%',['#tts-engine','#qwen-voice','#preview-voice','#save-settings']);
+      await evaluate(workbench,"document.getElementById('save-settings').click()");
+      await wait(workbench,"document.getElementById('save-settings').hidden");
       await evaluate(workbench,`document.querySelector('[data-setting-target="wallpaper-settings"]').click();document.querySelector('.settings-scroll').scrollTop=0`);
       await capture(workbench,'wallpaper-minimum-zoom-'+Math.round(zoom*100),760,540,zoom);
       if(zoom===2) {

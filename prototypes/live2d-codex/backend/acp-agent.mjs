@@ -8,10 +8,15 @@ import packageInfo from '../package.json' with { type: 'json' };
 
 const flatten = options => (options ?? []).flatMap(o => o.options ? flatten(o.options) : [o]);
 const timestamp = value => typeof value === 'number' ? (value > 1e12 ? value / 1000 : value) : Date.parse(value) / 1000 || 0;
+function markToolPreamble(message) {
+  if (message?.role === 'assistant') Object.assign(message, { complete: true, phase: 'commentary' });
+}
 function replayMessage(messages, update) {
+  const previous = messages.at(-1);
+  if (update.sessionUpdate === 'tool_call') { markToolPreamble(previous); return; }
   if (!['user_message_chunk', 'agent_message_chunk'].includes(update.sessionUpdate) || update.content?.type !== 'text' || update._meta?.['opencode/child-session']) return;
-  const role = update.sessionUpdate === 'user_message_chunk' ? 'user' : 'assistant', previous = messages.at(-1);
-  if (previous?.role === role) previous.text += update.content.text;
+  const role = update.sessionUpdate === 'user_message_chunk' ? 'user' : 'assistant';
+  if (previous?.role === role && previous.phase !== 'commentary') previous.text += update.content.text;
   else messages.push({ id: randomUUID(), role, text: update.content.text, complete: true });
 }
 
@@ -128,7 +133,7 @@ export class AcpCompanion extends NativeAgent {
     const type = update.sessionUpdate;
     if (type === 'config_option_update') { this.models(update); return; }
     if (type === 'session_info_update') {
-      if (update.title && !this.index[this.state.threadId]?.alias) this.state.threadName = update.title;
+      if (update.title && !this.cachedSession(this.state.cwd, this.state.threadId)?.alias) this.state.threadName = update.title;
       if (update._meta?.['opencode/retry']) this.state.activity = '模型提供商暂时不可用，CLI 正在重试';
       if (update._meta?.['opencode/compaction']?.status === 'started') this.state.activity = '正在整理会话上下文';
       this.changed(false); return;
@@ -137,7 +142,8 @@ export class AcpCompanion extends NativeAgent {
     if (type === 'agent_message_chunk' && update.content?.type === 'text' && !update._meta?.['opencode/child-session']) this.appendText(update.content.text);
     else if (type === 'tool_call' || type === 'tool_call_update') {
       this.receivedSubmission();
-      if (type === 'tool_call') { const previous = this.state.messages.at(-1); if (previous?.role === 'assistant') previous.complete = true; }
+      const previous = this.state.messages.at(-1);
+      if (type === 'tool_call' && previous?.turnId === this.state.turnId) markToolPreamble(previous);
       if (!this.stopRequested && !this.pending.size) this.state.activity = update.title || (update.status === 'completed' ? '继续处理中' : '正在调用工具');
       this.changed(false);
     }
@@ -213,11 +219,12 @@ export class AcpCompanion extends NativeAgent {
     const data = this.rememberList((result.sessions ?? []).filter(s => s.cwd && pathKey(s.cwd) === pathKey(cwd)).map(s => ({ id: s.sessionId, cwd: s.cwd, name: s.title || '未命名对话', updatedAt: timestamp(s.updatedAt), source: this.provider })));
     return { data: data.filter(s => s.name.toLowerCase().includes(String(search).toLowerCase())), nextCursor: result.nextCursor ?? null };
   }
-  async history(id, cursor = null) {
-    this.assertReady(); const item = this.session(id);
+  async history(id, cursor = null, cwd) {
+    this.assertReady(); const item = this.session(id, cwd);
+    const cached = this.cachedSession(item.cwd, id)?.messages;
     if (cursor) return { turns: [], nextCursor: null };
-    if (id === this.state.threadId && this.run) return { turns: historyTurns(this.state.messages), nextCursor: null, ...(this.state.historyLocalOnly ? { localOnly: true } : {}) };
-    if (!this.active.init.agentCapabilities?.loadSession) return { turns: historyTurns(this.index[id]?.messages ?? []), nextCursor: null, localOnly: true };
+    if (id === this.state.threadId && pathKey(item.cwd) === pathKey(this.state.cwd) && this.run) return { turns: historyTurns(this.state.messages), nextCursor: null, ...(this.state.historyLocalOnly ? { localOnly: true } : {}) };
+    if (!this.active.init.agentCapabilities?.loadSession) return { turns: historyTurns(cached ?? []), nextCursor: null, localOnly: true };
     // Replay in a separate CLI connection: inspecting history must not change
     // the active session or attach a second prompt to a running conversation.
     const messages = [], ep = await this.endpoint(item.cwd, { history: true, onUpdate: update => replayMessage(messages, update) });
@@ -225,7 +232,7 @@ export class AcpCompanion extends NativeAgent {
       if (!ep.init.agentCapabilities?.loadSession) throw new Error('CLI 不支持读取原生会话。');
       ep.sessionId = id;
       await deadline(ep.conn.loadSession({ sessionId: id, cwd: item.cwd, mcpServers: [], _meta: this.sessionMeta() }), 45000, '历史读取');
-      return { turns: historyTurns(restoreHistory(messages, this.index[id]?.messages)), nextCursor: null };
+      return { turns: historyTurns(restoreHistory(messages, cached)), nextCursor: null };
     } finally { await this.closeEndpoint(ep); }
   }
   async readSubmissionHistory({ cwd, threadId }) {

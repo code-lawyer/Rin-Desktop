@@ -7,7 +7,8 @@ import characters from '../prototypes/live2d-codex/backend/character-profiles.cj
 import stillSettings from '../prototypes/live2d-codex/backend/still-settings.cjs';
 import { stillPose, createIdleCycle, idleDuration, stillActivity } from '../prototypes/live2d-codex/renderer/still-policy.mjs';
 import { isCharacterImageRequest } from '../tools/qa/character-asset-probe.mjs';
-import { puppetPose, puppetActivity } from '../prototypes/live2d-codex/renderer/puppet-state.mjs';
+import { puppetPose, puppetActivity, replyHasStarted, THINK_DELAY_MS } from '../prototypes/live2d-codex/renderer/puppet-state.mjs';
+import { REPLY_THINKING_POSE } from '../prototypes/live2d-codex/renderer/pose-assets.mjs';
 
 const source = (await readFile(new URL('../prototypes/live2d-codex/renderer/still-wallpaper.js', import.meta.url), 'utf8'))
   .replace(/^import .*;\r?\n/gm, '').replace('export async function', 'async function');
@@ -26,7 +27,7 @@ async function fixture(t, { reload = true, pose = 'work', legacyVideo = false, r
     commitWallpaper(info) { return info.requestId > 0 && waiting ? new Promise(resolve => { release = () => { waiting = false; resolve({ ok: true, value: true }); }; }) : Promise.resolve({ ok: true, value: true }); },
     finishWallpaper(info, accept) { decisions.push([info.character, accept]); return { ok: true, value: accept }; },
   };
-  const runtime = vm.createContext({ StillSequence, characters, stillSettings, stillPose, puppetPose, puppetActivity, createIdleCycle, idleDuration, stillActivity, console, document,
+  const runtime = vm.createContext({ StillSequence, characters, stillSettings, stillPose, puppetPose, puppetActivity, replyHasStarted, THINK_DELAY_MS, REPLY_THINKING_POSE, createIdleCycle, idleDuration, stillActivity, console, document,
     loadMotionCatalog: async () => ({ posters: { work: 'app://local/assets/motion/female/work.png' } }),
     MotionWallpaper: class {
       static async prepare() {

@@ -1,4 +1,3 @@
-import { startAvatar } from './avatar.js';
 import { startWallpaperRenderer } from './wallpaper-renderer.js';
 import { currentReply } from './current-reply.mjs';
 import { renderReply } from './reply-document.mjs';
@@ -281,7 +280,7 @@ if (isWallpaper) {
     $('wallpaper-error').hidden = false;
   });
 } else if (isAvatar) {
-  startAvatar().catch(failure => {
+  import('app://local/dist/avatar.js').then(({ startAvatar }) => startAvatar()).catch(failure => {
     $('avatar-error').textContent = `Live2D 模型未能加载：${failure.message}。对话仍可使用。`;
     $('avatar-error').hidden = false; api.hit(true);
   });

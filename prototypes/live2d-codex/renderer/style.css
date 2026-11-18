@@ -181,8 +181,8 @@ button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-
 .approval-context summary:focus-visible { outline:2px solid var(--focus);outline-offset:2px; }
 .approval-context p { white-space:pre-wrap; }
 .approval p { margin: 6px 0; line-height: 1.75; }
-.approval-directory { color:#6e5839;font-size:11px; }
-.approval pre { font-family:"Cascadia Code",Consolas,monospace;font-size: 11px; line-height:1.7;white-space: pre-wrap; overflow-wrap:anywhere;background: #f2e7d6; padding: 10px; border-radius: 6px;margin:0 0 8px; }
+.approval-directory { color:var(--approval-ink);font-size:13px; }
+.approval pre { font-family:"Cascadia Code",Consolas,monospace;font-size:13px; line-height:1.6;white-space: pre-wrap; overflow-wrap:anywhere;background: #f2e7d6; padding: 10px; border-radius: 6px;margin:0 0 8px; }
 .approval-actions { flex:0 0 auto;display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; padding-top:10px;border-top:1px solid #cbb99670; }
 .approval-actions button { min-height: 34px; padding: 6px 10px; border: 1px solid #cbb996; background: #fffdf9; border-radius: 7px; font-size: 12px; }
 .approval-actions button:hover:not(:disabled) { background:#f2e7d6; }

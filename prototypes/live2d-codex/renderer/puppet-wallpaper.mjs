@@ -171,7 +171,7 @@ export class PuppetWallpaper {
       if (this.active) this.activityChanged?.();
     }
   }
-  update(pose, presentation, hidden) {
+  update(pose, presentation, hidden, quick = false) {
     if (this.closed) return;
     this.speaking = !!presentation.speaking;
     this.paused = !!presentation.paused;
@@ -183,7 +183,7 @@ export class PuppetWallpaper {
     }
     if (!this.paused && !hidden) {
       this.pose = pose;
-      this.transition.request(pose);
+      this.transition.request(pose, quick);
     }
     this.element.dataset.pose = this.pose;
     this.updateLoop();

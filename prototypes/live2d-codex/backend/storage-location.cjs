@@ -10,11 +10,11 @@ function dataHome(base, portable) {
 }
 function storageLocation({ defaultStorage, sourceStorage, packaged, override }) {
   if (override) return resolve(override);
-  if (!packaged) return resolve(sourceStorage);
-  const pointer = join(defaultStorage, 'data-location.json');
+  const root = packaged ? defaultStorage : resolve(sourceStorage);
+  const pointer = dataPointer(root);
   if (!existsSync(pointer)) {
     if (existsSync(pointer + '.tmp') || existsSync(pointer + '.bak')) throw new Error('数据目录记录缺失，发现恢复副本；请先恢复目录记录或明确指定数据副本。');
-    return defaultStorage;
+    return root;
   }
   try {
     const saved = JSON.parse(readFileSync(pointer, 'utf8'));
@@ -24,4 +24,5 @@ function storageLocation({ defaultStorage, sourceStorage, packaged, override }) 
     throw new Error(`原数据目录无法访问，未切换到空白数据。请恢复目录或使用数据副本：${error.message}`);
   }
 }
-module.exports = { dataHome, storageLocation };
+const dataPointer = root => join(root, 'data-location.json');
+module.exports = { dataHome, dataPointer, storageLocation };
