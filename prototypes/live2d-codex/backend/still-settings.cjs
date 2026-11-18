@@ -1,6 +1,6 @@
-const POSE_LABELS = Object.freeze({ work: '专注工作', cup: '持杯休息', thinking: '托腮思考', window: '看向窗外', attention: '看向你' });
-const POSES = Object.freeze(Object.keys(POSE_LABELS));
-const ACTIVITY_LABELS = Object.freeze({ auto: '自动轮换', manual: '固定姿态', paused: '壁纸已暂停', hidden: '壁纸暂不可见', capturing: '正在听写', speaking: '正在朗读', task: '正在处理任务', waiting: '等待操作确认', chat: '正在陪伴对话' });
+const POSE_LABELS = Object.freeze({ work: '专注工作', cup: '持杯休息', thinking: '托腮思考', window: '看向窗外', attention: '看向你', 'reply-thinking': '思考回复' });
+const POSES = Object.freeze(Object.keys(POSE_LABELS).filter(id => id !== 'reply-thinking'));
+const ACTIVITY_LABELS = Object.freeze({ auto: '自动轮换', manual: '固定姿态', paused: '壁纸已暂停', hidden: '壁纸暂不可见', capturing: '正在听写', speaking: '正在朗读', thinking: '正在思考', 'awaiting-narration': '等待朗读', task: '正在处理任务', waiting: '等待操作确认', chat: '正在陪伴对话' });
 const STILL_DEFAULTS = Object.freeze({ stillPose: 'auto', wallpaperMotion: false, animePlayback: 'poses', ambienceEnabled: false, rainVolume: .12, keyVolume: .08 });
 function stillSettings(input = {}) {
   return {

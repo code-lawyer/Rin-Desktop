@@ -1,4 +1,5 @@
 import { stillPose, stillActivity } from './still-policy.mjs';
+import { currentReply } from './current-reply.mjs';
 
 function attentionActivity(backend, presentation) {
   if (presentation.capturing) return 'capturing';
@@ -6,6 +7,14 @@ function attentionActivity(backend, presentation) {
   if (backend.status === 'waiting') return 'waiting';
   if (presentation.chatVisible) return 'chat';
   return null;
+}
+
+export const THINK_DELAY_MS = 500;
+
+export function replyHasStarted(backend) {
+  if (!backend.turnId) return false;
+  const reply = currentReply(backend.messages);
+  return reply.turnId === backend.turnId && !!reply.text.trim();
 }
 
 export function puppetPose(backend, presentation, idle) {

@@ -1,7 +1,7 @@
 import { access } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { releaseVersion, requireFreshDirectory } from './release-inputs.mjs';
+import { releaseVersion, requireFreshDirectory, reserveFreshDirectory } from './release-inputs.mjs';
 import { inspectMotionAssets } from './motion-assets.mjs';
 import { inspectPuppetAssets } from './puppet-assets.mjs';
 const root=resolve(import.meta.dirname,'../..'), app=join(root,'prototypes/live2d-codex');
@@ -13,6 +13,7 @@ await inspectPuppetAssets(join(app, 'assets/scene/rin-poses'));
 const resources=process.env.VIBE_RESOURCE_APP||app;
 await access(join(resources,'runtime/node.exe'));await access(join(app,'voice-resources.json'));
 const compiler=process.env.INNO_ISCC||join(root,'work/release-build/tools/inno/ISCC.exe');await access(compiler);
+await reserveFreshDirectory(output);
 execFileSync(process.execPath,[join(app,'scripts/build.mjs')],{windowsHide:true,stdio:'inherit'});
 execFileSync(process.execPath,[join(app,'scripts/package-portable.mjs'),`--out=${stage}`],{windowsHide:true,stdio:'inherit'});
 execFileSync(compiler,[`/DVersion=${version}`,`/DSourceDir=${stage}`,`/DReleaseDir=${output}`,join(root,'tools/release/installer.iss')],{windowsHide:true,stdio:'inherit'});

@@ -10,6 +10,7 @@ import catalog from './agent-catalog.cjs';
 import { readJson, writeJson } from './durable-json.mjs';
 import { pathKey } from './path-identity.mjs';
 export { pathKey } from './path-identity.mjs';
+const sessionKey = (cwd, id) => JSON.stringify([pathKey(cwd), id]);
 
 export function historyTurns(messages) {
   const turns = [];
@@ -50,28 +51,33 @@ export class NativeAgent extends EventEmitter {
       catch (error) { if (error.code === 'ENOENT') continue; throw new Error(`${this.spec.name} 会话记录无法读取，原文件已保留。`); }
       if (saved.format !== 1 || saved.provider !== this.provider) throw new Error('会话记录来源或格式不匹配，原文件已保留。');
       if (name === 'index') {
-        this.index = saved.sessions ?? {};
-        for (const item of Object.values(this.index)) {
+        this.index = {};
+        for (const item of Object.values(saved.sessions ?? {})) {
+          if (typeof item?.cwd !== 'string' || !item.cwd || typeof item.id !== 'string' || !item.id)
+            throw new Error('会话索引中的项目或会话编号无效，原文件已保留。');
+          const key = sessionKey(item.cwd, item.id);
+          if (Object.hasOwn(this.index, key)) throw new Error('会话索引含重复的项目和会话编号，原文件已保留。');
           // Legacy display caches did not record turn outcomes. Retain their
           // text, but never infer successful completion from that absence.
           if (Array.isArray(item.messages)) item.messages = item.messages.map(message => ({ ...message, turnStatus: message.turnStatus ?? 'unknown' }));
-          this.known.set(item.id, item);
+          this.index[key] = item;
+          this.known.set(key, item);
         }
       }
       else {
         if (typeof saved.cwd !== 'string' || !saved.cwd) throw new Error('已保存的项目路径无效。');
         Object.assign(this.state, { cwd: resolve(saved.cwd), projectName: basename(saved.cwd), threadId: saved.threadId || null, model: saved.model || null, effort: saved.effort || null });
-        const cached = this.index[this.state.threadId];
+        const cached = this.cachedSession(this.state.cwd, this.state.threadId);
         this.state.threadName = cached?.name || ''; this.state.messages = cached?.messages ?? [];
-        if (this.state.threadId) this.known.set(this.state.threadId, { ...cached, id: this.state.threadId, cwd: this.state.cwd });
+        if (this.state.threadId) this.known.set(sessionKey(this.state.cwd, this.state.threadId), { ...cached, id: this.state.threadId, cwd: this.state.cwd });
       }
     }
   }
   async persist() {
     if (this.state.threadId) {
-      const old = this.index[this.state.threadId];
+      const key = sessionKey(this.state.cwd, this.state.threadId), old = this.index[key];
       const entry = { ...old, id: this.state.threadId, cwd: this.state.cwd, name: old?.alias || this.state.threadName || '未命名对话', updatedAt: Date.now() / 1000, messages: structuredClone(this.state.messages.slice(-200)) };
-      this.index[entry.id] = entry; this.known.set(entry.id, entry);
+      this.index[key] = entry; this.known.set(key, entry);
     }
     const session = { format: 1, provider: this.provider, cwd: this.state.cwd, threadId: this.state.threadId, model: this.state.model, effort: this.state.effort };
     const index = { format: 1, provider: this.provider, sessions: this.index };
@@ -162,11 +168,12 @@ export class NativeAgent extends EventEmitter {
         this.stopRequested = false;
         try { await this.persist(); } catch (error) { this.report(new Error(`会话显示记录未保存：${safeError(error)}`)); }
         if (this.run === run) this.run = null;
-        this.changed();
+        // Match Codex: publish the narration intent before the idle snapshot.
         if (status === 'completed' && !this.closed) {
           const reply = currentReply(this.state.messages);
           if (reply.readable && reply.text && reply.turnId === turnId) this.emit('reply-completed', { threadId: this.state.threadId, turnId, text: reply.text });
         }
+        this.changed();
       }
     });
     this.run = run; return { accepted: true, pending: true };
@@ -231,8 +238,9 @@ export class NativeAgent extends EventEmitter {
   switchConversation(cwd, item) {
     return this.configure(async operation => {
       await this.disposeNative(); operation.check();
+      const cached = item && this.cachedSession(cwd, item.id);
       Object.assign(this.state, { cwd: resolve(cwd), projectName: basename(cwd), threadId: item?.id ?? null, turnId: null,
-        threadName: item ? this.index[item.id]?.alias || item.name || '' : '', messages: item ? this.index[item.id]?.messages ?? [] : [],
+        threadName: item ? cached?.alias || item.name || '' : '', messages: cached?.messages ?? [],
         approvals: [], error: null, restored: false, effort: null, ...(item ? { model: null } : {}) });
       if (!this.binary) await this.prepareNative();
       await this.openNative(); operation.check();
@@ -242,20 +250,29 @@ export class NativeAgent extends EventEmitter {
     } });
   }
   rememberList(data) {
-    return data.map(item => { this.known.set(item.id, item); return { ...item, name: this.index[item.id]?.alias || item.name || '未命名对话' }; });
+    return data.map(item => {
+      const key = sessionKey(item.cwd, item.id);
+      this.known.set(key, item);
+      return { ...item, name: this.index[key]?.alias || item.name || '未命名对话' };
+    });
   }
-  session(id) { if (typeof id !== 'string' || !id || id.length > 200 || !this.known.has(id)) throw new Error('请先在当前 Agent 的项目列表中选择会话。'); return this.known.get(id); }
+  cachedSession(cwd, id) { return id ? this.index[sessionKey(cwd, id)] : undefined; }
+  session(id, cwd = this.state.cwd) {
+    const item = typeof id === 'string' && id && id.length <= 200 && typeof cwd === 'string' && cwd && this.known.get(sessionKey(cwd, id));
+    if (!item) throw new Error('请先在当前 Agent 的项目列表中选择会话。');
+    return item;
+  }
   async resumeConversation(id, cwd) {
-    this.idle(); const item = this.session(id);
-    if (pathKey(item.cwd) !== pathKey(cwd)) throw new Error('会话目录与项目不一致。');
+    this.idle(); const item = this.session(id, cwd);
     return this.switchConversation(cwd, item);
   }
-  async renameConversation(id, name) {
-    this.assertReady(); const item = this.session(id);
+  async renameConversation(id, name, cwd) {
+    this.assertReady(); const item = this.session(id, cwd);
     if (typeof name !== 'string' || !name.trim() || name.length > 100) throw new Error('请输入 1–100 字的名称。');
     await this.renameNative?.(id, name.trim(), item.cwd);
-    this.index[id] = { ...item, ...this.index[id], alias: this.state.renameLocal ? name.trim() : undefined, name: name.trim() };
-    if (this.state.threadId === id) this.state.threadName = name.trim();
+    const key = sessionKey(item.cwd, id);
+    this.index[key] = { ...item, ...this.index[key], alias: this.state.renameLocal ? name.trim() : undefined, name: name.trim() };
+    if (this.state.threadId === id && pathKey(this.state.cwd) === pathKey(item.cwd)) this.state.threadName = name.trim();
     await this.persist(); this.changed();
   }
   async cancelLogin() {}

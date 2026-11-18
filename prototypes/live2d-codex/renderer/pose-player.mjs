@@ -1,4 +1,4 @@
-import { POSE_IDS, POSE_SIZE, validatePoses } from './pose-assets.mjs';
+import { POSE_IDS, poseTextureSize, validatePoses } from './pose-assets.mjs';
 
 const VERTEX = `#version 300 es
 in vec2 position;in vec2 texcoord;out vec2 uv;uniform vec2 viewport;
@@ -157,7 +157,7 @@ export class PosePlayer {
       for (let i = 0; i < files.length; i++) {
         const file = files[i],
           bitmap = outcomes[i].value,
-          size = file.includes('-') ? [512, 512] : POSE_SIZE;
+          size = poseTextureSize(file);
         if (bitmap.width !== size[0] || bitmap.height !== size[1]) throw Error('人物素材尺寸无效：' + file);
         const texture = gl.createTexture();
         this.textures.set(file, texture);

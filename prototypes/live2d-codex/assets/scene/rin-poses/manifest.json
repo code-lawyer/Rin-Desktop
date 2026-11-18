@@ -32,8 +32,8 @@
     },
     {
       "file": "poses.json",
-      "bytes": 1866,
-      "sha256": "790610f08e1a225c77bf28d198037901e5ee8709f2baf365e44b339af03f21ea"
+      "bytes": 2218,
+      "sha256": "6508ee34a4157057e6c6252395d1c939e5375efb84006d16f3b4f9ab07b513e8"
     },
     {
       "file": "attention.png",
@@ -84,6 +84,16 @@
       "file": "window-blink.png",
       "bytes": 507269,
       "sha256": "ee3f6a780bcc55c089fadf10c7fa01be26ef431f113288c1705a82c0426357b9"
+    },
+    {
+      "file": "reply-thinking.png",
+      "bytes": 1136316,
+      "sha256": "603ab596bc3c49dc1fb2cfcbf68b280a3a7392f8e24236a56006bea20b30af35"
+    },
+    {
+      "file": "reply-thinking-blink.png",
+      "bytes": 560052,
+      "sha256": "e708f3fbb57ad5ee5d04061862b8ab3130009c4fe59c71926ea255c862b9fa1f"
     },
     {
       "file": "attention-halfBlink.png",

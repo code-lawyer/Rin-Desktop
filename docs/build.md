@@ -73,7 +73,7 @@ npm start
 
 双击根目录 `启动 Rin Desktop.cmd` 使用同一启动器；旧“雨夜壁纸”和“整合壁纸”快捷入口也指向当前源码。`npm --prefix prototypes/live2d-codex start` 保留为兼容入口。所有这些入口都不会扫描 `release/` 并回退到旧可执行文件。只读检查不会启动 Electron 或下载模型；缺少条件会明确报错。
 
-默认使用壁纸和上次选择的 Agent。`npm start -- --provider=codex` 可明确选择后端；`--project="项目路径"`、`--storage="数据路径"` 支持空格，相对路径以仓库根目录为准。参数名使用小写，未知参数会报错。源码默认沿用 `work/runtime/avatar`，不覆盖安装版数据。双击入口等待构建及进程启动成功，失败时显示错误；启动器与应用日志均在 `work/runtime/launcher`。需要实时看错误时使用终端 `npm start`。切换已运行的安装版和源码版前先从托盘退出原实例。
+默认使用壁纸和上次选择的 Agent。`npm start -- --provider=codex` 可明确选择后端；`--project="项目路径"`、`--storage="数据路径"` 支持空格，相对路径以仓库根目录为准。参数名使用小写，未知参数会报错。源码默认沿用 `work/runtime/avatar`。在源码版选择已有数据副本时，选择记录也保存在该源码数据根，和安装版分开。显式 `--storage` 仍优先。双击入口等待构建及进程启动成功，失败时显示错误；启动器与应用日志均在 `work/runtime/launcher`。需要实时看错误时使用终端 `npm start`。切换已运行的安装版和源码版前先从托盘退出原实例。
 
 `npm run start:avatar` 需要本地旧 Hiyori 素材；`npm run start:dots` 需要本地私人桥接。它们不构成公开安装版的新功能。`npm run remote:diagnose` 是需要单独准备环境的硬件诊断，不会随正常启动自动运行。
 
@@ -104,4 +104,4 @@ npm run package
 
 当前 Release 同页提供 `Rin-Desktop-版本-Setup.exe` 与第三方对应源码 ZIP，普通用户只下载 Setup。不要上传开发用 JSON 清单或单独校验清单；版本和安装包校验值保存在仓库清单中，`voice-resources.json` 已随应用提供。
 
-GitHub 仅保留最新版 Release。清理旧发布前，先把仍在使用的第三方组件对应源码迁到保留的发布页，核对远端大小和 SHA-256，并确认公开下载可用；同时更新资源清单、README、许可说明和 Release 下载入口，验证资源恢复后再删除旧 Release。源码归档版本独立于应用版本，组件未变时保留原文件名和内容。Git 标签、历史、本地安装包与用户数据不随 Release 清理删除。
+维护旧 Release 时，先把仍在使用的第三方组件对应源码迁到保留的发布页，核对远端大小和 SHA-256，并确认公开下载可用；同时更新资源清单、README、许可说明和 Release 下载入口，验证资源恢复后再删除旧 Release。源码归档版本独立于应用版本，组件未变时保留原文件名和内容。Git 标签、历史、本地安装包与用户数据不随 Release 清理删除。

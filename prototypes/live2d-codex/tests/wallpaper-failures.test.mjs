@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import vm from 'node:vm';
 import { WorkspaceStore } from '../backend/workspace-store.mjs';
 import { AmbientBarrier } from '../backend/ambient-barrier.cjs';
+import { createReplyNarration } from '../backend/reply-narration.cjs';
 import characters from '../backend/character-profiles.cjs';
 import choices from '../backend/wallpaper-choice.cjs';
 
@@ -120,6 +121,7 @@ function playbackFixture() {
   const handlers = new Map(), waits = [], notices = [];
   const chat = { webContents: { send() {} } };
   const context = vm.createContext({ chat, captureTarget: null, suspended: false, screenLocked: false, speaking: false, playbackRevision: 0,
+    replyNarration: createReplyNarration(() => {}),
     notifyPresentation() { notices.push(context.speaking); }, speech: { stop: async () => {} }, console,
     applyAmbientBeforeAudio() { const gate = deferred(); waits.push(gate); return gate.promise; }, handler: (name, fn) => handlers.set(name, fn) });
   vm.runInContext(playbackSource + '\n' + main.slice(main.indexOf('function stopSpeech()'), main.indexOf('async function confirmWallpaper(')), context);
@@ -149,6 +151,7 @@ test('a confirmed wallpaper exit releases audio waits and recovery reinstates ac
   const barrier = new AmbientBarrier({ publish() {}, timeout: 15 }); t.after(() => barrier.close());
   const context = vm.createContext({ chat, avatar, wallpaperMode: true, ambientBarrier: barrier, store: { data: { settings: { ambienceEnabled: false } } },
     captureTarget: null, captureTimer: null, provider: 'codex', changingProvider: false, suspended: false, screenLocked: false, speaking: false, playbackRevision: 0, submissions: { active: new Set() },
+    replyNarration: createReplyNarration(() => {}),
     wallpaperStatus: { phase: 'ready', character: 'female', requestId: 0, frameRevision: 20, pose: 'window' }, ambienceStatus: {}, lastPresentation: '',
     notifyPresentation() {}, notifyWorkspace() {}, stopSpeech() {}, cancelWallpaperCommit() {}, showWorkbench() {}, speech: { status: () => ({ asr: true }) }, backend: { state: target },
     setTimeout: callback => { const id = ++serial; timers.set(id, callback); return id; }, clearTimeout: id => timers.delete(id),

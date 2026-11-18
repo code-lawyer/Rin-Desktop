@@ -1,4 +1,4 @@
-const { POSES, ACTIVITY_LABELS } = require('./still-settings.cjs');
+const { POSE_LABELS, ACTIVITY_LABELS } = require('./still-settings.cjs');
 
 // A status refresh from the retained frame must not clear a later load error.
 // Only a newly painted frame for the committed character can recover it.
@@ -7,7 +7,7 @@ function acceptWallpaperReport(status, info, appliedRequest, character) {
     || !['static-stills', 'motion-clips', 'rin-scene'].includes(info.model)
     || info.wallpaperKind !== 'artwork' || info.requestId !== status.requestId
     || info.requestId !== appliedRequest || info.character !== status.character
-    || info.character !== character || !POSES.includes(info.pose)
+    || info.character !== character || !Object.hasOwn(POSE_LABELS, info.pose)
     || !Object.hasOwn(ACTIVITY_LABELS, info.activity)
     || !Number.isSafeInteger(info.frameRevision) || info.frameRevision < 0
     || info.frameRevision < (status.frameRevision ?? -1)) return status;

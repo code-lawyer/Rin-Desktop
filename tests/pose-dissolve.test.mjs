@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { PoseDissolve } from '../prototypes/live2d-codex/renderer/pose-dissolve.mjs';
-import { POSE_IDS, validatePoses } from '../prototypes/live2d-codex/renderer/pose-assets.mjs';
+import { POSE_IDS, REPLY_THINKING_POSE, validatePoses } from '../prototypes/live2d-codex/renderer/pose-assets.mjs';
 
 function settle(motion) {
   const frames = [];
@@ -51,6 +51,24 @@ test('wake interrupts a requested resting pose without finishing a cup or arm se
     'obsolete requests are coalesced',
   );
   assert.equal(frames.at(-1).pose, 'attention');
+});
+
+test('dialogue retargets an idle dissolve promptly and subsequent manual changes restore the slow effect', () => {
+  const motion = new PoseDissolve('attention');
+  motion.request('cup');
+  motion.step(0.1);
+  motion.request(REPLY_THINKING_POSE, true);
+  const thinking = settle(motion);
+  assert.ok(thinking.length / 60 < 0.3);
+  assert.ok(thinking.every(frame => frame.effect === 'fade' && frame.pose !== 'cup'));
+  motion.request('attention', true);
+  const speaking = settle(motion);
+  assert.ok(speaking.length / 60 < 0.3);
+  assert.equal(speaking.at(-1).pose, 'attention');
+  motion.request('window');
+  const idle = settle(motion);
+  assert.ok(idle.length / 60 >= 2.79);
+  assert.equal(idle.at(-1).effect, 'pixels');
 });
 
 test('changing the target during fade-in fades the current painting back out without a jump', () => {

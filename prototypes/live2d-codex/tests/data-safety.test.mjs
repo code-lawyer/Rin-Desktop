@@ -18,6 +18,31 @@ async function fixture(t, io) {
   return { root, store, target: { provider: 'codex', cwd: root, threadId: 'saved' } };
 }
 
+test('legacy unsent draft and a real session called new stay isolated across saves and restart', async t => {
+  const {store,target}=await fixture(t);
+  const legacy=JSON.parse(await fs.readFile(store.file,'utf8'));
+  legacy.drafts[target.cwd.toLowerCase()+'|new']={text:'legacy unsent'};
+  await writeJson(store.file,legacy);
+  const pending={...target,threadId:null}, named={...target,threadId:'new'};
+  await store.load();
+  assert.equal(store.draft(pending),'legacy unsent');
+  assert.equal(store.draft(named),'');
+  await store.saveDraft(named,'native session draft');
+  const restored=new WorkspaceStore(join(store.file,'..'));await restored.load();
+  assert.equal(restored.draft(pending),'legacy unsent');
+  assert.equal(restored.draft(named),'native session draft');
+});
+
+test('source and installed data selections use different restart records', async t => {
+  const {root,store}=await fixture(t);
+  const source=join(root,'source'), installed=join(root,'installed'), imported=join(store.file,'..');
+  const sourcePointer=storage.dataPointer(source);
+  await selectDataDirectory(imported,sourcePointer);
+  assert.equal(storage.storageLocation({sourceStorage:source,defaultStorage:installed,packaged:false}),imported);
+  assert.equal(storage.storageLocation({sourceStorage:source,defaultStorage:installed,packaged:true}),installed);
+  await assert.rejects(fs.access(storage.dataPointer(installed)));
+});
+
 for (const failure of ['open', 'sync', 'rename']) test(`failed ${failure} keeps committed data and memory, then permits retry`, async t => {
   let fail = false;
   const io = { ...fs,

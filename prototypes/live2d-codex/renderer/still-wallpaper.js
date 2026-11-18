@@ -2,10 +2,11 @@ import characters from '../backend/character-profiles.cjs';
 import stillSettings from '../backend/still-settings.cjs';
 import { StillSequence } from './still-sequence.mjs';
 import { AmbientPreview } from './ambient-preview.mjs';
-import { stillPose, createIdleCycle, idleDuration, stillActivity } from './still-policy.mjs';
+import { createIdleCycle, idleDuration, stillActivity } from './still-policy.mjs';
 import { MotionWallpaper, loadMotionCatalog } from './motion-wallpaper.mjs';
 import { PuppetWallpaper } from './puppet-wallpaper.mjs';
-import { puppetPose, puppetActivity } from './puppet-state.mjs';
+import { puppetPose, puppetActivity, replyHasStarted, THINK_DELAY_MS } from './puppet-state.mjs';
+import { REPLY_THINKING_POSE } from './pose-assets.mjs';
 
 export async function startStillWallpaper({ host, api }) {
   const canvas = document.createElement('canvas'); canvas.className = 'wallpaper-still'; host.append(canvas);
@@ -18,6 +19,7 @@ export async function startStillWallpaper({ host, api }) {
   let idle = 'work', idleTimer, remaining = idleDuration('work'), began = 0, lastReport;
   let received = false, audioRevision = 0, committedRequest = -1;
   let motion, motionInfo, puppet, puppetError, fallbackFrame;
+  let thinkTimer, replyWaitSince, thinking = false, thinkingTurn, dialoguePose, replyStarted = false;
   function loadImage(pose, override) {
     const url = override || `app://local/assets/stills/female-v2-4k/${pose}.png`;
     if (!cache.has(url)) {
@@ -110,7 +112,7 @@ export async function startStillWallpaper({ host, api }) {
         motion.start(backend, presentation, document.hidden);
       } else {
         delete host.dataset.motionPhase; delete host.dataset.motionClip;
-        puppet.activate(); puppet.update(puppetPose(backend, presentation, idle), presentation, document.hidden); host.dataset.rig = 'scene';
+        puppet.activate(); updatePuppet(); host.dataset.rig = 'scene';
       }
       report(true);
       updateAudio();
@@ -140,7 +142,9 @@ export async function startStillWallpaper({ host, api }) {
     host.dataset.pose = pose;
     const info = { ready: true, kind: 'wallpaper', wallpaperKind: 'artwork', character: shown.character, wallpaperMotion: shown.animated, animePlayback: shown.animePlayback, requestId: shown.requestId,
       pose,
-      activity: (shown.animated ? stillActivity : puppetActivity)(backend, presentation, document.hidden), model: shown.animated ? 'motion-clips' : 'rin-scene',
+      activity: !shown.animated && dialoguePose === REPLY_THINKING_POSE && !presentation.paused && !document.hidden
+        ? (backend.status === 'idle' ? 'awaiting-narration' : 'thinking')
+        : (shown.animated ? stillActivity : puppetActivity)(backend, presentation, document.hidden), model: shown.animated ? 'motion-clips' : 'rin-scene',
       motionPhase: shown.animated ? motionInfo?.phase || null : puppet.transitioning?.() ? 'transition' : 'loop',
       gesture: null,
       frameRevision: shown.frameRevision, painted, ...(error ? { ready: false, error: error.message || String(error) } : {}),
@@ -181,6 +185,42 @@ export async function startStillWallpaper({ host, api }) {
       idleTimer = setTimeout(() => { idleTimer = null; idle = nextIdlePose(idle); remaining = idleDuration(idle); update(); }, remaining);
     }
   }
+  function updateDialoguePose() {
+    clearTimeout(thinkTimer);
+    const active = ['starting', 'working'].includes(backend.status) && backend.connection !== 'error';
+    const cue = presentation.replyNarration;
+    const awaitingNarration = thinking && backend.status === 'idle' && thinkingTurn && cue?.turnId === thinkingTurn &&
+      (cue.mode === 'automatic' || presentation.chatVisible);
+    dialoguePose = null;
+    if (!presentation.stills?.wallpaperMotion && (active || awaitingNarration)) {
+      replyWaitSince ??= performance.now();
+      thinkingTurn = backend.turnId ?? thinkingTurn;
+      const interrupted = presentation.capturing || presentation.speaking;
+      if (active) replyStarted ||= replyHasStarted(backend);
+      if (!thinking && !interrupted && !replyStarted) {
+        const wait = THINK_DELAY_MS - (performance.now() - replyWaitSince);
+        if (wait <= 0) thinking = true;
+        else if (!presentation.paused && !document.hidden) thinkTimer = setTimeout(update, Math.ceil(wait));
+      }
+      dialoguePose = thinking && !interrupted ? REPLY_THINKING_POSE : 'attention';
+    } else {
+      resetDialogue();
+    }
+  }
+  function resetDialogue() {
+    replyWaitSince = undefined;
+    thinking = false;
+    thinkingTurn = undefined;
+    replyStarted = false;
+  }
+  function updatePuppet() {
+    const pose = dialoguePose ?? puppetPose(backend, presentation, idle);
+    const quick = !!dialoguePose || !!presentation.speaking || !!puppet?.dialoguePose;
+    if (puppet) {
+      puppet.dialoguePose = dialoguePose;
+      puppet.update(pose, presentation, document.hidden, quick);
+    }
+  }
   function update() {
     if (closed) return;
     updateAudio(); updateIdle();
@@ -191,7 +231,8 @@ export async function startStillWallpaper({ host, api }) {
     const key = JSON.stringify([presentation.characterRequest ?? 0, character, pose, animated, animePlayback]);
     host.dataset.paused = String(!!presentation.paused);
     motion?.update(backend, presentation, document.hidden);
-    puppet?.update(puppetPose(backend, presentation, idle), presentation, document.hidden);
+    updateDialoguePose();
+    updatePuppet();
     sequence.setPaused(!!shown && (!!presentation.paused || document.hidden));
     if (key !== desiredKey) { desiredKey = key; frameRevision++; host.dataset.loading = 'true'; sequence.select(key); }
     report();
@@ -202,9 +243,16 @@ export async function startStillWallpaper({ host, api }) {
   const observer = new ResizeObserver(fit); observer.observe(host);
   document.addEventListener('visibilitychange', update); update();
   function destroy() {
-    if (closed) return; closed = true; clearTimeout(idleTimer); unsubscribe(); observer.disconnect(); sequence.close();
+    if (closed) return; closed = true; clearTimeout(idleTimer); clearTimeout(thinkTimer); unsubscribe(); observer.disconnect(); sequence.close();
     document.removeEventListener('visibilitychange', update); window.removeEventListener('beforeunload', destroy); unsubscribeMouth?.(); motion?.close(); puppet?.close(); audio.close(); canvas.remove(); cache.clear(); shown = null;
   }
   window.addEventListener('beforeunload', destroy);
-  return { setBackendState(value) { backend = value; update(); }, destroy };
+  return { setBackendState(value) {
+    if (backend.provider !== value.provider || backend.cwd !== value.cwd ||
+        (backend.threadId && backend.threadId !== value.threadId) ||
+        (thinkingTurn && value.turnId && thinkingTurn !== value.turnId)) {
+      resetDialogue();
+    }
+    backend = value; update();
+  }, destroy };
 }

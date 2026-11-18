@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto';
 import { join, resolve } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { writeManifest } from './manifest.mjs';
-import { releaseVersion, requireFreshDirectory } from './release-inputs.mjs';
+import { releaseVersion, requireFreshDirectory, reserveFreshDirectory } from './release-inputs.mjs';
 import { inspectMotionAssets } from './motion-assets.mjs';
 import { inspectPuppetAssets } from './puppet-assets.mjs';
 
@@ -26,7 +26,7 @@ const source = { format:1, build:id, baseVersion:version, channel:'internal-test
 for (const file of [...new Set(git(['ls-files','--cached','--others','--exclude-standard','-z']).split('\0').filter(Boolean))].sort()) {
   try { const data=await readFile(join(root,file));source.files.push({file,sha256:createHash('sha256').update(data).digest('hex')}); } catch(error) {if(error.code!=='ENOENT')throw error;}
 }
-await mkdir(output,{recursive:true});
+await reserveFreshDirectory(output);
 execFileSync(process.execPath,[join(app,'scripts/build.mjs')],{windowsHide:true,stdio:'inherit'});
 execFileSync(process.execPath,[join(app,'scripts/package-portable.mjs'),`--out=${stage}`,`--test-build=${id}`],{windowsHide:true,stdio:'inherit'});
 await mkdir(join(stage,'tools'),{recursive:true});await mkdir(join(stage,'resources/app/tests'),{recursive:true});

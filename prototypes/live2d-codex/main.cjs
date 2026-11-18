@@ -13,19 +13,21 @@ const { wallpaperChoice, isWallpaperKind } = require('./backend/wallpaper-choice
 const { stillSettings } = require('./backend/still-settings.cjs');
 const { acceptWallpaperReport } = require('./backend/wallpaper-report.cjs');
 const { AmbientBarrier } = require('./backend/ambient-barrier.cjs');
-const { dataHome, storageLocation } = require('./backend/storage-location.cjs');
+const { createReplyNarration } = require('./backend/reply-narration.cjs');
+const { dataHome, dataPointer, storageLocation } = require('./backend/storage-location.cjs');
 
 const root = __dirname;
 const packaged = require('node:fs').existsSync(join(root, 'portable.json'));
 const legacyDotsAvailable = !packaged && require('node:fs').existsSync(join(root, '../dots-bridge/src/client.mjs')) && require('node:fs').existsSync(join(root, 'backend/dots.mjs'));
 const projectRoot = packaged ? app.getPath('documents') : resolve(root, '../..');
+const sourceStorage = join(projectRoot, 'work/runtime/avatar');
 const argument = key => process.argv.find(arg => arg.startsWith(`--${key}=`))?.slice(key.length + 3);
 const wallpaperMode = packaged || (argument('mode') ?? 'wallpaper') === 'wallpaper';
 let portable, startupStorageError, defaultStorage, storageDir;
 try {
   if (packaged) portable = JSON.parse(require('node:fs').readFileSync(join(root, 'portable.json'), 'utf8'));
   defaultStorage = dataHome(process.env.LOCALAPPDATA || app.getPath('userData'), portable);
-  storageDir = storageLocation({ defaultStorage, sourceStorage: join(projectRoot, 'work/runtime/avatar'), packaged, override: argument('storage') });
+  storageDir = storageLocation({ defaultStorage, sourceStorage, packaged, override: argument('storage') });
 } catch (error) {
   startupStorageError = error;
   storageDir = join(app.getPath('temp'), 'rin-startup-error');
@@ -50,6 +52,7 @@ let bubblePosition = null, chatDragOrigin, currentChatLayout;
 let wallpaperHost, manualPause = false, pendingMode = null, lastPresentation = '', trayMenu;
 let wallpaperStatus = { phase: 'loading', requestId: 0 }, appliedWallpaperRequest = -1, wallpaperCommit;
 let suspended = false, screenLocked = false, speaking = false, playbackRevision = 0, ambientRevision = 0, ambientRetry = 0;
+const replyNarration = createReplyNarration(notifyPresentation, reply => chat.webContents.send('speech:reply', reply));
 let ambienceStatus = { phase: 'off', error: '' };
 const ambientBarrier = new AmbientBarrier({ publish(revision) { ambientRevision = revision; notifyPresentation(); } });
 const applyAmbientBeforeAudio = () => ambientBarrier.wait(wallpaperMode && !!avatar && !avatar.isDestroyed());
@@ -57,7 +60,7 @@ const remoteInput = new RemoteInput({onError:error=>remote?.disconnect().then(()
 const isLocal = url => { try { const u = new URL(url); return u.protocol === 'app:' && u.hostname === 'local' && ['/renderer/index.html', '/renderer/workbench.html'].includes(u.pathname); } catch { return false; } };
 const trusted = event => [avatar, chat, workbench].some(win => win && !win.isDestroyed() && win.webContents === event.sender) && isLocal(event.senderFrame?.url ?? '');
 const appearance = () => ({ scale: characterScale, mode: wallpaperMode ? 'wallpaper' : 'avatar' });
-const presentation = () => ({ mode: wallpaperMode ? 'wallpaper' : 'avatar', wallpaperKind: wallpaperStatus.wallpaperKind || 'artwork', character: wallpaperStatus.character ?? characterProfile(store?.data.settings.character).id, characterRequest: wallpaperStatus.requestId, chatVisible: !!chat?.isVisible(), paused: manualPause || suspended || screenLocked || !!wallpaperHost?.status.occluded, manualPause, stills: { ...stillSettings(store?.data.settings), wallpaperMotion: wallpaperStatus.wallpaperMotion ?? store?.data.settings.wallpaperMotion === true }, capturing: !!captureTarget, speaking, ambientRevision, ambientRetry, desktopAttached: !!wallpaperHost?.status.ok, desktopLayer: wallpaperHost?.status.parentClass ?? null, desktopBounds: wallpaperHost?.status.bounds ?? null });
+const presentation = () => ({ mode: wallpaperMode ? 'wallpaper' : 'avatar', wallpaperKind: wallpaperStatus.wallpaperKind || 'artwork', character: wallpaperStatus.character ?? characterProfile(store?.data.settings.character).id, characterRequest: wallpaperStatus.requestId, chatVisible: !!chat?.isVisible(), paused: manualPause || suspended || screenLocked || !!wallpaperHost?.status.occluded, manualPause, stills: { ...stillSettings(store?.data.settings), wallpaperMotion: wallpaperStatus.wallpaperMotion ?? store?.data.settings.wallpaperMotion === true }, capturing: !!captureTarget, speaking, replyNarration: replyNarration.cue, ambientRevision, ambientRetry, desktopAttached: !!wallpaperHost?.status.ok, desktopLayer: wallpaperHost?.status.parentClass ?? null, desktopBounds: wallpaperHost?.status.bounds ?? null });
 function notifyPresentation() {
   if (!avatar || avatar.isDestroyed() || avatar.webContents.isCrashed()) return;
   const value = presentation(), encoded = JSON.stringify(value);
@@ -136,7 +139,7 @@ async function changeAgentConfiguration(operation) {
   } finally { changingAgentConfig = false; }
 }
 function notifyWorkspace() { workspaceVersion++; notifyPresentation(); for (const win of [chat, workbench]) if (win && !win.isDestroyed()) win.webContents.send('workbench:state', workspaceSnapshot()); }
-function stopSpeech() { playbackRevision++; speaking = false; notifyPresentation(); chat?.webContents.send('speech:stop'); return speech?.stop().catch(error => console.error('[speech:stop]', error.message)); }
+function stopSpeech() { playbackRevision++; speaking = false; replyNarration.clear(); notifyPresentation(); chat?.webContents.send('speech:stop'); return speech?.stop().catch(error => console.error('[speech:stop]', error.message)); }
 async function confirmWallpaper(info) {
   const requested = wallpaperStatus;
   const rendererKind = info?.wallpaperKind || 'artwork';
@@ -276,8 +279,10 @@ function bindBackend() {
     // Only successful, complete, deduplicated turns emit this event. A chime
     // never depends on model residency or automatic narration being enabled.
     if (store?.data.settings.completionSound) chat?.webContents.send('notification:sound', { action: 'play' });
-    const settings = store?.data.settings;
-    if (settings?.ttsResident && (settings.autoSpeak || settings.prepareSpeech) && !captureTarget) chat?.webContents.send('speech:reply', reply);
+    const settings = store?.data.settings ?? {};
+    const available = settings.ttsResident && ['ready', 'loading', 'generating', 'stopping'].includes(speech?.phase) &&
+      !captureTarget && !suspended && !screenLocked && chat && !chat.isDestroyed() && !chat.webContents.isCrashed();
+    replyNarration.complete(reply, { available, autoSpeak: settings.autoSpeak, prepareSpeech: settings.prepareSpeech });
   });
 }
 async function changeProvider(next, { reconnect = false } = {}) {
@@ -418,7 +423,10 @@ else {
       return require('node:fs').existsSync(join(bundled, MODEL_FOLDERS[id], 'model.int8.onnx')) ? bundled : voiceResources.directory(id);
     };
     speech = new ResidentSpeech(models, { executable: join(root, 'runtime/node.exe'), qwenRoot });
-    speech.on('state', notifyWorkspace);
+    speech.on('state', status => {
+      if (!['ready', 'loading', 'generating', 'stopping'].includes(status.phase)) replyNarration.clear();
+      notifyWorkspace();
+    });
     console.info('[companion:startup]', 'services');
     const area = screen.getPrimaryDisplay().workArea;
     let savedAppearance;
@@ -505,7 +513,7 @@ else {
     powerMonitor.on('resume',()=>{ suspended=false; notifyPresentation(); remote.resume(); });
     powerMonitor.on('lock-screen',()=>{ screenLocked=true; notifyPresentation(); stopSpeech(); remote.cancel(); chat.webContents.send('speech:cancel'); });
     powerMonitor.on('unlock-screen',()=>{ screenLocked=false; notifyPresentation(); });
-    chat.webContents.on('render-process-gone',()=>{ playbackRevision++; speaking=false; if(captureTarget?.origin!=='rc003')captureTarget=null; clearTimeout(captureTimer); notifyPresentation(); });
+    chat.webContents.on('render-process-gone',()=>{ playbackRevision++; speaking=false; replyNarration.clear(); if(captureTarget?.origin!=='rc003')captureTarget=null; clearTimeout(captureTimer); notifyPresentation(); });
     avatar.webContents.on('did-start-loading',()=>ambientBarrier.startOwner());
     avatar.webContents.on('render-process-gone',()=>{
       cancelWallpaperCommit();
@@ -537,7 +545,7 @@ else {
       const directory = await validateDataDirectory(chosen.filePaths[0]);
       if (resolve(directory) === storageDir) return;
       if (backend.busy || captureTarget || closing || changingProvider) throw new Error('应用状态已改变，数据目录未切换。');
-      const pointer = join(defaultStorage,'data-location.json');
+      const pointer = dataPointer(packaged ? defaultStorage : sourceStorage);
       await store.queue;
       pendingDataSelection = () => selectDataDirectory(directory, pointer);
       pendingRelaunch = { args:[...process.argv.slice(1).filter(value=>!value.startsWith('--storage=')),`--storage=${directory}`] }; app.quit();
@@ -625,10 +633,14 @@ else {
     handler('workbench:remove', async (_event, id) => { await store.remove(id, backend.state.cwd); notifyWorkspace(); });
     const requireProvider = expected => { if (expected !== undefined && expected !== provider) throw new Error('Agent 已切换，请刷新列表。'); };
     handler('workbench:list', (_event, id, cursor, search, expected) => { requireProvider(expected); return backend.listThreads(store.project(id).cwd, cursor, search); });
-    handler('workbench:history', (_event, id, cursor, expected) => { requireProvider(expected); return backend.history(id, cursor); });
+    handler('workbench:history', (_event, id, cursor, expected, projectId) => {
+      requireProvider(expected); return backend.history(id, cursor, store.project(projectId).cwd);
+    });
     handler('workbench:resume', async (_event, id, threadId, expected) => { requireProvider(expected); switchAllowed(); await backend.resumeConversation(threadId, store.project(id).cwd); showChat(); });
     handler('workbench:new', async (_event, id, expected) => { requireProvider(expected); switchAllowed(); await backend.newConversation(store.project(id).cwd); showChat(); });
-    handler('workbench:rename', (_event, id, name, expected) => { requireProvider(expected); return backend.renameConversation(id, name); });
+    handler('workbench:rename', (_event, id, name, expected, projectId) => {
+      requireProvider(expected); return backend.renameConversation(id, name, store.project(projectId).cwd);
+    });
     handler('workbench:effort', (_event, effort) => backend.chooseEffort(effort));
     handler('workbench:draft', (_event, target, text) => text === undefined ? store.draftSnapshot(target) : store.saveDraft(target, text));
     ipcMain.on('draft:flushed', (event, id, result) => {
@@ -651,7 +663,7 @@ else {
       if (Object.keys(patch).length) await store.updateSettings(patch);
       registerShortcuts();
       const next = store.data.settings;
-      if (!next.ttsResident || next.ttsEngine !== previous.ttsEngine || next.qwenRoot !== previous.qwenRoot) chat.webContents.send('speech:stop');
+      if (!next.ttsResident || next.ttsEngine !== previous.ttsEngine || next.qwenRoot !== previous.qwenRoot) stopSpeech();
       else if ((previous.autoSpeak && !next.autoSpeak) || next.character !== previous.character || next.qwenVoice !== previous.qwenVoice || next.voice !== previous.voice || next.speed !== previous.speed) stopSpeech();
       if (patch.completionSound === false) chat.webContents.send('notification:sound', { action: 'stop' });
       if (!closing && !voiceResources.active && (changesEngine || patch.ttsResident === true && speech.phase === 'error')) speech.configure(next);
@@ -700,11 +712,15 @@ else {
       }
     });
     const { speechProfile } = await import(pathToFileURL(join(root,'backend/speech-plan.mjs')).href);
+    ipcMain.on('speech:reply-settled', (event, turnId) => {
+      if (trusted(event) && event.sender === chat.webContents) replyNarration.settle(turnId);
+    });
     handler('speech:playback', async (event, active) => {
       if (event.sender !== chat.webContents || typeof active !== 'boolean') throw new Error('播放状态无效。');
       if(active && (captureTarget || suspended || screenLocked)) throw new Error('请先结束听写或恢复电脑，再朗读。');
       const owned = ++playbackRevision; speaking=active;
       if(active) {
+        replyNarration.clear();
         try {
           await applyAmbientBeforeAudio();
           if (owned !== playbackRevision) throw new Error('本次朗读已取消。');
@@ -747,7 +763,10 @@ else {
     handler('speech:stop', async (event, notify = true) => {
       // The chat already stopped its own playback. Echoing that stop can arrive
       // after it starts a new reply and accidentally cancel the new narration.
-      if (notify !== false || event.sender !== chat.webContents) chat.webContents.send('speech:stop');
+      if (notify !== false || event.sender !== chat.webContents) {
+        replyNarration.clear();
+        chat.webContents.send('speech:stop');
+      }
       await speech.stop();
     });
     handler('speech:volume', async (_event, value) => { await store.updateSettings({playbackVolume:value}); notifyWorkspace(); return workspaceSnapshot(); });

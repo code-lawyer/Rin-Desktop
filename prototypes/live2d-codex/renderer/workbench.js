@@ -33,6 +33,12 @@ $('sidebar-backdrop').onclick = closeNavigation;
 narrowNavigation.addEventListener('change', closeNavigation);
 populateAgentPicker($('agent-select'));
 let workspace = { projects: [], settings: {} }, current, projectId, selected, threads = [], listCursor, historyCursor, listVersion = 0, historyVersion = 0, noticeTimer, searchTimer, settingsDirty = false, ready = false;
+let settingsRevision = 0;
+function markSettingsDirty(dirty) {
+  settingsDirty = dirty;
+  if (dirty) settingsRevision++;
+  $('save-settings').hidden = !dirty;
+}
 const node = (tag, text, cls) => { const n = document.createElement(tag); if (text !== undefined) n.textContent = text; if (cls) n.className = cls; return n; };
 for (const [id, voice] of Object.entries(characters.QWEN_VOICES)) $('qwen-voice').append(Object.assign(node('option', voice.label), { value: id }));
 function notice(text) { clearTimeout(noticeTimer); $('notice').textContent = text; $('notice').hidden = !text; if (text) noticeTimer = setTimeout(() => $('notice').hidden = true, 10000); }
@@ -128,10 +134,10 @@ async function selectThread(t) {
   $('history').replaceChildren(node('p', '正在读取历史…', 'hint')); historyCursor = null; $('more-history').hidden = true; await loadHistory();
 }
 async function loadHistory(older = false) {
-  if (!selected) return; const id = selected.id, version = ++historyVersion;
+  if (!selected) return; const target = selected, project = projectId, version = ++historyVersion;
   try {
-    const result = await run(api.history(id, older ? historyCursor : null, current.provider));
-    if (version !== historyVersion || selected?.id !== id) return;
+    const result = await run(api.history(target.id, older ? historyCursor : null, current.provider, project));
+    if (version !== historyVersion || selected !== target || projectId !== project) return;
     if (!older) $('history').replaceChildren();
     if (!older && result.localOnly) $('history').append(node('p', '此 Agent 不提供历史回放，以下仅显示本机缓存的最近消息；没有缓存时不会显示旧消息。', 'hint'));
     const fragment = document.createDocumentFragment();
@@ -146,7 +152,7 @@ async function loadHistory(older = false) {
     older ? $('history').prepend(fragment) : $('history').append(fragment);
     if (!$('history').children.length) $('history').append(node('p', '还没有可显示的文字消息。', 'hint'));
     historyCursor = result.nextCursor; $('more-history').hidden = !historyCursor;
-  } catch { if (version === historyVersion && !older) $('history').replaceChildren(node('p', '历史暂时无法读取，可以刷新后重试。', 'hint')); }
+  } catch { if (version === historyVersion && selected === target && projectId === project && !older) $('history').replaceChildren(node('p', '历史暂时无法读取，可以刷新后重试。', 'hint')); }
 }
 function fillModels() {
   const select = $('model'); select.replaceChildren(); for (const m of current?.models ?? []) { const o = node('option', m.name); o.value = m.model; select.append(o); } select.value = current?.model ?? ''; fillEfforts();
@@ -164,12 +170,12 @@ function keyFields(id, values) {
     field.addEventListener('keydown', event => {
       if (event.key === 'Tab') return; event.preventDefault(); event.stopPropagation();
       if (event.repeat) return;
-      if (event.key === 'Escape') { field.blur(); return; } if (event.key === 'Backspace' || event.key === 'Delete') { field.value = ''; settingsDirty = true; return; }
+      if (event.key === 'Escape') { field.blur(); return; } if (event.key === 'Backspace' || event.key === 'Delete') { field.value = ''; markSettingsDirty(true); return; }
       if (['Control','Shift','Alt','Meta'].includes(event.key)) return;
       const mediaKeys = {AudioVolumeUp:'VolumeUp',AudioVolumeDown:'VolumeDown',AudioVolumeMute:'VolumeMute',MediaTrackNext:'MediaNextTrack',MediaTrackPrevious:'MediaPreviousTrack',MediaPlayPause:'MediaPlayPause',MediaStop:'MediaStop'};
       const name = event.code === 'Space' ? 'Space' : mediaKeys[event.key] ?? (event.key.length === 1 ? event.key.toUpperCase() : event.key.replace('Arrow',''));
       if (id !== 'remote-keys' && !event.ctrlKey && !event.altKey && !event.metaKey && !/^F\d{1,2}$/.test(name)) { notice('日常快捷键请使用组合键或 F1–F24；遥控器单键请填在下方的可选映射中。'); return; }
-      field.value = [...(event.ctrlKey?['Control']:[]),...(event.altKey?['Alt']:[]),...(event.shiftKey?['Shift']:[]),...(event.metaKey?['Super']:[]),name].join('+'); settingsDirty = true; field.blur();
+      field.value = [...(event.ctrlKey?['Control']:[]),...(event.altKey?['Alt']:[]),...(event.shiftKey?['Shift']:[]),...(event.metaKey?['Super']:[]),name].join('+'); markSettingsDirty(true); field.blur();
     }); label.append(field); host.append(label);
   }
 }
@@ -201,7 +207,7 @@ function fillSettings() {
   keyFields('shortcuts',s.shortcuts); keyFields('remote-keys',s.remoteKeys); fillModels();
   $('tts-engine').value = s.ttsEngine || 'qwen';
   updateSpeechStatus();
-  refreshDevices().catch(() => {}); settingsDirty = false;
+  refreshDevices().catch(() => {}); markSettingsDirty(false);
 }
 function updateSpeechStatus() {
   updateCharacterStatus();
@@ -268,7 +274,10 @@ async function refreshDevices() {
 }
 async function saveSettings() {
   const values = id => Object.fromEntries([...$(id).querySelectorAll('input')].map(f => [f.dataset.action,f.value]));
-  acceptWorkspace(await run(api.saveSettings({autoSpeak:$('auto-speak').checked,ttsEngine:$('tts-engine').value,qwenVoice:$('qwen-voice').value,voice:Number($('voice').value),speed:Number($('speed').value),microphone:$('microphone').value,remoteEnabled:$('remote-enabled').checked,shortcuts:values('shortcuts'),remoteKeys:values('remote-keys')}))); settingsDirty = false;
+  const revision = settingsRevision;
+  const saved = await run(api.saveSettings({voice:Number($('voice').value),speed:Number($('speed').value),microphone:$('microphone').value,remoteEnabled:$('remote-enabled').checked,shortcuts:values('shortcuts'),remoteKeys:values('remote-keys')}));
+  if (revision === settingsRevision) markSettingsDirty(false);
+  acceptWorkspace(saved);
   notice(workspace.shortcutErrors?.join(' ') || '设置已保存。');
 }
 async function refreshWorkspace() {
@@ -280,7 +289,7 @@ $('add-project').onclick = act(async () => { const p = await run(api.addProject(
 $('remove-project').onclick = act(async () => { await run(api.removeProject(projectId)); projectId = null; await refreshWorkspace(); });
 $('new-thread').onclick = act(async () => { await run(api.newThread(projectId, current.provider)); await refreshThreads(); });
 $('resume').onclick = act(async () => { if (selected) await run(api.resumeThread(projectId,selected.id,current.provider)); });
-$('rename').onclick = act(async () => { if (!selected) return; const target = selected, name = $('thread-title').value.trim(), provider = current.provider; await run(api.renameThread(target.id,name,provider)); if (current.provider !== provider || selected !== target) return; target.name = name; const t = threads.find(t => t.id === target.id); if (t) t.name = name; renderThreads(); notice(current.renameLocal ? '已更新 Rin 中的会话名称。' : '对话已重命名。'); });
+$('rename').onclick = act(async () => { if (!selected) return; const target = selected, name = $('thread-title').value.trim(), provider = current.provider; await run(api.renameThread(target.id,name,provider,projectId)); if (current.provider !== provider || selected !== target) return; target.name = name; const t = threads.find(t => t.id === target.id); if (t) t.name = name; renderThreads(); notice(current.renameLocal ? '已更新 Rin 中的会话名称。' : '对话已重命名。'); });
 $('agent-select').onchange = act(async () => { try { await run(api.chooseProvider($('agent-select').value)); } finally { updateActivity(); } });
 $('agent-reconnect').onclick = act(() => run(api.reconnect()));
 $('refresh').onclick = act(() => refreshThreads()); $('more-threads').onclick = act(() => refreshThreads(true)); $('more-history').onclick = act(() => loadHistory(true));
@@ -359,8 +368,8 @@ $('preview-completion-sound').onclick = act(() => run(api.previewCompletionSound
 $('retry-tts').onclick = act(() => saveSpeechChoice({ttsResident:true}));
 $('choose-qwen').onclick = act(async () => { acceptWorkspace(await run(api.chooseQwen())); updateSpeechStatus(); });
 $('use-existing-data').onclick = act(() => run(api.useData()));
-$('save-settings').onclick = act(saveSettings); $('preview-voice').onclick = act(async () => { await saveSettings(); await run(api.previewVoice()); }); $('refresh-microphones').onclick = act(refreshDevices);
-$('settings').addEventListener('change',event => { if (!event.target.closest('#remote-settings,#ambience-settings,#agent-settings') && event.target.name !== 'wallpaper-style' && !['still-pose','model','effort','tts-resident','tts-engine','qwen-voice','auto-speak','prepare-speech','completion-sound'].includes(event.target.id)) settingsDirty = true; });
+$('save-settings').onclick = act(saveSettings); $('preview-voice').onclick = act(async () => { if (settingsDirty) await saveSettings(); await run(api.previewVoice()); }); $('refresh-microphones').onclick = act(refreshDevices);
+for (const id of ['voice','speed','microphone','remote-enabled']) $(id).addEventListener('change', () => markSettingsDirty(true));
 $('model').onchange = act(async () => { await run(api.chooseModel($('model').value)); }); $('effort').onchange = act(async () => { await run(api.chooseEffort($('effort').value)); });
 $('close').onclick = () => api.windowAction('hide-workbench'); $('back-chat').onclick = () => api.windowAction('show-chat');
 window.addEventListener('blur', () => { if (document.activeElement?.matches('#shortcuts input,#remote-keys input')) document.activeElement.blur(); });

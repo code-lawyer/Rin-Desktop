@@ -28,6 +28,36 @@ async function setup(t,overrides={}) {
   return {native,controller,deliveries,ends,actions,saved};
 }
 async function record(native) {native.event('control',[8]);await tick();native.event('control',[4,0,2,7]);for(let i=0;i<16;i++)native.event('audio',Array(120).fill(0x11));}
+const voiceWrites = native => native.calls.filter(c=>c.command==='write').map(c=>Buffer.from(c.data,'base64')[0]).filter(code=>[12,13].includes(code));
+
+test('releasing while ambient preparation is pending never starts audio or leaves timers', async t => {
+  const opening=Promise.withResolvers();
+  const {controller,native}=await setup(t,{begin:()=>opening.promise});
+  const started=controller.startCapture();
+  controller.release();
+  opening.resolve(target);
+  await started;
+  assert.deepEqual(voiceWrites(native),[]);
+  assert.equal(controller.session,null);
+  assert.equal(controller.state.audio,'idle');
+  assert.equal(controller.limit,null);
+  assert.equal(controller.silence,null);
+});
+
+test('cancellation waits behind a dispatched start and keeps ownership until stop is sent', async t => {
+  const start=Promise.withResolvers(), {controller,native}=await setup(t);
+  const request=native.request.bind(native);
+  native.request=(command,args)=>{
+    const result=request(command,args);
+    return command==='write' && Buffer.from(args.data,'base64')[0]===12 ? start.promise : result;
+  };
+  const started=controller.startCapture(); await tick();
+  const cancelled=controller.cancel();
+  controller.release(); await controller.startCapture();
+  assert.deepEqual(voiceWrites(native),[12]);
+  start.resolve(); await started; await cancelled;
+  assert.deepEqual(voiceWrites(native),[12,13]);
+});
 
 test('RC003 capabilities and IMA ADPCM enforce codec, size, synchronization and duration',()=>{
   assert.equal(capabilities(Buffer.from(caps)).sampleRate,16000);

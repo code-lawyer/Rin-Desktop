@@ -20,8 +20,7 @@ export const draftKey = target => {
   const provider = target?.provider ?? 'codex';
   if (!isStoredCliAgent(provider) && provider !== 'dots') throw new Error('草稿来源无效。');
   if (target.threadId != null && (typeof target.threadId !== 'string' || !target.threadId || target.threadId.length > 200)) throw new Error('草稿会话无效。');
-  // Keep existing Codex keys unchanged; Dots has no local project directory.
-  return provider === 'dots' ? `dots|${target.threadId ?? 'new'}` : `${provider === 'codex' ? '' : provider + '|'}${pathKey(target.cwd)}|${target.threadId ?? 'new'}`;
+  return JSON.stringify([provider, provider === 'dots' ? '' : pathKey(target.cwd), target.threadId ?? null]);
 };
 
 export function validateWorkspace(saved) {
@@ -42,12 +41,30 @@ export function validateWorkspace(saved) {
   return saved;
 }
 
+function canonicalDraftKey(key) {
+  if (key.startsWith('[')) {
+    try {
+      const fields = JSON.parse(key);
+      if (!Array.isArray(fields) || fields.length !== 3 || typeof fields[0] !== 'string') return key;
+      const [provider, cwd, threadId] = fields;
+      return draftKey({ provider, cwd, threadId });
+    } catch { return key; }
+  }
+  const parts = key.split('|');
+  const provider = parts[0] === 'dots' || isStoredCliAgent(parts[0]) ? parts.shift() : 'codex';
+  const cwd = provider === 'dots' ? '' : parts.shift();
+  if (provider !== 'dots' && !cwd) return key;
+  const legacyId = parts.join('|');
+  // The legacy sentinel was ambiguous. Keep that draft in the unsent slot,
+  // where the user can review it without attributing it to a native session.
+  try { return draftKey({ provider, cwd, threadId: legacyId === 'new' ? null : legacyId }); }
+  catch { return key; }
+}
+
 function canonicalDrafts(drafts = {}) {
   const result = {};
   for (const [oldKey, draft] of Object.entries(drafts)) {
-    const parts = oldKey.split('|');
-    const provider = isStoredCliAgent(parts[0]) ? parts.shift() : 'codex';
-    const key = parts[0] === 'dots' || parts.length < 2 ? oldKey : `${provider === 'codex' ? '' : provider + '|'}${pathKey(parts.shift())}|${parts.join('|')}`;
+    const key = canonicalDraftKey(oldKey);
     const existing = result[key];
     // Aliases may contain independently edited drafts. Show all distinct text
     // instead of choosing a winner and silently discarding the other version.

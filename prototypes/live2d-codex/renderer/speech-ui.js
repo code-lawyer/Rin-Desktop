@@ -59,18 +59,27 @@ export function installSpeech({ api, state, insert, error, measure, isBusy = () 
       button.title = audio.has(replyKey()) ? '完整语音已就绪 · 再次朗读使用缓存' : narration ? '只需按一次，完整语音准备好后开始播放' : ready ? '完整生成当前回复后再连续播放' : '语音模型尚未就绪';
     }
   }
+  function settleReply(job) {
+    if (job?.automatic) api.settleReplySpeech?.(job.turnId);
+  }
   function refresh() {
     if (narration && !valid(narration)) stopPlayback(false);
     if (narration?.modelReady && speech.phase === 'ready') { narration.modelReady(); narration.modelReady = null; }
     if (!audio.has(replyKey()) && $('playback-status').textContent === '已就绪') playbackLabel('');
     if (pendingCompletion) {
       const pending = pendingCompletion, reply = currentReply(state()?.messages);
-      if (pending.target !== target() || (pending.turnId && reply.turnId && pending.turnId !== reply.turnId) || recording || starting || recognizing || remoteBusy) pendingCompletion = null;
+      if (pending.target !== target() || (pending.turnId && reply.turnId && pending.turnId !== reply.turnId) ||
+          !settings.ttsResident || !(settings.autoSpeak || settings.prepareSpeech) || speech.phase === 'error' ||
+          recording || starting || recognizing || remoteBusy) {
+        pendingCompletion = null;
+        settleReply(pending);
+      }
       // Codex emits reply-completed just before its final state push. Keep the
       // event until that matching successful turn becomes readable and idle.
       else if (!isBusy() && reply.readable && pending.text === reply.text && speech.phase === 'ready') {
         pendingCompletion = null;
-        speak(pending.text,{play:settings.autoSpeak === true}).catch(e => error(e.message));
+        speak(pending.text,{play:settings.autoSpeak === true})
+          .catch(e => error(e.message)).finally(() => settleReply(pending));
       }
     }
     updateControls();
@@ -78,6 +87,8 @@ export function installSpeech({ api, state, insert, error, measure, isBusy = () 
   async function check(promise) { const r = await promise; if (!r?.ok) throw new Error(r?.error || '语音操作失败。'); return r.value; }
   function stopPlayback(wait = true) {
     stopMouth();
+    settleReply(pendingCompletion);
+    if (narration?.playRequested && narration.turnId) api.settleReplySpeech?.(narration.turnId);
     playGeneration++; pendingCompletion = null; narration?.modelReady?.(); narration = null; readRequested = false;
     audioSource?.stop(); audioSource?.disconnect?.(); audioSource = null; finishPlayback?.(); finishPlayback = null;
     api.playbackState?.(false);
@@ -94,7 +105,8 @@ export function installSpeech({ api, state, insert, error, measure, isBusy = () 
     // Starting a background preparation must not invalidate a read hotkey
     // that is concurrently fetching its authoritative workspace snapshot.
     const stopped = narration || audioSource ? stopPlayback() : audio.drain, generation = playGeneration;
-    const session = narration = {key,target:target(),text,profile:speechProfile(settings),playRequested:play,preview};
+    const session = narration = {key,target:target(),text,profile:speechProfile(settings),playRequested:play,preview,
+      turnId: preview ? null : currentReply(state()?.messages).turnId};
     $('stop-speech').hidden = false; showProgress();
     session.promise = (async () => {
       try {
@@ -133,6 +145,7 @@ export function installSpeech({ api, state, insert, error, measure, isBusy = () 
   async function readReply() {
     if (readRequested || narration?.playRequested) return;
     const requestToken = {}; readRequested = requestToken; const generation = playGeneration;
+    const turnId = currentReply(state()?.messages).turnId;
     try {
       // A global hotkey can arrive before the renderer receives the latest
       // model-ready push. Check the authoritative snapshot for this request.
@@ -146,7 +159,10 @@ export function installSpeech({ api, state, insert, error, measure, isBusy = () 
       if (!reply.readable) { unavailable('本轮没有成功完成的最终回复，暂不能朗读。'); return; }
       if (!['ready','loading'].includes(speech.phase) && !narration) { unavailable('语音模型尚未就绪，请稍候再按朗读键。'); return; }
       await speak(reply.text);
-    } finally { if (readRequested === requestToken) readRequested = false; }
+    } finally {
+      if (turnId) api.settleReplySpeech?.(turnId);
+      if (readRequested === requestToken) readRequested = false;
+    }
   }
   async function releaseCapture() {
     clearTimeout(timer); clearInterval(tick); stream?.getTracks().forEach(t => t.stop()); stream = null; source?.disconnect(); processor?.disconnect(); processor = null; source = null;
@@ -214,13 +230,14 @@ export function installSpeech({ api, state, insert, error, measure, isBusy = () 
   $('replay-reply').onclick = () => readReply().catch(e => error(e.message));
   api.onSpeech('cancel',() => cancel()); api.onSpeech('stop',() => stopPlayback(false));
   api.onSpeech('reply',reply => {
-    if (!settings.ttsResident) return;
+    if (!settings.ttsResident) { settleReply(reply); return; }
     if (reply.preview) { speak(reply.text,{preview:true}).catch(e => error(e.message)); return; }
     const current = currentReply(state()?.messages);
-    if (!(settings.autoSpeak || settings.prepareSpeech) || reply.threadId !== state()?.threadId || (reply.turnId && current.turnId && reply.turnId !== current.turnId)) return;
+    if (!(settings.autoSpeak || settings.prepareSpeech) || reply.threadId !== state()?.threadId || (reply.turnId && current.turnId && reply.turnId !== current.turnId)) { settleReply(reply); return; }
     const key = JSON.stringify([target(),reply.turnId,reply.text,speechProfile(settings)]); if (seenCompletions.has(key)) return;
     seenCompletions.add(key); if (seenCompletions.size > 32) seenCompletions.delete(seenCompletions.values().next().value);
-    pendingCompletion = {target:target(),text:reply.text,turnId:reply.turnId}; refresh();
+    settleReply(pendingCompletion);
+    pendingCompletion = {...reply,target:target()}; refresh();
   });
   function workspace(value) {
     if ((value.version ?? 0) < workspaceVersion) return;

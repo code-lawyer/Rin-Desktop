@@ -26,7 +26,13 @@ let wallpaperStatus={phase:'loading',character:'female',requestId:0};
 const state={provider:'codex',connection:'ready',status:'idle',cwd:output,projectName:'Example',threadId:'fixture-thread',threadName:'本地验证',models:[],messages:[{role:'assistant',text:'这是离线验证的完整回复。',complete:true}],approvals:[],activity:''};
 const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 const js=(win,code)=>win.webContents.executeJavaScript(code);
-const sendPresentation=()=>{present.stills={...store.data.settings,wallpaperMotion:wallpaperStatus.wallpaperMotion ?? store.data.settings.wallpaperMotion===true,animePlayback:wallpaperStatus.animePlayback ?? store.data.settings.animePlayback};if(wallpaper&&!wallpaper.isDestroyed()&&!wallpaper.webContents.isCrashed())wallpaper.webContents.send('companion:presentation',present);};
+const { createReplyNarration } = require(join(application,'backend/reply-narration.cjs'));
+const replyNarration = createReplyNarration(sendPresentation, reply => chat.webContents.send('speech:reply',reply));
+function sendPresentation(){
+  present.stills={...store.data.settings,wallpaperMotion:wallpaperStatus.wallpaperMotion ?? store.data.settings.wallpaperMotion===true,animePlayback:wallpaperStatus.animePlayback ?? store.data.settings.animePlayback};
+  present.replyNarration=replyNarration.cue;
+  if(wallpaper&&!wallpaper.isDestroyed()&&!wallpaper.webContents.isCrashed())wallpaper.webContents.send('companion:presentation',present);
+}
 let remote;
 const snapshot=()=>({...store.snapshot(),version,speech:{phase:'ready',asr:true,engine:'qwen',engines:{qwen:true,kokoro:true}},remote,wallpaper:wallpaperStatus,ambience:ambient,wallpaperPaused:present.paused,resources:{phase:'idle',packs:[]},shortcutErrors:[]});
 const notify=()=>{version++;sendPresentation();for(const w of [chat,workbench])if(w&&!w.isDestroyed())w.webContents.send('workbench:state',snapshot());};
@@ -84,11 +90,16 @@ app.whenReady().then(async()=>{
   handler('companion:snapshot',()=>state);handler('companion:appearance',()=>({scale:1,mode:'wallpaper'}));handler('companion:presentation',()=>present);handler('workbench:snapshot',snapshot);
   handler('remote:command',()=>remote);handler('workbench:list',()=>({data:[],nextCursor:null}));handler('workbench:draft',()=>({text:''}));handler('workbench:learn-key',()=>{});
   handler('speech:stop',()=>{});handler('speech:volume',async(_e,value)=>{await store.updateSettings({playbackVolume:value});notify();return snapshot();});
-  handler('speech:synthesize',()=>({samples:Float32Array.from({length:24000*2},(_,i)=>puppetRun && Math.floor(i/4800)%2===0 ? .14*Math.sin(2*Math.PI*220*i/24000) : 0),sampleRate:24000}));
-  handler('speech:playback',async(_e,active)=>{const revision=++playbackRevision;present.speaking=active;if(active)await barrier.wait();else sendPresentation();return {revision};});
-  const mouthContext=vm.createContext({ipcMain,trusted:()=>true,Date});
-  Object.defineProperties(mouthContext,{chat:{get:()=>chat},avatar:{get:()=>wallpaper},speaking:{get:()=>present.speaking},playbackRevision:{get:()=>playbackRevision}});
-  vm.runInContext(mainSource.slice(mainSource.indexOf('    let lastMouthAt ='),mainSource.indexOf("    handler('wallpaper:control'")),mouthContext);
+  let synthesisGate;
+  handler('speech:synthesize',async()=>{if(synthesisGate)await synthesisGate;return {samples:Float32Array.from({length:24000*2},(_,i)=>puppetRun && Math.floor(i/4800)%2===0 ? .14*Math.sin(2*Math.PI*220*i/24000) : 0),sampleRate:24000};});
+  const playbackContext=vm.createContext({ipcMain,trusted:()=>true,Date,handler,replyNarration,
+    suspended:false,screenLocked:false,notifyPresentation:sendPresentation,applyAmbientBeforeAudio:()=>barrier.wait()});
+  Object.defineProperties(playbackContext,{
+    chat:{get:()=>chat}, avatar:{get:()=>wallpaper}, captureTarget:{get:()=>present.capturing},
+    speaking:{get:()=>present.speaking,set:value=>{present.speaking=value;}},
+    playbackRevision:{get:()=>playbackRevision,set:value=>{playbackRevision=value;}},
+  });
+  vm.runInContext(mainSource.slice(mainSource.indexOf("    ipcMain.on('speech:reply-settled'"),mainSource.indexOf("    handler('wallpaper:control'")),playbackContext);
   handler('speech:capture',async(_e,target)=>{present.capturing=!!target;if(target)await barrier.wait();else sendPresentation();});
   handler('companion:window',(_e,action)=>{if(action==='show-chat'||action==='recall-chat'){present.chatVisible=true;chat.show();}else if(action==='workbench'){present.chatVisible=false;chat.hide();workbench.show();}sendPresentation();});
   handler('wallpaper:control',(_e,action,value)=>{if(action==='pause')present.paused=value;else if(action==='gesture')throw Error('单次骨骼动作已停用');else if(action==='retry-audio'){present.ambientRetry++;commitContext.recoverWallpaperRenderer();}else throw Error('壁纸操作无效');notify();return snapshot();});
@@ -136,6 +147,12 @@ app.whenReady().then(async()=>{
       await capture(wallpaper,'rin-'+pose);
     }
     checks.push('all five workbench pose buttons show intact paintings; the cup is part of its pose');
+    const dialogue = require('./puppet-dialogue-case.cjs');
+    await dialogue({
+      wallpaper, chat, host, puppet, state, present, output, checks, js, until, delay, notify, replyNarration,
+      sendPresentation, completeReply: reply => replyNarration.complete(reply, { available:true, ...store.data.settings }),
+      settings: patch => store.updateSettings(patch), synthesis: gate => { synthesisGate = gate; }
+    });
     await js(workbench,"companion.saveSettings({ambienceEnabled:true})");
     await until(wallpaper,host+".dataset.audioState==='ready' && "+host+".dataset.audioKeys==='0.08'");
     assert.equal(await js(workbench,"document.querySelectorAll('[data-gesture]').length"),0);
