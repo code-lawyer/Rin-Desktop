@@ -1,6 +1,6 @@
 # 当前项目状态
 
-当前候选版本为 [0.6.3-rc.7](https://github.com/code-lawyer/Rin-Desktop/releases/tag/v0.6.3-rc.7)。动漫静态壁纸新增人物点击和托盘姿态切换，使用独立安装和数据目录供 Windows 测试。下载页同时提供安装器与第三方对应源码，构建资源按仓库清单单独校验。
+当前候选版本为 [0.6.3-rc.8](https://github.com/code-lawyer/Rin-Desktop/releases/tag/v0.6.3-rc.8)。动漫静态壁纸新增人物点击和托盘姿态切换，使用独立安装和数据目录供 Windows 测试。下载页同时提供安装器与第三方对应源码，构建资源按仓库清单单独校验。
 
 当前源码已兼容仅声明 `sessionCapabilities.resume` 的 ACP Agent：优先 load 回放，否则 resume 恢复原上下文并保留本机显示缓存；能力不足、恢复失败与认证错误分别提示。本机缓存不作为远端送达证据，不确定发送仍保留原稿。离线协议回归覆盖连续重连、消息及完成状态、失败时存储保护和其他 ACP Agent 的 load 路径；这项修复纳入 0.6.3-rc.4；真实 Agent 多轮上下文、GUI 完整退出重开和系统重启仍待独立验收。
 
