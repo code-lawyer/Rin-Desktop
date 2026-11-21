@@ -29,7 +29,7 @@ const clean = source => !/(^|[/\\])(__pycache__|cache|\.cache|\.git)([/\\]|$)/.t
 await cp(join(root,'node_modules/electron/dist'),output,{recursive:true,filter:src=>!src.endsWith('electron.exe')});
 await cp(join(root,'node_modules/electron/dist/electron.exe'),join(output,'VibeVoice.exe'));
 for (const file of ['main.cjs','preload.cjs','voice-resources.json']) await cp(join(root,file),join(appDir,file));
-for (const dir of ['backend','renderer','dist']) await cp(join(root,dir),join(appDir,dir),{recursive:true,filter:src=>!src.includes('__pycache__') && !src.endsWith('dots.mjs') && src!==join(root,'dist/avatar.js') && !/[/\\]anime-(catalog|player|wallpaper)\.mjs$/.test(src)});
+for (const dir of ['backend','renderer','dist']) await cp(join(root,dir),join(appDir,dir),{recursive:true,filter:src=>!src.includes('__pycache__') && !src.endsWith('dots.mjs') && src!==join(root,'dist/avatar.js') && !/[/\\]anime-(catalog|player)\.mjs$/.test(src)});
 for (const dir of ['vendor']) await cp(join(resources,dir),join(appDir,dir),{recursive:true,filter:clean});
 await mkdir(join(appDir,'runtime'),{recursive:true});
 await cp(await buildRemoteHelper(join(root,'native/rc003-helper.cs'),join(workspace,'work/build/remote')),join(appDir,'runtime/rc003-helper.exe'));

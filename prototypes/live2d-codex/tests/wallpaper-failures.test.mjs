@@ -10,6 +10,7 @@ import { AmbientBarrier } from '../backend/ambient-barrier.cjs';
 import { createReplyNarration } from '../backend/reply-narration.cjs';
 import characters from '../backend/character-profiles.cjs';
 import choices from '../backend/wallpaper-choice.cjs';
+import stills from '../backend/still-settings.cjs';
 
 const main = await fs.readFile(new URL('../main.cjs', import.meta.url), 'utf8');
 const confirmSource = main.slice(main.indexOf('async function confirmWallpaper('), main.indexOf('function recoverWallpaperRenderer('));
@@ -28,7 +29,7 @@ async function characterFixture(t) {
   } });
   await store.load(); await store.updateSettings({ qwenVoice: 'Vivian', voice: 48 });
   const context = vm.createContext({ store, isCharacter: characters.isCharacter, isWallpaperKind: choices.isWallpaperKind,
-    wallpaperStatus: { phase: 'loading', character: 'female', wallpaperMotion: true, wallpaperKind: 'artwork', requestId: 1 }, appliedWallpaperRequest: -1, wallpaperCommit: null,
+    wallpaperStatus: { phase: 'loading', character: 'female', wallpaperMotion: true, wallpaperKind: 'artwork', requestId: 1 }, appliedWallpaperRequest: -1, wallpaperCommit: null, fixedPosePreview: null,
     setTimeout, clearTimeout, presentation: () => ({ paused: false }), stopSpeech() {}, notifyWorkspace() {}, console: { error() {} } });
   vm.runInContext(confirmSource, context);
   t.after(async () => { context.cancelWallpaperCommit(); await store.queue.catch(() => {}); });
@@ -145,25 +146,41 @@ test('late playback success cannot revive a stopped request; current failures st
 
 test('a confirmed wallpaper exit releases audio waits and recovery reinstates acknowledgement protection', async t => {
   const handlers = new Map(), events = new Map(), timers = new Map(); let serial = 0, reloads = 0;
-  let mouseInputEnabled = true;
+  let mouseInputEnabled = false, crashed = false, trayUpdates = 0, trayDestroyed = false;
+  const poseMenu = { enabled: false }, poseSelections = [];
   const target = { provider: 'codex', cwd: 'project', threadId: 'thread' };
   const chat = { webContents: { on() {}, send() {} } };
-  const avatar = { isDestroyed: () => false, webContents: { on: (name, fn) => events.set(name, fn), reload() { reloads++; events.get('did-start-loading')(); } } };
+  const avatar = { isDestroyed: () => false, webContents: {
+    isDestroyed: () => false, isCrashed: () => crashed, on: (name, fn) => events.set(name, fn),
+    send(channel, value) { if (channel === 'wallpaper:pose-selection') poseSelections.push(value); },
+    reload() { reloads++; crashed = false; events.get('did-start-loading')(); },
+  } };
   const barrier = new AmbientBarrier({ publish() {}, timeout: 15 }); t.after(() => barrier.close());
   const context = vm.createContext({ chat, avatar, wallpaperMode: true, ambientBarrier: barrier, store: { data: { settings: { ambienceEnabled: false } } },
     captureTarget: null, captureTimer: null, provider: 'codex', changingProvider: false, suspended: false, screenLocked: false, speaking: false, playbackRevision: 0, submissions: { active: new Set() },
     replyNarration: createReplyNarration(() => {}),
-    wallpaperStatus: { phase: 'ready', character: 'female', requestId: 0, frameRevision: 20, pose: 'window' }, ambienceStatus: {}, lastPresentation: '',
+    wallpaperStatus: { phase: 'ready', character: 'female', requestId: 0, frameRevision: 20, pose: 'window', activity: 'auto' }, ambienceStatus: {}, lastPresentation: '',
+    trayMenu: { getMenuItemById: () => poseMenu }, tray: { isDestroyed: () => trayDestroyed, setContextMenu() { trayUpdates++; } },
+    presentation: () => ({ desktopAttached: true }), canPreviewPose: stills.canPreviewPose, closing: false, quitting: false,
     wallpaperHost: { setPoseInputEnabled(enabled) { mouseInputEnabled = enabled; } },
-    notifyPresentation() {}, notifyWorkspace() {}, stopSpeech() {}, cancelWallpaperCommit() {}, showWorkbench() {}, speech: { status: () => ({ asr: true }) }, backend: { state: target },
+    notifyWorkspace() { context.notifyPresentation(); }, stopSpeech() {}, cancelWallpaperCommit() {}, showWorkbench() {}, speech: { status: () => ({ asr: true }) }, backend: { state: target },
     setTimeout: callback => { const id = ++serial; timers.set(id, callback); return id; }, clearTimeout: id => timers.delete(id),
     handler: (name, fn) => handlers.set(name, fn) });
   vm.runInContext(main.match(/^const applyAmbientBeforeAudio = .*;$/m)[0], context);
+  vm.runInContext(main.slice(main.indexOf('function wallpaperRenderer()'), main.indexOf('function switchMode(')), context);
   vm.runInContext(main.slice(main.indexOf("    chat.webContents.on('render-process-gone'"), main.indexOf('    const handler =')), context);
   vm.runInContext(main.slice(main.indexOf('function recoverWallpaperRenderer('), main.indexOf('function switchAllowed()')), context);
   vm.runInContext(main.slice(main.indexOf("    handler('speech:capture'"), main.indexOf('    const { speechProfile }')) + playbackSource, context);
   const event = { sender: chat.webContents }, capture = value => handlers.get('speech:capture')(event, value), play = value => handlers.get('speech:playback')(event, value);
-  const waiting = capture({ ...target }); events.get('render-process-gone')(); await waiting;
+  context.notifyPresentation();
+  assert.equal(poseMenu.enabled, true);
+  assert.equal(mouseInputEnabled, true);
+  context.selectWallpaperPose({ pose: 'window' });
+  const waiting = capture({ ...target }); crashed = true; events.get('render-process-gone')(); await waiting;
+  context.selectWallpaperPose({ pose: 'cup' });
+  assert.deepEqual(poseSelections, [{ pose: 'window' }]);
+  assert.equal(poseMenu.enabled, false);
+  assert.equal(trayUpdates, 2);
   assert.equal(mouseInputEnabled, false);
   assert.equal(barrier.stopped, true); await capture(null);
   await play(true); assert.equal(context.speaking, true); await play(false);
@@ -174,5 +191,13 @@ test('a confirmed wallpaper exit releases audio waits and recovery reinstates ac
   // Turning ambience off cannot prove a hung audio owner is silent.
   const ready = capture({ ...target }); barrier.acknowledge(barrier.revision); await ready; await capture(null);
   context.recoverWallpaperRenderer(); assert.equal(reloads, 1, 'a responsive owner is not reloaded');
+  assert.equal(poseMenu.enabled, false, 'pose controls wait for a new ready frame');
+  context.wallpaperStatus = { ...context.wallpaperStatus, phase: 'ready', activity: 'auto' };
+  context.notifyPresentation();
+  assert.equal(poseMenu.enabled, true);
+  assert.equal(mouseInputEnabled, true);
+  trayDestroyed = true; crashed = true; context.notifyPresentation();
+  assert.equal(trayUpdates, 3, 'late notifications leave the destroyed tray alone');
+  assert.equal(mouseInputEnabled, false);
   assert.equal(timers.size, 0);
 });

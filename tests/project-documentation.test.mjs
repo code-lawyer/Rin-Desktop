@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { root, checkProject } from '../tools/project/check-project.mjs';
 import { publicPathIssue } from '../tools/project/public-path.mjs';
+import { auditPublic } from '../tools/release/audit-public.mjs';
 
 test('live Agent probes show help without credentials, SDK loading or fixture work', () => {
   for (const entry of ['claude-probe.mjs', 'acp-probe.mjs']) {
@@ -22,6 +23,30 @@ test('public documentation rejects private directories and casing aliases', () =
     assert.match(publicPathIssue(root, name), /private or external dependency/, name);
   }
   assert.equal(publicPathIssue(root, 'docs/build.md'), null);
+});
+
+test('public audit reads indexed bytes and rejects forced ignored and private paths', async t => {
+  const directory = mkdtempSync(join(tmpdir(), 'rin-public-'));
+  t.after(() => rmSync(directory, { recursive: true, force: true }));
+  const git = (...args) => execFileSync('git', ['-C', directory, ...args], { windowsHide: true });
+  git('init', '--quiet');
+  writeFileSync(join(directory, '.gitignore'), 'scratch.txt\n');
+  writeFileSync(join(directory, 'scratch.txt'), 'synthetic ignored output\n');
+  mkdirSync(join(directory, 'prototypes', 'Dots-Bridge'), { recursive: true });
+  writeFileSync(join(directory, 'prototypes', 'Dots-Bridge', 'fixture.mjs'), 'export {};\n');
+  const draft = join(directory, 'README.md');
+  writeFileSync(draft, 'sk-' + '0'.repeat(32) + '\n');
+  git('add', '--force', '.');
+  writeFileSync(draft, '# Public guide\n');
+
+  const indexed = await auditPublic(directory, { staged: true });
+  assert.deepEqual(indexed.problems, [
+    { file: 'README.md', reason: 'secret pattern' },
+    { file: 'prototypes/Dots-Bridge/fixture.mjs', reason: 'non-public path' },
+    { file: 'scratch.txt', reason: 'non-public path' },
+  ]);
+  const working = await auditPublic(directory, { worktree: true });
+  assert.deepEqual(working.problems, indexed.problems.slice(1));
 });
 
 test('project check includes new docs, ignores deleted files, and detects broken links and version drift', t => {

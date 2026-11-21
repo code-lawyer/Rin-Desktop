@@ -21,7 +21,7 @@
         <section class="detail-pane" aria-label="所选对话"><div id="empty-detail" class="empty"><h3>从这里接着聊</h3><p>选择一段对话查看历史，或在当前项目开始新对话。文件与会话保留在本机。</p></div><div id="detail" hidden><div class="detail-heading"><input id="thread-title" maxlength="100" aria-label="对话名称"><button id="rename" class="quiet">重命名</button></div><div class="detail-actions"><span id="thread-info"></span><button id="resume" class="primary">继续这段对话</button></div><button id="more-history" class="load-more" hidden>查看更早的消息</button><div id="history"></div></div></section></div>
     </section>
     <section id="settings" class="page settings" hidden>
-      <div class="page-heading"><div><h2>壁纸与设置</h2><p>按分类调整，保留你的使用习惯。</p></div><button id="save-settings" class="primary" hidden>保存更改</button></div>
+      <div class="page-heading"><div><h2>壁纸与设置</h2></div><span id="settings-save-status" role="status"></span><button id="save-settings" class="primary" hidden>保存更改</button></div>
       <nav class="settings-nav" aria-label="设置分类"><button type="button" data-setting-target="wallpaper-settings" aria-pressed="true">壁纸</button><button type="button" data-setting-target="remote-settings" aria-pressed="false">遥控器</button><button type="button" data-setting-target="playback-settings" aria-pressed="false">声音与听写</button><button type="button" data-setting-target="conversation-settings" aria-pressed="false">对话</button><button type="button" data-setting-target="agent-settings" aria-pressed="false">Agent</button><button type="button" data-setting-target="shortcut-settings" aria-pressed="false">键盘</button><button type="button" data-setting-target="data-settings" aria-pressed="false">数据</button></nav>
       <div class="settings-scroll">
       <section class="setting-section" id="wallpaper-settings" data-settings-group="wallpaper" aria-labelledby="wallpaper-heading">
@@ -30,7 +30,7 @@
           <label class="character-option"><input type="radio" name="wallpaper-style" value="anime" checked><span class="character-card"><img src="app://local/assets/scene/rin-poses/cover.webp" alt="雨夜坐姿原画中的 Rin"><span class="character-caption"><strong>动漫静态</strong><span>五种可选姿态 · 对话时自动切换</span></span></span></label>
           <label class="character-option"><input type="radio" name="wallpaper-style" value="realistic"><span class="character-card"><img src="app://local/assets/motion/female/work.png" alt="真人画风，红衬衫女生在雨夜窗前工作"><span class="character-caption"><strong>真人视频</strong><span>视频循环 · 工作与看向你</span></span></span></label>
         </div>
-        <p id="character-help" class="hint">选择后自动保存，保留你的朗读声线。暂停可停住画面并关闭环境音。</p>
+        <p id="character-help" class="hint">壁纸风格自动保存，朗读声线独立设置。</p>
         <p id="character-status" class="hint" role="status" aria-live="polite"></p>
         <button id="retry-character" aria-describedby="character-status" hidden>重试加载</button>
         <div class="field-grid still-controls"><label>陪伴状态<select id="still-pose"><option value="auto">自动 · 随工作与对话切换</option><option value="work">专注工作</option><option value="cup">持杯休息</option><option value="thinking">托腮思考</option><option value="window">看向窗外</option><option value="attention">看向你</option></select></label><button id="pause-stills" aria-pressed="false">暂停壁纸与环境音</button></div>

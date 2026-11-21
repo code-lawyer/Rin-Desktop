@@ -33,6 +33,7 @@ const names = new Set(), forbidden = /\.(onnx|safetensors|wav|pcm)$|(^|\/)(codex
 // retired. Verify them against current source; compare all other assets to the
 // previous package byte-for-byte.
 const revisedAssetMetadata = new Set(['assets/stills/manifest.json', 'assets/stills/README.md']);
+const wallpaperScripts = new Set(['scripts/wallpaper-host.ps1', 'scripts/wallpaper-pose-input.cs']);
 let bytes = 0, sourceMatches = 0;
 for (const entry of manifest.files) {
   const file = resolve(directory, entry.file), inside = relative(directory, file);
@@ -46,11 +47,12 @@ for (const entry of manifest.files) {
   assert.ok(!/^(assets\/motion\/anime\/|renderer\/anime-(catalog|player|wallpaper)\.mjs$)/.test(local), 'Experimental anime video must not be packaged: ' + entry.file);
   assert.ok(!/^assets\/livliv\//.test(local), 'Rejected split character must not be packaged: ' + entry.file);
   assert.ok(!retiredWallpaperAsset(local.replace(/^assets\//, '')), 'Retired wallpaper in package: ' + entry.file);
-  if (entry.file !== local && (/^(main\.cjs|preload\.cjs|voice-resources\.json|backend\/|renderer\/|dist\/)/.test(local) || revisedAssetMetadata.has(local))) {
+  if (entry.file !== local && (/^(main\.cjs|preload\.cjs|voice-resources\.json|backend\/|renderer\/|dist\/)/.test(local) || revisedAssetMetadata.has(local) || wallpaperScripts.has(local))) {
     assert.equal(await hash(join(root, 'prototypes/live2d-codex', local)), entry.sha256, 'Source mismatch: ' + local);
     sourceMatches++;
   }
 }
+for (const script of wallpaperScripts) assert.ok(names.has('resources/app/' + script), 'Missing wallpaper helper: ' + script);
 assert.ok(names.size > 100 && sourceMatches > 20);
 assert.equal(bytes, manifest.bytes);
 // Installed instructions must resolve locally or point to a public web page.
