@@ -6,6 +6,21 @@ import { join, relative } from 'node:path';
 // the current checkout, even when the runtime archive itself is historical.
 export const retiredWallpaperAsset = path => /^(?:rainy-window-male(?:\/|$)|stills\/male(?:\/|$)|character-previews\/male\.png$)/i.test(path.replaceAll('\\', '/'));
 
+const sourceAvatarFiles = new Set([
+  'resources/app/renderer/avatar.js',
+  'resources/app/renderer/pixi-compat.js',
+  'resources/app/renderer/wallpaper.js',
+  'resources/app/dist/avatar.js',
+  'licenses/agent-avatar-LICENSE',
+  'licenses/live2d-proprietary-agreement.html',
+  'licenses/pixi-LICENSE',
+  'licenses/pixi-live2d-LICENSE',
+]);
+export function sourceAvatarAsset(path) {
+  const name = path.replaceAll('\\', '/');
+  return name === 'resources/app/vendor' || name.startsWith('resources/app/vendor/') || sourceAvatarFiles.has(name);
+}
+
 async function inspect(path) {
   try { return await lstat(path); }
   catch(error) { if(error.code==='ENOENT')return null; throw error; }

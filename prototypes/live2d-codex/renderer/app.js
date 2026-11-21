@@ -280,10 +280,20 @@ if (isWallpaper) {
     $('wallpaper-error').hidden = false;
   });
 } else if (isAvatar) {
-  import('app://local/dist/avatar.js').then(({ startAvatar }) => startAvatar()).catch(failure => {
+  try {
+    await new Promise((resolve, reject) => {
+      const core = document.createElement('script');
+      core.src = 'app://local/vendor/live2dcubismcore.min.js';
+      core.addEventListener('load', resolve, { once: true });
+      core.addEventListener('error', () => reject(new Error('无法载入 Cubism Core')), { once: true });
+      document.head.append(core);
+    });
+    const { startAvatar } = await import('app://local/dist/avatar.js');
+    await startAvatar();
+  } catch (failure) {
     $('avatar-error').textContent = `Live2D 模型未能加载：${failure.message}。对话仍可使用。`;
     $('avatar-error').hidden = false; api.hit(true);
-  });
+  }
 } else {
   installCompletionSound(api);
   installRemoteNavigation(api,{notice:error,compose:(action,active)=>composerControls?.action(action,active)});

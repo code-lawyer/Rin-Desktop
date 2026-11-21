@@ -29,7 +29,12 @@ test('source selection never falls back to an old release, and retains the exist
   assert.match(missing,/scene\/rin-poses\/scene\.png/);
   assert.match(missing,/scene\/rin-poses\/cup-blink\.png/);
   assert.doesNotMatch(missing,/scene\/rin\//);
+  assert.doesNotMatch(missing,/live2dcubismcore/);
   assert.doesNotMatch(missing,/reading\.png|rest\.png|smile\.png/);
+  const avatar = inspectLaunch(launchPlan(['--mode=avatar'], root), { platform: 'win32', nodeVersion: '24.0.0' });
+  const missingAvatar = avatar.problems.find(problem=>problem.startsWith('Missing visual resources:'));
+  assert.match(missingAvatar,/vendor\/live2dcubismcore\.min\.js/);
+  assert.match(missingAvatar,/assets\/hiyori\/Hiyori\.model3\.json/);
 });
 
 test('space-containing project and data paths remain separate arguments rooted at the repository', () => {

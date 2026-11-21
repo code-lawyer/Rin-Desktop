@@ -67,8 +67,8 @@ export function inspectLaunch(plan, { platform = process.platform, nodeVersion =
     electron = join(env.ELECTRON_OVERRIDE_DIST_PATH || join(electronRoot, 'dist'), executable || 'electron');
     if (!statSync(electron).isFile()) throw new Error('missing executable');
   } catch { electron = null; problems.push('Electron is unavailable. Run npm --prefix prototypes/live2d-codex ci without ELECTRON_SKIP_BINARY_DOWNLOAD.'); }
-  const resources = ['vendor/live2dcubismcore.min.js'];
-  if (plan.mode === 'avatar') resources.push('assets/hiyori/Hiyori.model3.json');
+  const resources = [];
+  if (plan.mode === 'avatar') resources.push('vendor/live2dcubismcore.min.js', 'assets/hiyori/Hiyori.model3.json');
   else {
     for (const pose of stills.POSES) resources.push(`assets/stills/female-v2-4k/${pose}.png`);
     for (const file of [...POSE_FILES, 'manifest.json']) resources.push(`assets/scene/rin-poses/${file}`);

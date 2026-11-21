@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { cp, readFile, writeFile, realpath, lstat } from 'node:fs/promises';
+import { cp, readFile, writeFile, realpath, lstat, stat } from 'node:fs/promises';
 import { join, resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { packagedSession } from './packaged-session.mjs';
@@ -9,28 +9,30 @@ import { rejectDataLinks } from './data-copy-safety.mjs';
 import { createRunDirectory, requireLiveRun, writeRunReport } from './run-output.mjs';
 
 requireLiveRun(
-  'npm run qa:upgrade-data -- --run --setup=<candidate Setup> --previous-setup=<published Setup> --source=<closed real data copy>',
+  'npm run qa:upgrade-data -- --run --setup=<candidate Setup> --previous-setup=<old Setup> --source=<closed data copy> [--release-channel]',
   'portable installation of old/current/old builds under a fresh QA path and actual launches using further isolated copies. No registration, accounts or hardware',
 );
 const args = process.argv.slice(2),
   option = (key) => args.find((arg) => arg.startsWith(`--${key}=`))?.slice(key.length + 3);
+const releaseChannel = args.includes('--release-channel');
 if (
   !option('setup') ||
   !option('previous-setup') ||
   !option('source') ||
-  args.some((arg) => arg !== '--run' && !/^--(setup|previous-setup|source)=./.test(arg))
+  args.some((arg) => !['--run', '--release-channel'].includes(arg) && !/^--(setup|previous-setup|source)=./.test(arg))
 )
   throw Error('Use --run, --setup, --previous-setup and --source');
 const execute = promisify(execFile),
   output = await createRunDirectory('upgrade-data');
 const application = join(output, '中文 程序'),
+  rollbackApplication = join(output, '回退 程序'),
   data = join(output, 'isolated-data'),
   rollback = join(output, 'rollback-copy');
 await rejectDataLinks(resolve(option('source')));
 const original = await readFile(join(resolve(option('source')), 'workspaces.json'));
-const report = { checks: [], accounts: false, hardware: false, passed: false };
+const report = { checks: [], releaseChannel, accounts: false, hardware: false, passed: false };
 let session;
-async function install(setup, name) {
+async function install(setup, name, directory = application) {
   await execute(
     resolve(setup),
     [
@@ -39,42 +41,59 @@ async function install(setup, name) {
       '/NORESTART',
       '/SP-',
       '/PORTABLE=1',
-      '/DIR=' + application,
+      '/DIR=' + directory,
       '/LOG=' + join(output, name + '.log'),
     ],
     { windowsHide: true, timeout: 120000 },
   );
-  return JSON.parse(await readFile(join(application, 'resources/app/portable.json'), 'utf8'));
+  return JSON.parse(await readFile(join(directory, 'resources/app/portable.json'), 'utf8'));
 }
-async function check(storage, label) {
-  const { WorkspaceStore } = await import(
-    pathToFileURL(join(application, 'resources/app/backend/workspace-store.mjs')) + '?phase=' + label
-  );
-  const expected = new WorkspaceStore(storage);
-  await expected.load();
+async function check(storage, label, directory = application) {
+  const primary = join(storage, 'workspaces.json');
+  const saved = JSON.parse(await readFile(primary, 'utf8'));
   const savedSession = JSON.parse(await readFile(join(storage, 'session.json'), 'utf8'));
+  const target = { provider: 'codex', cwd: savedSession.cwd, threadId: savedSession.threadId ?? null };
+  // In-place upgrades replace dependencies at the same paths. Each phase must
+  // read the installed store in a fresh Node process with an empty module cache.
+  const { stdout } = await execute(process.execPath, [
+    '--input-type=module', '--eval', `
+      const [entry, storage, draftTarget] = process.argv.slice(1);
+      const { WorkspaceStore } = await import(entry);
+      const store = new WorkspaceStore(storage);
+      await store.load();
+      console.log(JSON.stringify({ ...store.snapshot(), draft: store.draftSnapshot(JSON.parse(draftTarget)) }));
+    `,
+    pathToFileURL(join(directory, 'resources/app/backend/workspace-store.mjs')).href,
+    storage,
+    JSON.stringify(target),
+  ], { windowsHide: true, timeout: 15000, maxBuffer: Math.max(1024 * 1024, 2 * (await stat(primary)).size) });
+  const expected = JSON.parse(stdout);
   session = await packagedSession({
-    directory: application,
+    directory,
     output,
     storage,
     project: savedSession.cwd,
+    env: { LOCALAPPDATA: join(output, 'local-app-data') },
     allowReleasePackage: true,
   });
   const actual = (await session.workspace.evaluate('companion.workspace()')).value;
-  assert.deepEqual(actual.projects, expected.data.projects);
-  assert.deepEqual(actual.settings, expected.data.settings);
+  assert.deepEqual(actual.projects, expected.projects);
+  assert.deepEqual(actual.settings, expected.settings);
   assert.equal(actual.remote.phase, 'disconnected');
-  assert.deepEqual(
-    JSON.parse(await readFile(join(storage, 'workspaces.json'), 'utf8')).drafts,
-    expected.data.drafts,
-  );
+  const draft = await session.chat.evaluate(`companion.draft(${JSON.stringify(target)})`);
+  assert.equal(draft.ok, true, draft.error);
+  assert.deepEqual(draft.value, expected.draft);
   assert.deepEqual(session.errors, []);
   await session.close();
   session = null;
+  const persisted = JSON.parse(await readFile(primary, 'utf8'));
+  // The runtime can read legacy draft keys without rewriting them on disk.
+  assert.deepEqual(persisted.drafts, saved.drafts, 'read-only startup and shutdown preserve stored drafts');
   report.checks.push(
     label +
       ': actual app restores projects, conversation references, drafts and settings, then exits with all owned processes',
   );
+  return { projects: actual.projects, draft: draft.value };
 }
 console.log(JSON.stringify({ output }));
 try {
@@ -103,19 +122,21 @@ try {
   };
   await writeFile(join(data, 'workspaces.json'), JSON.stringify(saved, null, 2));
   report.previous = await install(option('previous-setup'), 'previous-install');
-  await check(data, 'previous');
+  if (releaseChannel) assert.equal(report.previous.testBuild, undefined, 'Use an older release-channel installer');
+  const before = await check(data, 'previous');
+  await cp(data, rollback, { recursive: true, force: false, errorOnExist: true });
   const beforeUpgrade = await readFile(join(data, 'workspaces.json'));
   report.candidate = await install(option('setup'), 'candidate-upgrade');
-  assert.equal(report.candidate.testBuild?.channel, 'internal-test');
+  if (releaseChannel) assert.equal(report.candidate.testBuild, undefined, 'Candidate must use the release channel');
+  else assert.equal(report.candidate.testBuild?.channel, 'internal-test');
   assert.deepEqual(
     await readFile(join(data, 'workspaces.json')),
     beforeUpgrade,
     'upgrade installer never rewrites separate app data',
   );
-  await check(data, 'upgraded');
-  await cp(data, rollback, { recursive: true, force: false, errorOnExist: true });
-  await install(option('previous-setup'), 'rollback-install');
-  await check(rollback, 'rollback');
+  assert.deepEqual(await check(data, 'upgraded'), before, 'upgrade preserves projects and drafts from the old app');
+  report.rollback = await install(option('previous-setup'), 'rollback-install', rollbackApplication);
+  assert.deepEqual(await check(rollback, 'rollback', rollbackApplication), before, 'rollback restores the saved data with the old app');
   assert.deepEqual(
     await readFile(join(resolve(option('source')), 'workspaces.json')),
     original,
