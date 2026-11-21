@@ -17,6 +17,7 @@ export async function startStillWallpaper({ host, api }) {
   let presentation = {}, backend = {}, shown, desiredKey, closed = false, audioAttempt = '', audioLoading = false;
   const nextIdlePose = createIdleCycle();
   let idle = 'work', idleTimer, remaining = idleDuration('work'), began = 0, lastReport;
+  let autoPreview;
   let received = false, audioRevision = 0, committedRequest = -1;
   let motion, motionInfo, puppet, puppetError, fallbackFrame;
   let thinkTimer, replyWaitSince, thinking = false, thinkingTurn, dialoguePose, replyStarted = false;
@@ -182,7 +183,10 @@ export async function startStillWallpaper({ host, api }) {
       if (idleTimer) { clearTimeout(idleTimer); idleTimer = null; remaining = Math.max(0, remaining - (performance.now() - began)); }
     } else if (!idleTimer) {
       began = performance.now();
-      idleTimer = setTimeout(() => { idleTimer = null; idle = nextIdlePose(idle); remaining = idleDuration(idle); update(); }, remaining);
+      idleTimer = setTimeout(() => {
+        idleTimer = null; autoPreview = undefined;
+        idle = nextIdlePose(idle); remaining = idleDuration(idle); update();
+      }, remaining);
     }
   }
   function updateDialoguePose() {
@@ -214,11 +218,29 @@ export async function startStillWallpaper({ host, api }) {
     replyStarted = false;
   }
   function updatePuppet() {
-    const pose = dialoguePose ?? puppetPose(backend, presentation, idle);
+    const preview = stillSettings.stillSettings(presentation.stills).stillPose === 'auto' ? autoPreview : presentation.fixedPosePreview;
+    const pose = dialoguePose ?? (stillSettings.canPreviewPose(backend, presentation) ? preview : undefined) ?? puppetPose(backend, presentation, idle);
     const quick = !!dialoguePose || !!presentation.speaking || !!puppet?.dialoguePose;
     if (puppet) {
       puppet.dialoguePose = dialoguePose;
       puppet.update(pose, presentation, document.hidden, quick);
+    }
+  }
+  function selectPose(selection) {
+    if (!puppet?.visible() || shown?.requestId !== presentation.characterRequest || dialoguePose || document.hidden ||
+        !stillSettings.canPreviewPose(backend, presentation)) return;
+    const { POSES } = stillSettings;
+    let pose = selection.pose;
+    if (selection.click) {
+      if (!selection.click.every(point => puppet.player.hitsCharacter(point))) return;
+      pose = POSES[(POSES.indexOf(puppet.pose) + 1) % POSES.length];
+    }
+    if (!POSES.includes(pose)) return;
+    if (stillSettings.stillSettings(presentation.stills).stillPose === 'auto') {
+      autoPreview = pose;
+      updatePuppet(); report();
+    } else {
+      api.previewFixedPose({ pose, requestId: shown.requestId, revision: presentation.posePreferenceRevision });
     }
   }
   function update() {
@@ -237,14 +259,19 @@ export async function startStillWallpaper({ host, api }) {
     if (key !== desiredKey) { desiredKey = key; frameRevision++; host.dataset.loading = 'true'; sequence.select(key); }
     report();
   }
-  const unsubscribe = api.onPresentation(value => { received = true; presentation = value; update(); });
+  const unsubscribe = api.onPresentation(value => {
+    received = true;
+    if (value.posePreferenceRevision !== presentation.posePreferenceRevision || value.stills?.wallpaperMotion !== presentation.stills?.wallpaperMotion) autoPreview = undefined;
+    presentation = value; update();
+  });
   const unsubscribeMouth = api.onMouth?.(value => puppet?.receiveMouth(value));
+  const unsubscribePose = api.onPoseSelection?.(selectPose);
   const initial = await api.presentation(); if (initial.ok && !received) presentation = initial.value;
   const observer = new ResizeObserver(fit); observer.observe(host);
   document.addEventListener('visibilitychange', update); update();
   function destroy() {
     if (closed) return; closed = true; clearTimeout(idleTimer); clearTimeout(thinkTimer); unsubscribe(); observer.disconnect(); sequence.close();
-    document.removeEventListener('visibilitychange', update); window.removeEventListener('beforeunload', destroy); unsubscribeMouth?.(); motion?.close(); puppet?.close(); audio.close(); canvas.remove(); cache.clear(); shown = null;
+    document.removeEventListener('visibilitychange', update); window.removeEventListener('beforeunload', destroy); unsubscribeMouth?.(); unsubscribePose?.(); motion?.close(); puppet?.close(); audio.close(); canvas.remove(); cache.clear(); shown = null;
   }
   window.addEventListener('beforeunload', destroy);
   return { setBackendState(value) {

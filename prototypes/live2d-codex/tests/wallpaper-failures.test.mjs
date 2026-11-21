@@ -145,6 +145,7 @@ test('late playback success cannot revive a stopped request; current failures st
 
 test('a confirmed wallpaper exit releases audio waits and recovery reinstates acknowledgement protection', async t => {
   const handlers = new Map(), events = new Map(), timers = new Map(); let serial = 0, reloads = 0;
+  let mouseInputEnabled = true;
   const target = { provider: 'codex', cwd: 'project', threadId: 'thread' };
   const chat = { webContents: { on() {}, send() {} } };
   const avatar = { isDestroyed: () => false, webContents: { on: (name, fn) => events.set(name, fn), reload() { reloads++; events.get('did-start-loading')(); } } };
@@ -153,6 +154,7 @@ test('a confirmed wallpaper exit releases audio waits and recovery reinstates ac
     captureTarget: null, captureTimer: null, provider: 'codex', changingProvider: false, suspended: false, screenLocked: false, speaking: false, playbackRevision: 0, submissions: { active: new Set() },
     replyNarration: createReplyNarration(() => {}),
     wallpaperStatus: { phase: 'ready', character: 'female', requestId: 0, frameRevision: 20, pose: 'window' }, ambienceStatus: {}, lastPresentation: '',
+    wallpaperHost: { setPoseInputEnabled(enabled) { mouseInputEnabled = enabled; } },
     notifyPresentation() {}, notifyWorkspace() {}, stopSpeech() {}, cancelWallpaperCommit() {}, showWorkbench() {}, speech: { status: () => ({ asr: true }) }, backend: { state: target },
     setTimeout: callback => { const id = ++serial; timers.set(id, callback); return id; }, clearTimeout: id => timers.delete(id),
     handler: (name, fn) => handlers.set(name, fn) });
@@ -162,6 +164,7 @@ test('a confirmed wallpaper exit releases audio waits and recovery reinstates ac
   vm.runInContext(main.slice(main.indexOf("    handler('speech:capture'"), main.indexOf('    const { speechProfile }')) + playbackSource, context);
   const event = { sender: chat.webContents }, capture = value => handlers.get('speech:capture')(event, value), play = value => handlers.get('speech:playback')(event, value);
   const waiting = capture({ ...target }); events.get('render-process-gone')(); await waiting;
+  assert.equal(mouseInputEnabled, false);
   assert.equal(barrier.stopped, true); await capture(null);
   await play(true); assert.equal(context.speaking, true); await play(false);
   await capture({ ...target }); await capture(null);

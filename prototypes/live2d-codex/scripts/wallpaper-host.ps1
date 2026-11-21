@@ -80,6 +80,7 @@ public static class WallpaperDesktop {
   }
   public static string ParentClass() { return ClassOf(parent); }
   public static long ParentHandle() { return parent.ToInt64(); }
+  public static long IconViewHandle() { return icons.ToInt64(); }
   public static bool IsRaised() { return raised; }
   public static Rect Bounds() { Rect r; GetWindowRect(own,out r); return r; }
   public static void Close() {
@@ -92,13 +93,49 @@ function Write-WallpaperStatus {
     $bounds=[WallpaperDesktop]::Bounds()
     [Console]::Out.WriteLine((@{ ok=$true; attached=$true; raised=[WallpaperDesktop]::IsRaised(); parentClass=[WallpaperDesktop]::ParentClass(); parentHandle=[WallpaperDesktop]::ParentHandle(); occluded=[WallpaperDesktop]::Covered(); bounds=@{x=$bounds.Left;y=$bounds.Top;width=$bounds.Right-$bounds.Left;height=$bounds.Bottom-$bounds.Top} } | ConvertTo-Json -Compress))
 }
+$poseInput = $null
+$poseInputAvailable = $true
+$poseInputRevision = 0
+$poseInputEnabled = $false
+function Update-PoseInput {
+    if ($poseInputEnabled -and $poseInputAvailable) {
+        try {
+            if ($null -eq $script:poseInput) {
+                Add-Type -Path (Join-Path $PSScriptRoot 'wallpaper-pose-input.cs') -ReferencedAssemblies 'Accessibility.dll', 'System.dll', 'System.Core.dll'
+                $script:poseInput = [WallpaperPoseInput]::new()
+            }
+            # Hook points are physical pixels. GetWindowRect inside the hook can
+            # return virtualized bounds after Explorer reparents the window.
+            $bounds = [WallpaperDesktop]::Bounds()
+            $poseInput.Enable($WindowHandle, [WallpaperDesktop]::ParentHandle(), [WallpaperDesktop]::IconViewHandle(), $poseInputRevision, $bounds.Left, $bounds.Top, $bounds.Right, $bounds.Bottom)
+        }
+        catch {
+            $script:poseInputAvailable = $false
+            if ($null -ne $poseInput) { $poseInput.Disable() }
+            [Console]::Out.WriteLine((@{type='pose-input-error';error=$_.Exception.Message} | ConvertTo-Json -Compress))
+        }
+    }
+    elseif ($null -ne $poseInput) { $poseInput.Disable() }
+}
 try {
     [WallpaperDesktop]::Start($WindowHandle,$OwnerProcess)
     Write-WallpaperStatus
     while ($null -ne ($commandLine=[Console]::In.ReadLine())) {
         if ($commandLine -eq 'quit') { break }
-        if ($commandLine -eq 'ensure') { [WallpaperDesktop]::Ensure() | Out-Null; Write-WallpaperStatus }
+        if ($commandLine -eq 'ensure') {
+            [WallpaperDesktop]::Ensure() | Out-Null
+            if ($poseInputEnabled) { Update-PoseInput }
+            Write-WallpaperStatus
+        }
+        elseif ($commandLine -match '^pose-input (on|off) ([0-9]+)$') {
+            $poseInputEnabled = $Matches[1] -eq 'on'
+            $poseInputRevision = [int]$Matches[2]
+            Update-PoseInput
+        }
     }
 }
 catch { [Console]::Out.WriteLine((@{ok=$false;attached=$false;error=$_.Exception.Message} | ConvertTo-Json -Compress)) }
-finally { [WallpaperDesktop]::Close() }
+finally {
+    if ($null -ne $poseInput) { $poseInput.Dispose() }
+    [WallpaperDesktop]::Close()
+}

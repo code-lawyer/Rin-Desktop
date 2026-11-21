@@ -21,4 +21,8 @@ function validateStillPatch(patch) {
   for (const key of ['rainVolume', 'keyVolume']) if (key in patch && (!Number.isFinite(patch[key]) || patch[key] < 0 || patch[key] > 1)) throw new Error('环境音量应在 0–100% 之间。');
   return Object.fromEntries(Object.keys(STILL_DEFAULTS).filter(key => key in patch).map(key => [key, key === 'animePlayback' ? 'poses' : patch[key]]));
 }
-module.exports = { POSES, POSE_LABELS, ACTIVITY_LABELS, STILL_DEFAULTS, stillSettings, validateStillPatch };
+function canPreviewPose(state = {}, presentation = {}) {
+  return !presentation.paused && !presentation.stills?.wallpaperMotion && !presentation.chatVisible &&
+    !presentation.capturing && !presentation.speaking && !['starting', 'working', 'stopping', 'waiting'].includes(state.status);
+}
+module.exports = { POSES, POSE_LABELS, ACTIVITY_LABELS, STILL_DEFAULTS, stillSettings, validateStillPatch, canPreviewPose };

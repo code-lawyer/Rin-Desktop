@@ -1,11 +1,13 @@
 const { spawn } = require('node:child_process');
 const { join } = require('node:path');
 const { EventEmitter } = require('node:events');
+const isPoint = point => Array.isArray(point) && point.length === 2 && point.every(value => Number.isFinite(value) && value >= 0 && value < 1);
 
 // The helper only reparents our own HWND. It never changes the saved wallpaper.
 class WallpaperHost extends EventEmitter {
   constructor(window) {
     super(); this.window = window; this.status = { ok: false, attached: false };
+    this.poseInputEnabled = false; this.poseInputRevision = 0;
   }
   start() {
     const handle = this.window.getNativeWindowHandle();
@@ -19,7 +21,17 @@ class WallpaperHost extends EventEmitter {
       for (let index; (index = buffer.indexOf('\n')) >= 0;) {
         const line = buffer.slice(0, index).trim(); buffer = buffer.slice(index + 1);
         if (!line) continue;
-        try { this.status = JSON.parse(line); this.emit('status', this.status); } catch { /* Ignore PowerShell startup noise. */ }
+        let value;
+        try { value = JSON.parse(line); } catch { continue; }
+        if (value?.type === 'pose-click') {
+          if (this.poseInputEnabled && value.revision === this.poseInputRevision && isPoint(value.down) && isPoint(value.up)) {
+            this.emit('pose-click', [value.down, value.up]);
+          }
+        } else if (value?.type === 'pose-input-error') {
+          console.warn('[wallpaper:pose-input]', value.error);
+        } else if (typeof value?.ok === 'boolean') {
+          this.status = value; this.emit('status', value);
+        }
       }
     });
     this.child.on('error', error => this.emit('status', this.status = { ok: false, error: error.message }));
@@ -32,6 +44,11 @@ class WallpaperHost extends EventEmitter {
     });
   }
   command(value) { if (!this.child?.killed && this.child?.stdin.writable) this.child.stdin.write(value + '\n'); }
+  setPoseInputEnabled(enabled) {
+    if (this.poseInputEnabled === enabled) return;
+    this.poseInputEnabled = enabled;
+    this.command(`pose-input ${enabled ? 'on' : 'off'} ${++this.poseInputRevision}`);
+  }
   async close() {
     this.closing = true; clearInterval(this.timer);
     if (!this.child || this.child.exitCode !== null) return;
