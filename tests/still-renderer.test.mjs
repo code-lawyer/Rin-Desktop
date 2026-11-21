@@ -15,7 +15,8 @@ const source = (await readFile(new URL('../prototypes/live2d-codex/renderer/stil
 const tick = () => new Promise(resolve => setImmediate(resolve));
 
 async function fixture(t, { reload = true, pose = 'work', legacyVideo = false, realistic = false, motionPreparation = {} } = {}) {
-  let receive, release, waiting = true;
+  let receive, receivePose, release, waiting = true, now = 0, timerId = 0;
+  const timers = new Map(), fixedRequests = [];
   const ready = [], reports = [], decisions = [], draws = [], requests = [], puppets = [], motions = [], events = new Map();
   const context = { drawImage(...args) { draws.push(args); }, createLinearGradient: () => ({ addColorStop() {} }), fillRect() {} };
   const host = { dataset: {}, clientWidth: 1280, clientHeight: 800, append() {} };
@@ -23,6 +24,8 @@ async function fixture(t, { reload = true, pose = 'work', legacyVideo = false, r
   const document = { hidden: false, createElement: () => ({ getContext: () => context, remove() {} }), addEventListener: (name, fn) => events.set(name, fn), removeEventListener() {} };
   const api = {
     onPresentation(fn) { receive = fn; return () => {}; }, presentation: async () => ({ ok: true, value: initial }),
+    onPoseSelection(fn) { receivePose = fn; return () => {}; },
+    previewFixedPose(selection) { fixedRequests.push(selection); },
     avatarAnchor() {}, ambientApplied() {}, ambientStatus() {}, renderReady(info) { reports.push(info); if(ready.at(-1)?.join(':')!==[info.character,info.pose].join(':')) ready.push([info.character, info.pose]); },
     commitWallpaper(info) { return info.requestId > 0 && waiting ? new Promise(resolve => { release = () => { waiting = false; resolve({ ok: true, value: true }); }; }) : Promise.resolve({ ok: true, value: true }); },
     finishWallpaper(info, accept) { decisions.push([info.character, accept]); return { ok: true, value: accept }; },
@@ -37,14 +40,20 @@ async function fixture(t, { reload = true, pose = 'work', legacyVideo = false, r
       }
       ready = true; start() { this.started = true; } update() {} close() { this.closed = true; }
     },
-    performance: { now: () => 0 }, setTimeout: () => 1, clearTimeout() {}, window: { devicePixelRatio: 1, addEventListener() {}, removeEventListener() {} },
+    performance: { now: () => now },
+    setTimeout(fn, delay) { timers.set(++timerId, { fn, at: now + delay }); return timerId; },
+    clearTimeout(id) { timers.delete(id); },
+    window: { devicePixelRatio: 1, addEventListener() {}, removeEventListener() {} },
     Image: class { get naturalWidth() { return this.src.includes('female-v2-4k') ? 3840 : 1586; } get naturalHeight() { return this.src.includes('female-v2-4k') ? 2400 : 992; } decode() { requests.push(this.src); return Promise.resolve(); } },
     ResizeObserver: class { observe() {} disconnect() {} },
     AmbientPreview: class { update() { return { rain: 0, keys: 0 }; } enable() { return Promise.resolve(true); } close() {} },
     PuppetWallpaper: class {
       static async prepare() { const puppet = new this(); puppets.push(puppet); return puppet; }
-      player = { contextLost: false }; pose = 'work'; fit() {} activate() { this.active = true; }
-      update(pose, presentation, hidden) { if (!presentation.paused && !hidden) this.pose = pose; }
+      player = { contextLost: false, hitsCharacter: ([x, y]) => x > .5 && y < .5 };
+      pose = 'work'; fit() {} activate() { this.active = true; } visible() { return this.active && !this.closed; }
+      update(pose, presentation, hidden, quick) {
+        if (!presentation.paused && !hidden) { this.pose = pose; this.quick = quick; }
+      }
       close() { this.closed = true; }
     },
   });
@@ -53,7 +62,20 @@ async function fixture(t, { reload = true, pose = 'work', legacyVideo = false, r
   let current = initial;
   const present = patch => { current = { ...current, ...patch, stills: { ...current.stills, ...patch.stills } }; receive(current); };
   if(reload) { present({ character: 'female', characterRequest: 1 }); await tick(); }
-  return { host, ready, reports, draws, requests, decisions, puppets, motions, present, app, release: () => release(), hide(value) { document.hidden = value; events.get('visibilitychange')(); } };
+  return {
+    host, ready, reports, draws, requests, decisions, puppets, motions, present, app, fixedRequests,
+    select: command => receivePose(command), release: () => release(),
+    hide(value) { document.hidden = value; events.get('visibilitychange')(); },
+    nextTimer: () => [...timers.values()].sort((a, b) => a.at - b.at)[0]?.at,
+    advanceTo(time) {
+      for (;;) {
+        const next = [...timers].filter(([, event]) => event.at <= time).sort((a, b) => a[1].at - b[1].at)[0];
+        if (!next) break;
+        const [id, event] = next; timers.delete(id); now = event.at; event.fn();
+      }
+      now = time;
+    },
+  };
 }
 
 test('realistic decoder failure cannot commit or close the working original renderer', async t => {
@@ -153,6 +175,54 @@ test('a manual anime pose reports its effective wake activity and restores manua
   h.present({ paused: false });
   h.hide(true);
   assert.equal(h.reports.at(-1).activity, 'hidden');
+});
+
+test('click and tray previews use the idle layer and expire at the original automatic tick', async t => {
+  const h = await fixture(t, { reload: false, pose: 'auto' });
+  const deadline = h.nextTimer();
+  h.advanceTo(deadline - 10);
+  h.select({ click: [[.8, .2], [.4, .2]] });
+  assert.equal(h.host.dataset.pose, 'work');
+  h.select({ click: [[.8, .2], [.8, .2]] });
+  assert.equal(h.host.dataset.pose, 'cup');
+  assert.equal(h.puppets[0].quick, false);
+  h.select({ pose: 'attention' });
+  assert.equal(h.host.dataset.pose, 'attention');
+  assert.equal(h.puppets[0].quick, false);
+  h.select({ pose: 'reply-thinking' });
+  assert.equal(h.host.dataset.pose, 'attention');
+  assert.equal(h.nextTimer(), deadline);
+  h.advanceTo(deadline);
+  assert.ok(['cup', 'thinking', 'window'].includes(h.host.dataset.pose));
+  assert.equal(h.host.dataset.activity, 'auto');
+});
+
+test('fixed previews send a session request and yield to chat, reply thinking and pause', async t => {
+  const h = await fixture(t, { reload: false, pose: 'window' });
+  h.present({ posePreferenceRevision: 2 });
+  h.select({ click: [[.8, .2], [.8, .2]] });
+  assert.equal(h.host.dataset.pose, 'window');
+  assert.equal(h.fixedRequests.length, 1);
+  assert.equal(h.fixedRequests[0].pose, 'attention');
+  assert.equal(h.fixedRequests[0].revision, 2);
+  h.present({ fixedPosePreview: 'cup' });
+  assert.equal(h.host.dataset.pose, 'cup');
+  assert.equal(h.puppets[0].quick, false);
+  h.present({ chatVisible: true });
+  h.select({ pose: 'work' });
+  assert.equal(h.host.dataset.pose, 'attention');
+  h.app.setBackendState({ status: 'working', turnId: 'turn-1' });
+  h.advanceTo(THINK_DELAY_MS);
+  assert.equal(h.host.dataset.pose, 'reply-thinking');
+  h.select({ pose: 'thinking' });
+  h.app.setBackendState({ status: 'idle' });
+  h.present({ chatVisible: false, paused: true });
+  h.select({ pose: 'work' });
+  h.present({ paused: false });
+  assert.equal(h.fixedRequests.length, 1);
+  assert.equal(h.host.dataset.pose, 'cup');
+  h.present({ fixedPosePreview: null, posePreferenceRevision: 3 });
+  assert.equal(h.host.dataset.pose, 'window');
 });
 
 for (const mode of ['paused', 'hidden']) test(`${mode} during preparation keeps the visible character; resume commits only the latest frame`, async t => {

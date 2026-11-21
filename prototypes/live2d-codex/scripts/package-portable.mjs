@@ -41,7 +41,8 @@ for (const name of ['character-previews','stills','ambience']) await cp(join(roo
 await copyMotionAssets(motionDirectory, join(appDir, 'assets/motion/female'));
 await copyPuppetAssets(puppetDirectory, join(appDir, 'assets/scene/rin-poses'));
 await mkdir(join(appDir,'scripts'),{recursive:true});
-await cp(join(root,'scripts/wallpaper-host.ps1'),join(appDir,'scripts/wallpaper-host.ps1'));
+for (const file of ['wallpaper-host.ps1', 'wallpaper-pose-input.cs'])
+  await cp(join(root, 'scripts', file), join(appDir, 'scripts', file));
 for (const name of ['sherpa-onnx-node','sherpa-onnx-win-x64']) await cp(join(root,'node_modules',name),join(appDir,'node_modules',name),{recursive:true});
 await copyAgentDependencies(root, appDir);
 await writeFile(join(appDir,'package.json'),JSON.stringify({name:'vibe-voice',version,type:'module',main:'main.cjs',private:true},null,2));

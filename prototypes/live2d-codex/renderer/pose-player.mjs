@@ -1,8 +1,11 @@
-import { POSE_IDS, poseTextureSize, validatePoses } from './pose-assets.mjs';
+import { POSE_IDS, POSE_SIZE, poseTextureSize, validatePoses } from './pose-assets.mjs';
+
+const SCENE_WIDTH = 3840, SCENE_HEIGHT = 2400;
+const MASK_WIDTH = Math.ceil(POSE_SIZE[0] / 4), MASK_HEIGHT = Math.ceil(POSE_SIZE[1] / 4);
 
 const VERTEX = `#version 300 es
 in vec2 position;in vec2 texcoord;out vec2 uv;uniform vec2 viewport;
-void main(){uv=texcoord;vec2 size=vec2(3840.,2400.);vec2 p=position*size*max(viewport.x/size.x,viewport.y/size.y)/viewport;gl_Position=vec4(p.x,-p.y,0.,1.);}`;
+void main(){uv=texcoord;vec2 size=vec2(${SCENE_WIDTH}.,${SCENE_HEIGHT}.);vec2 p=position*size*max(viewport.x/size.x,viewport.y/size.y)/viewport;gl_Position=vec4(p.x,-p.y,0.,1.);}`;
 const FRAGMENT = `#version 300 es
 precision highp float;in vec2 uv;out vec4 color;
 uniform sampler2D backgroundImage;uniform sampler2D foregroundImage;uniform sampler2D poseImage;
@@ -54,6 +57,7 @@ export class PosePlayer {
   constructor(canvas, { lost = () => {} } = {}) {
     this.canvas = canvas;
     this.textures = new Map();
+    this.hitMasks = new Map();
     this.closed = false;
     this.ready = false;
     const gl = (this.gl = canvas.getContext('webgl2', {
@@ -154,6 +158,9 @@ export class PosePlayer {
       if (failed) throw failed.reason;
       if (this.closed || this.contextLost || signal?.aborted) throw Error('人物素材准备已取消。');
       const gl = this.gl;
+      const scratch = document.createElement('canvas');
+      scratch.width = MASK_WIDTH; scratch.height = MASK_HEIGHT;
+      const maskContext = scratch.getContext('2d', { willReadFrequently: true });
       for (let i = 0; i < files.length; i++) {
         const file = files[i],
           bitmap = outcomes[i].value,
@@ -167,12 +174,33 @@ export class PosePlayer {
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, bitmap);
+        if (maskContext && (file === 'foreground' || POSE_IDS.includes(file))) {
+          try {
+            maskContext.clearRect(0, 0, MASK_WIDTH, MASK_HEIGHT);
+            maskContext.drawImage(bitmap, 0, 0, MASK_WIDTH, MASK_HEIGHT);
+            const rgba = maskContext.getImageData(0, 0, MASK_WIDTH, MASK_HEIGHT).data;
+            this.hitMasks.set(file, Uint8Array.from({ length: MASK_WIDTH * MASK_HEIGHT }, (_, index) => rgba[index * 4 + 3]));
+          } catch { /* A missing hit mask leaves the native tray available. */ }
+        }
       }
       if (gl.isContextLost() || gl.getError() !== gl.NO_ERROR) throw Error('人物贴图准备失败。');
       this.ready = true;
     } finally {
       for (const result of outcomes) if (result.status === 'fulfilled') result.value.close();
     }
+  }
+  hitsCharacter([x, y]) {
+    const frame = this.state?.frame;
+    if (!frame || frame.opacity < .85 || !this.ready || this.contextLost) return false;
+    const { width, height } = this.canvas;
+    const scale = Math.max(width / SCENE_WIDTH, height / SCENE_HEIGHT);
+    const u = .5 + (x - .5) * width / (scale * SCENE_WIDTH);
+    const v = .5 + (y - .5) * height / (scale * SCENE_HEIGHT);
+    if (!(u >= 0 && u < 1 && v >= 0 && v < 1)) return false;
+    const index = Math.floor(v * MASK_HEIGHT) * MASK_WIDTH + Math.floor(u * MASK_WIDTH);
+    const body = this.hitMasks.get(frame.pose)?.[index] ?? 0;
+    const foreground = this.hitMasks.get('foreground')?.[index] ?? 255;
+    return body * (1 - foreground / 255) >= 160;
   }
   render(state = {}) {
     if (!this.ready || this.closed || this.contextLost) return;
@@ -241,6 +269,7 @@ export class PosePlayer {
     if (!gl) return;
     for (const texture of this.textures.values()) gl.deleteTexture(texture);
     this.textures.clear();
+    this.hitMasks.clear();
     gl.deleteBuffer(this.buffer);
     gl.deleteVertexArray(this.vao);
     gl.deleteProgram(this.program);

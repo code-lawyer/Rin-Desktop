@@ -79,6 +79,7 @@ contextBridge.exposeInMainWorld('companion', {
   moveChatTo: point => ipcRenderer.send('companion:chat-drag-move', point),
   endChatMove: () => ipcRenderer.send('companion:chat-drag-end'),
   renderReady: info => ipcRenderer.send('companion:render-ready', info),
+  previewFixedPose: selection => ipcRenderer.send('wallpaper:preview-fixed-pose', selection),
   commitWallpaper: info => ipcRenderer.invoke('wallpaper:commit', info),
   finishWallpaper: (info, accept) => ipcRenderer.sendSync('wallpaper:finish', info, accept),
   avatarAnchor: anchor => ipcRenderer.send('companion:avatar-anchor', anchor),
@@ -107,5 +108,10 @@ contextBridge.exposeInMainWorld('companion', {
     const listener = (_event, value) => callback(value);
     ipcRenderer.on('companion:presentation', listener);
     return () => ipcRenderer.removeListener('companion:presentation', listener);
+  },
+  onPoseSelection: callback => {
+    const listener = (_event, value) => callback(value);
+    ipcRenderer.on('wallpaper:pose-selection', listener);
+    return () => ipcRenderer.removeListener('wallpaper:pose-selection', listener);
   }
 });

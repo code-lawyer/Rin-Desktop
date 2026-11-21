@@ -10,7 +10,7 @@ const { registerInputActions } = require('./backend/input-actions.cjs');
 const { RemoteInput, RESERVED_KEYS } = require('./backend/remote-input.cjs');
 const { characterProfile, isCharacter } = require('./backend/character-profiles.cjs');
 const { wallpaperChoice, isWallpaperKind } = require('./backend/wallpaper-choice.cjs');
-const { stillSettings } = require('./backend/still-settings.cjs');
+const { stillSettings, canPreviewPose, POSES, POSE_LABELS } = require('./backend/still-settings.cjs');
 const { acceptWallpaperReport } = require('./backend/wallpaper-report.cjs');
 const { AmbientBarrier } = require('./backend/ambient-barrier.cjs');
 const { createReplyNarration } = require('./backend/reply-narration.cjs');
@@ -51,6 +51,7 @@ let characterScale = 1, characterBox, dragOrigin, appearanceTimer, appearanceQue
 let bubblePosition = null, chatDragOrigin, currentChatLayout;
 let wallpaperHost, manualPause = false, pendingMode = null, lastPresentation = '', trayMenu;
 let wallpaperStatus = { phase: 'loading', requestId: 0 }, appliedWallpaperRequest = -1, wallpaperCommit;
+let fixedPosePreview = null, posePreferenceRevision = 0;
 let suspended = false, screenLocked = false, speaking = false, playbackRevision = 0, ambientRevision = 0, ambientRetry = 0;
 const replyNarration = createReplyNarration(notifyPresentation, reply => chat.webContents.send('speech:reply', reply));
 let ambienceStatus = { phase: 'off', error: '' };
@@ -60,10 +61,27 @@ const remoteInput = new RemoteInput({onError:error=>remote?.disconnect().then(()
 const isLocal = url => { try { const u = new URL(url); return u.protocol === 'app:' && u.hostname === 'local' && ['/renderer/index.html', '/renderer/workbench.html'].includes(u.pathname); } catch { return false; } };
 const trusted = event => [avatar, chat, workbench].some(win => win && !win.isDestroyed() && win.webContents === event.sender) && isLocal(event.senderFrame?.url ?? '');
 const appearance = () => ({ scale: characterScale, mode: wallpaperMode ? 'wallpaper' : 'avatar' });
-const presentation = () => ({ mode: wallpaperMode ? 'wallpaper' : 'avatar', wallpaperKind: wallpaperStatus.wallpaperKind || 'artwork', character: wallpaperStatus.character ?? characterProfile(store?.data.settings.character).id, characterRequest: wallpaperStatus.requestId, chatVisible: !!chat?.isVisible(), paused: manualPause || suspended || screenLocked || !!wallpaperHost?.status.occluded, manualPause, stills: { ...stillSettings(store?.data.settings), wallpaperMotion: wallpaperStatus.wallpaperMotion ?? store?.data.settings.wallpaperMotion === true }, capturing: !!captureTarget, speaking, replyNarration: replyNarration.cue, ambientRevision, ambientRetry, desktopAttached: !!wallpaperHost?.status.ok, desktopLayer: wallpaperHost?.status.parentClass ?? null, desktopBounds: wallpaperHost?.status.bounds ?? null });
+const presentation = () => ({ mode: wallpaperMode ? 'wallpaper' : 'avatar', wallpaperKind: wallpaperStatus.wallpaperKind || 'artwork', character: wallpaperStatus.character ?? characterProfile(store?.data.settings.character).id, characterRequest: wallpaperStatus.requestId, chatVisible: !!chat?.isVisible(), paused: manualPause || suspended || screenLocked || !!wallpaperHost?.status.occluded, manualPause, stills: { ...stillSettings(store?.data.settings), wallpaperMotion: wallpaperStatus.wallpaperMotion ?? store?.data.settings.wallpaperMotion === true }, capturing: !!captureTarget, speaking, replyNarration: replyNarration.cue, ambientRevision, ambientRetry, desktopAttached: !!wallpaperHost?.status.ok, desktopLayer: wallpaperHost?.status.parentClass ?? null, desktopBounds: wallpaperHost?.status.bounds ?? null,
+  fixedPosePreview, posePreferenceRevision });
+function poseSelectionEnabled(value = presentation()) {
+  return wallpaperMode && !closing && !quitting && wallpaperStatus.phase === 'ready' &&
+    ['auto', 'manual'].includes(wallpaperStatus.activity) && canPreviewPose(backend?.state, value);
+}
+function selectWallpaperPose(selection) {
+  if (poseSelectionEnabled() && avatar && !avatar.isDestroyed() && !avatar.webContents.isCrashed()) {
+    avatar.webContents.send('wallpaper:pose-selection', selection);
+  }
+}
 function notifyPresentation() {
   if (!avatar || avatar.isDestroyed() || avatar.webContents.isCrashed()) return;
   const value = presentation(), encoded = JSON.stringify(value);
+  const poseEnabled = poseSelectionEnabled(value);
+  const poseMenu = trayMenu?.getMenuItemById('wallpaper-poses');
+  if (poseMenu && poseMenu.enabled !== poseEnabled) {
+    poseMenu.enabled = poseEnabled;
+    tray.setContextMenu(trayMenu);
+  }
+  wallpaperHost?.setPoseInputEnabled(poseEnabled && value.desktopAttached);
   if (encoded !== lastPresentation) { lastPresentation = encoded; avatar.webContents.send('companion:presentation', value); }
 }
 function switchMode(mode) {
@@ -204,6 +222,7 @@ function finishWallpaper(info, accept) {
     if (accept !== true || !commit.ready || commit.cancelled || wallpaperStatus !== commit.requested || (presentation().paused && info.initial !== true)) { cancelWallpaperCommit(); return false; }
     // Wallpaper style changes keep the selected voice and ongoing narration.
     commit.prepared?.commit();
+    if (info.wallpaperMotion) fixedPosePreview = null;
     appliedWallpaperRequest = info.requestId;
     wallpaperStatus = { ...commit.requested, phase: 'ready' };
     return true;
@@ -266,6 +285,7 @@ function bindBackend() {
   backend.on('state', state => {
     if (state.connection !== previousState?.connection || state.status !== previousState?.status) {
       console.info('[companion:connection]', JSON.stringify({ provider, connection: state.connection, status: state.status }));
+      notifyPresentation();
     }
     for (const win of [avatar, chat, workbench]) if (win && !win.isDestroyed()) win.webContents.send('companion:state', { ...state, provider, submission: submissions?.snapshot(provider) });
     const target = `${provider}|${state.cwd}|${state.threadId}`;
@@ -518,6 +538,7 @@ else {
     avatar.webContents.on('render-process-gone',()=>{
       cancelWallpaperCommit();
       ambientBarrier.stopOwner();
+      wallpaperHost?.setPoseInputEnabled(false);
       ambienceStatus={phase:'error',error:'壁纸窗口已停止，环境音已静音；听写与朗读仍可使用。请重试恢复壁纸。'};
       wallpaperStatus={...wallpaperStatus,phase:'error',error:'壁纸窗口已停止，请重试加载。'};
       notifyWorkspace();
@@ -661,6 +682,7 @@ else {
       if (voiceResources.active && changesEngine) throw new Error('模型正在准备，请先取消下载或等待载入完成。');
       if (patch.ttsResident === true && !speech.status().engines[patch.ttsEngine ?? previous.ttsEngine ?? 'qwen']) throw new Error('请先下载所选播报引擎的资源，再开启常驻。');
       if (Object.keys(patch).length) await store.updateSettings(patch);
+      if ('stillPose' in patch) { fixedPosePreview = null; posePreferenceRevision++; }
       registerShortcuts();
       const next = store.data.settings;
       if (!next.ttsResident || next.ttsEngine !== previous.ttsEngine || next.qwenRoot !== previous.qwenRoot) stopSpeech();
@@ -747,6 +769,13 @@ else {
     handler('wallpaper:commit', (event, info) => {
       if (!wallpaperMode || event.sender !== avatar.webContents) throw new Error('请从壁纸窗口提交人物画面。');
       return confirmWallpaper(info);
+    });
+    ipcMain.on('wallpaper:preview-fixed-pose', (event, selection) => {
+      if (!trusted(event) || event.sender !== avatar.webContents || !poseSelectionEnabled() ||
+          selection?.requestId !== appliedWallpaperRequest || selection.revision !== posePreferenceRevision ||
+          stillSettings(store.data.settings).stillPose === 'auto' || !POSES.includes(selection.pose)) return;
+      fixedPosePreview = selection.pose;
+      notifyPresentation();
     });
     ipcMain.on('wallpaper:finish', (event, info, accept) => {
       if (!wallpaperMode || !trusted(event) || event.sender !== avatar.webContents) { event.returnValue = { ok: false, error: '请从壁纸窗口确认人物画面。' }; return; }
@@ -851,6 +880,7 @@ else {
       avatar.setIgnoreMouseEvents(true); avatar.setOpacity(0); avatar.showInactive();
       wallpaperHost = new WallpaperHost(avatar);
       wallpaperHost.on('status', value => { notifyPresentation(); if (!value.ok) console.error(value.error); });
+      wallpaperHost.on('pose-click', click => selectWallpaperPose({ click }));
       await wallpaperHost.start(); avatar.setOpacity(1); wallpaperHost.command('ensure');
       console.info('[companion:desktop]', JSON.stringify(presentation()));
       screen.on('display-metrics-changed', () => { wallpaperHost.command('ensure'); positionChat(); });
@@ -858,6 +888,8 @@ else {
     tray = new Tray(icon()); tray.setToolTip(`${portable?.testBuild ? 'Rin Desktop 测试版' : 'Vibe Voice'} · ${agentName(provider)} 桌面伙伴`);
     trayMenu = Menu.buildFromTemplate([{ label: '打开对话  Ctrl+Alt+空格', click: showChat },
       { label: '壁纸人物', click: () => showWorkbench('wallpaper') },
+      ...(wallpaperMode ? [{ id: 'wallpaper-poses', label: '人物姿态', enabled: false,
+        submenu: POSES.map(pose => ({ label: POSE_LABELS[pose], click: () => selectWallpaperPose({ pose }) })) }] : []),
       { label: '项目与对话工作台', click: showWorkbench }, { label:'连接与设置遥控器', click:()=>showWorkbench('remote') }, { label: '听写 / 完成听写', click: () => sendInputAction('record') },
       { label: '发送当前草稿', click: () => sendInputAction('send') }, { label: '朗读此条', click: () => sendInputAction('readReply') }, { label: '停止播报', click: stopSpeech },
       ...(wallpaperMode ? [{ id: 'pause-wallpaper', label: '暂停壁纸动画', type: 'checkbox', checked: manualPause, click: item => { manualPause = item.checked; notifyPresentation(); notifyWorkspace(); } }, ...(!packaged ? [{ label: '切换为悬浮角色', click: () => switchMode('avatar') }] : [])]
