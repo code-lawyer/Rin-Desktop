@@ -63,26 +63,32 @@ const trusted = event => [avatar, chat, workbench].some(win => win && !win.isDes
 const appearance = () => ({ scale: characterScale, mode: wallpaperMode ? 'wallpaper' : 'avatar' });
 const presentation = () => ({ mode: wallpaperMode ? 'wallpaper' : 'avatar', wallpaperKind: wallpaperStatus.wallpaperKind || 'artwork', character: wallpaperStatus.character ?? characterProfile(store?.data.settings.character).id, characterRequest: wallpaperStatus.requestId, chatVisible: !!chat?.isVisible(), paused: manualPause || suspended || screenLocked || !!wallpaperHost?.status.occluded, manualPause, stills: { ...stillSettings(store?.data.settings), wallpaperMotion: wallpaperStatus.wallpaperMotion ?? store?.data.settings.wallpaperMotion === true }, capturing: !!captureTarget, speaking, replyNarration: replyNarration.cue, ambientRevision, ambientRetry, desktopAttached: !!wallpaperHost?.status.ok, desktopLayer: wallpaperHost?.status.parentClass ?? null, desktopBounds: wallpaperHost?.status.bounds ?? null,
   fixedPosePreview, posePreferenceRevision });
-function poseSelectionEnabled(value = presentation()) {
+function wallpaperRenderer() {
+  if (!avatar || avatar.isDestroyed()) return null;
+  const contents = avatar.webContents;
+  return contents.isDestroyed() || contents.isCrashed() ? null : contents;
+}
+function poseSelectionEnabled(value) {
   return wallpaperMode && !closing && !quitting && wallpaperStatus.phase === 'ready' &&
     ['auto', 'manual'].includes(wallpaperStatus.activity) && canPreviewPose(backend?.state, value);
 }
 function selectWallpaperPose(selection) {
-  if (poseSelectionEnabled() && avatar && !avatar.isDestroyed() && !avatar.webContents.isCrashed()) {
-    avatar.webContents.send('wallpaper:pose-selection', selection);
-  }
+  const contents = wallpaperRenderer();
+  if (contents && poseSelectionEnabled(presentation())) contents.send('wallpaper:pose-selection', selection);
 }
 function notifyPresentation() {
-  if (!avatar || avatar.isDestroyed() || avatar.webContents.isCrashed()) return;
-  const value = presentation(), encoded = JSON.stringify(value);
-  const poseEnabled = poseSelectionEnabled(value);
+  const contents = wallpaperRenderer();
+  const value = presentation();
+  const poseEnabled = !!contents && poseSelectionEnabled(value);
   const poseMenu = trayMenu?.getMenuItemById('wallpaper-poses');
-  if (poseMenu && poseMenu.enabled !== poseEnabled) {
+  if (tray && !tray.isDestroyed() && poseMenu && poseMenu.enabled !== poseEnabled) {
     poseMenu.enabled = poseEnabled;
     tray.setContextMenu(trayMenu);
   }
   wallpaperHost?.setPoseInputEnabled(poseEnabled && value.desktopAttached);
-  if (encoded !== lastPresentation) { lastPresentation = encoded; avatar.webContents.send('companion:presentation', value); }
+  if (!contents) return;
+  const encoded = JSON.stringify(value);
+  if (encoded !== lastPresentation) { lastPresentation = encoded; contents.send('companion:presentation', value); }
 }
 function switchMode(mode) {
   if (quitting || closing) return;
@@ -538,7 +544,6 @@ else {
     avatar.webContents.on('render-process-gone',()=>{
       cancelWallpaperCommit();
       ambientBarrier.stopOwner();
-      wallpaperHost?.setPoseInputEnabled(false);
       ambienceStatus={phase:'error',error:'壁纸窗口已停止，环境音已静音；听写与朗读仍可使用。请重试恢复壁纸。'};
       wallpaperStatus={...wallpaperStatus,phase:'error',error:'壁纸窗口已停止，请重试加载。'};
       notifyWorkspace();
@@ -692,7 +697,6 @@ else {
       if (choice) {
         wallpaperStatus = { phase: 'loading', ...choice, requestId: wallpaperStatus.requestId + 1 };
         recoverWallpaperRenderer();
-        notifyPresentation();
       }
       notifyWorkspace(); return workspaceSnapshot();
     });
@@ -892,7 +896,7 @@ else {
         submenu: POSES.map(pose => ({ label: POSE_LABELS[pose], click: () => selectWallpaperPose({ pose }) })) }] : []),
       { label: '项目与对话工作台', click: showWorkbench }, { label:'连接与设置遥控器', click:()=>showWorkbench('remote') }, { label: '听写 / 完成听写', click: () => sendInputAction('record') },
       { label: '发送当前草稿', click: () => sendInputAction('send') }, { label: '朗读此条', click: () => sendInputAction('readReply') }, { label: '停止播报', click: stopSpeech },
-      ...(wallpaperMode ? [{ id: 'pause-wallpaper', label: '暂停壁纸动画', type: 'checkbox', checked: manualPause, click: item => { manualPause = item.checked; notifyPresentation(); notifyWorkspace(); } }, ...(!packaged ? [{ label: '切换为悬浮角色', click: () => switchMode('avatar') }] : [])]
+      ...(wallpaperMode ? [{ id: 'pause-wallpaper', label: '暂停壁纸动画', type: 'checkbox', checked: manualPause, click: item => { manualPause = item.checked; notifyWorkspace(); } }, ...(!packaged ? [{ label: '切换为悬浮角色', click: () => switchMode('avatar') }] : [])]
         : [{ label: '显示 / 隐藏角色', click: () => avatar.isVisible() ? avatar.hide() : avatar.showInactive() }, { label: '恢复默认位置与大小', click: resetAvatar }, { label: '切换为雨夜壁纸', click: () => switchMode('wallpaper') }]),
       { type: 'separator' }, { label: '退出桌面伙伴', click: () => app.quit() }]);
     tray.setContextMenu(trayMenu);

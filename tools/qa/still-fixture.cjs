@@ -41,6 +41,7 @@ async function until(win,expression){for(let i=0;i<waitAttempts;i++){if(await js
 async function open(file,width,height){
   // The puppet probe drives input over IPC while the wallpaper needs a visible surface.
   const win=new BrowserWindow({width,height,show:false,frame:false,focusable:!puppetRun,webPreferences:{preload:join(application,'preload.cjs'),contextIsolation:true,nodeIntegration:false,sandbox:true,backgroundThrottling:false,autoplayPolicy:'no-user-gesture-required'}});windows.push(win);
+  win.webContents.setAudioMuted(true);
   if (puppetRun) win.setIgnoreMouseEvents(true);
   win.webContents.on('console-message',event=>{const {level,message}=event;if((level==='error'||level===3)&&!message.includes('Electron Security Warning')&&message!=='[wallpaper:still] The source image cannot be decoded.'&&!(expectedFailure&&(message.includes('404')||message.startsWith('[wallpaper:still]'))))errors.push(message);});
   await win.loadURL('app://local/renderer/'+file);return win;
@@ -63,7 +64,7 @@ app.whenReady().then(async()=>{
   present.character=store.data.settings.character;present.stills=store.data.settings;
   wallpaperStatus={phase:'loading',character:present.character,wallpaperMotion:store.data.settings.wallpaperMotion===true,animePlayback:store.data.settings.animePlayback,requestId:0};
   const mainSource=readFileSync(join(application,'main.cjs'),'utf8');
-  const commitContext=vm.createContext({store,appliedWallpaperRequest:-1,wallpaperCommit:null,setTimeout,clearTimeout,presentation:()=>present,
+  const commitContext=vm.createContext({store,appliedWallpaperRequest:-1,wallpaperCommit:null,fixedPosePreview:null,setTimeout,clearTimeout,presentation:()=>present,
     isCharacter:require(join(application,'backend/character-profiles.cjs')).isCharacter,
     isWallpaperKind:require(join(application,'backend/wallpaper-choice.cjs')).isWallpaperKind,
     stopSpeech(){present.speaking=false;sendPresentation();},notifyWorkspace:notify,console:{info(){},error(...args){if(!persistFault)console.error(...args);}}});
@@ -145,8 +146,6 @@ app.whenReady().then(async()=>{
     barrier.close();for(const win of windows)win.destroy();app.exit(0);return;
   }
   if(puppetRun) {
-    chat.webContents.setAudioMuted(true);
-    wallpaper.webContents.setAudioMuted(true);
     const puppet="document.querySelector('.wallpaper-puppet[data-active=true]')";
     await until(wallpaper,host+".dataset.rig==='scene'");
     await capture(wallpaper,'rin-work');
@@ -345,9 +344,14 @@ app.whenReady().then(async()=>{
     await js(workbench,"companion.saveSettings({qwenVoice:'Uncle_Fu',voice:59})");
     await wallpaper.webContents.session.clearCache();await wallpaper.loadURL('app://local/renderer/index.html?view=wallpaper');
     await until(wallpaper,host+".dataset.ready==='true'");
-    const older=arm('anime',true);await pick('anime');await waitHeld();await pick('realistic');
+    const older=arm('anime',true);await pick('anime');await waitHeld();
+    const latestRequest=wallpaperStatus.requestId+1;
+    await pick('realistic');
     characterFault=null;for(const release of older.releases.splice(0))release();
-    await until(wallpaper,host+".dataset.rig==='motion'");await delay(200);
+    // The retained video already satisfies the rig predicate during the
+    // replacement. Wait for the newer request to commit before checking it.
+    await until(workbench,`companion.workspace().then(({value})=>value.wallpaper.requestId===${latestRequest} && value.wallpaper.phase==='ready')`);
+    await until(wallpaper,host+".dataset.rig==='motion' && "+host+".dataset.loading==='false'");
     await assertCharacter('female','Uncle_Fu',59);assert.equal(store.data.settings.wallpaperMotion,true);assert.equal(wallpaperStatus.phase,'ready');
     checks.push('rapid return to realistic style discards the older failed anime request and preserves custom voices');
     const final=arm('anime');await pick('anime');await waitError();assert.ok(final.hits);
@@ -459,7 +463,8 @@ app.whenReady().then(async()=>{
     await capture(wallpaper,'pose-'+pose);checks.push('live model state '+pose+' / custom voices retained');
   }
   await js(workbench,"document.querySelector('#still-previews [data-pose=cup]').click()");await until(wallpaper,host+".dataset.pose==='cup'");
-  await until(workbench,"document.getElementById('still-status').textContent.includes('拿杯喝水') && document.getElementById('still-status').textContent.includes('固定姿态')");
+  const { POSE_LABELS, ACTIVITY_LABELS } = require(join(application,'backend/still-settings.cjs'));
+  await until(workbench,`document.getElementById('still-status').textContent.includes(${JSON.stringify(POSE_LABELS.cup + ' · ' + ACTIVITY_LABELS.manual)})`);
   assert.equal(await js(workbench,"document.querySelector('#still-previews [data-pose=cup]').getAttribute('aria-pressed')"),'true');
   checks.push('pose thumbnails select the actual frame and show the fixed-pose reason');
   await js(workbench,"companion.saveSettings({stillPose:'work',ambienceEnabled:true})");await until(wallpaper,host+".dataset.audioState==='ready' && "+host+".dataset.audioKeys==='0.08'");
@@ -470,6 +475,7 @@ app.whenReady().then(async()=>{
   // Real speech-ui starts and ends a synthesized silent PCM fixture. No model.
   chat.webContents.send('speech:reply',{text:'离线播放状态验证。',preview:true});await until(wallpaper,host+".dataset.audioRain==='0.024'");
   assert.equal((await levels())[1],0);await until(wallpaper,host+".dataset.audioRain==='0.12'");checks.push('actual narration start/end ducks rain and stops keys through production preload');
+  await until(wallpaper,host+".dataset.pose==='work'");
   await js(workbench,"companion.wallpaperControl('pause',true)");await until(wallpaper,host+".dataset.paused==='true'");
   await js(workbench,"companion.saveSettings({stillPose:'window'})");await delay(150);assert.equal(await js(wallpaper,host+'.dataset.pose'),'work');assert.deepEqual(await levels(),[0,0]);
   await js(workbench,"companion.wallpaperControl('pause',false)");await until(wallpaper,host+".dataset.pose==='window'");assert.equal((await levels())[1],0);checks.push('pause freezes current image and mutes; resume applies latest selection');
@@ -508,6 +514,7 @@ app.whenReady().then(async()=>{
   await js(workbench,"companion.saveSettings({ambienceEnabled:false})");
   const exited=new Promise(resolve=>wallpaper.webContents.once('render-process-gone',resolve));
   wallpaper.webContents.forcefullyCrashRenderer();await exited;assert.equal(barrier.stopped,true);
+  assert.equal(wallpaperStatus.phase,'error');
   assert.equal((await js(chat,"companion.capture({provider:'codex',cwd:'fixture',threadId:'fixture'})")).ok,true);
   await js(chat,'companion.capture(null)');assert.equal((await js(chat,'companion.playbackState(true)')).ok,true);await js(chat,'companion.playbackState(false)');
   await js(workbench,"companion.wallpaperControl('retry-audio')");

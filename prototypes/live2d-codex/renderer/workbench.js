@@ -38,15 +38,14 @@ function markSettingsDirty(dirty) {
   settingsDirty = dirty;
   if (dirty) {
     settingsRevision++;
-    if ($('notice').dataset.confirmation === 'true') notice('');
+    $('settings-save-status').textContent = '';
   }
   $('save-settings').hidden = !dirty;
 }
 const node = (tag, text, cls) => { const n = document.createElement(tag); if (text !== undefined) n.textContent = text; if (cls) n.className = cls; return n; };
 for (const [id, voice] of Object.entries(characters.QWEN_VOICES)) $('qwen-voice').append(Object.assign(node('option', voice.label), { value: id }));
-function notice(text, confirmation = false) {
+function notice(text) {
   clearTimeout(noticeTimer);
-  $('notice').dataset.confirmation = String(confirmation);
   $('notice').textContent = text;
   $('notice').hidden = !text;
   if (text) noticeTimer = setTimeout(() => $('notice').hidden = true, 10000);
@@ -288,7 +287,11 @@ async function saveSettings() {
   if (revision === settingsRevision) markSettingsDirty(false);
   acceptWorkspace(saved);
   const warning = workspace.shortcutErrors?.join(' ');
-  if (warning || revision === settingsRevision) notice(warning || '设置已保存。', !warning);
+  if (warning) notice(warning);
+  else if (revision === settingsRevision) {
+    notice('');
+    $('settings-save-status').textContent = '设置已保存';
+  }
 }
 async function refreshWorkspace() {
   acceptWorkspace(await run(api.workspace()));

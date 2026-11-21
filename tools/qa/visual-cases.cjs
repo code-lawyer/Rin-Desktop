@@ -149,6 +149,10 @@ module.exports=async function visualCases({open,evaluate,delay,output,extended=f
     await evaluate(workbench,`document.querySelector('[data-setting-target="${group}"]').click();document.querySelector('.settings-scroll').scrollTop=0`);
     await capture(workbench,group+'-standard',1120,760);
     await capture(workbench,group+'-compact',760,540);
+    if(group==='wallpaper-settings') {
+      await reachable(workbench,'the default compact wallpaper view shows the pose selector and pause control',
+        ['#still-pose','#pause-stills'],{withoutScrolling:true});
+    }
   }
   await evaluate(workbench,`document.querySelector('[data-setting-target="wallpaper-settings"]').click();document.querySelector('[name="wallpaper-style"]').focus();interfaceFixture.emit('remoteAction','down')`);
   await capture(workbench,'character-focus',1120,760);
@@ -157,6 +161,8 @@ module.exports=async function visualCases({open,evaluate,delay,output,extended=f
   await verify(workbench,'editing a deferred setting exposes save',"!document.getElementById('save-settings').hidden");
   await evaluate(workbench,"document.getElementById('save-settings').click()");
   await wait(workbench,"document.getElementById('save-settings').hidden");
+  await verify(workbench,'save confirmation is inline and leaves the workbench unobstructed',
+    "document.querySelector('.page-heading [role=status]').textContent==='设置已保存' && document.getElementById('notice').hidden");
   await evaluate(workbench,`document.querySelector('[data-setting-target="wallpaper-settings"]').click()`);
   await evaluate(workbench,`document.getElementById('still-previews').scrollIntoView({block:'center'})`);
   await capture(workbench,'pose-previews-standard',1120,760);
