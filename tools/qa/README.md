@@ -19,7 +19,7 @@
 | `npm run qa:remote-component` | 编译 RC003 组件、管道与输入绑定加载，不扫描或连接设备 |
 | `npm run qa:data-agent` | 立即执行合成协议与数据契约检查，创建报告目录 |
 | `npm run qa:installer -- -Run -Setup "<测试 Setup>" -PreviousSetup "<旧测试 Setup>" -Lifecycle` | 标准用户下提取、注册、升级、卸载；仅当同 AppId/快捷方式不存在时运行注册检查。安装目录在本次 QA 输出内，不启动账户或硬件 |
-| `npm run qa:upgrade-data -- --run --setup="<测试 Setup>" --previous-setup="<旧正式 Setup>" --source="<已关闭的真实数据副本>"` | 在隔离路径实际运行旧包、升级包和回退包，核对项目、会话入口、设置及草稿；运行副本关闭模型、遥控器和环境音 |
+| `npm run qa:upgrade-data -- --run --setup="<候选 Setup>" --previous-setup="<旧 Setup>" --source="<已关闭的数据副本>"` | 在隔离路径运行旧包、覆盖升级包和从升级前备份回退的旧包，核对项目和草稿。加 `--release-channel` 测试两份正式通道安装器。运行副本关闭模型、遥控器和环境音，应用安装不注册 |
 | `npm run qa:data-copy -- --run --package="<测试包目录>" --source="<已关闭的应用数据>"` | 完整副本逐文件哈希、数据目录验证、损坏副本恢复与包内工作台启动；源应用必须完全退出。原目录不写入，运行副本禁用 RC003 自动连接 |
 | `npm run qa:release-soak -- --run --package="<测试包目录>" --seconds=1800` | 实际包连续渲染，切姿态/风格、暂停恢复、WebGL 和堆内存检查；隐藏窗口不等于桌面挂载、系统 DPI 或整夜稳定性 |
 | `npm run qa:agent-desktop -- --run --package="<测试包目录>" --provider=codex --turns=20` | 使用现有真实认证完成固定任务、流式中断、历史与重启草稿恢复；provider 可选 grok。会产生模型用量和原生 CLI 测试会话 |

@@ -7,7 +7,7 @@ import { join, resolve, relative, isAbsolute } from 'node:path';
 import { createRunDirectory, writeRunReport } from './run-output.mjs';
 import { inspectMotionAssets } from '../release/motion-assets.mjs';
 import { inspectPuppetAssets } from '../release/puppet-assets.mjs';
-import { retiredWallpaperAsset } from '../release/resource-assets.mjs';
+import { retiredWallpaperAsset, sourceAvatarAsset } from '../release/resource-assets.mjs';
 
 const option = key => process.argv.find(arg => arg.startsWith(`--${key}=`))?.slice(key.length + 3);
 if (!option('package') || process.argv.includes('--help')) {
@@ -40,6 +40,7 @@ for (const entry of manifest.files) {
   assert.ok(inside && !inside.startsWith('..') && !isAbsolute(inside), 'Unsafe package path');
   assert.ok(!names.has(entry.file) && !forbidden.test(entry.file), 'Unexpected or duplicate package file: ' + entry.file);
   names.add(entry.file);
+  assert.ok(!sourceAvatarAsset(entry.file), 'Source-only Live2D file in package: ' + entry.file);
   assert.equal((await stat(file)).size, entry.bytes, entry.file);
   assert.equal(await hash(file), entry.sha256, entry.file);
   bytes += entry.bytes;
@@ -55,6 +56,8 @@ for (const entry of manifest.files) {
 for (const script of wallpaperScripts) assert.ok(names.has('resources/app/' + script), 'Missing wallpaper helper: ' + script);
 assert.ok(names.size > 100 && sourceMatches > 20);
 assert.equal(bytes, manifest.bytes);
+const licenseIndex = await json(join(directory, 'licenses/SOURCES.json'));
+assert.ok(licenseIndex.every(entry => !sourceAvatarAsset(`licenses/${entry.file}`)), 'Source-only Live2D entries in the package license index');
 // Installed instructions must resolve locally or point to a public web page.
 const guide = await readFile(join(directory, 'CLI-AGENTS.md'), 'utf8');
 for (const [, target] of guide.matchAll(/\[[^\]]*\]\(([^)]+)\)/g)) {
@@ -83,6 +86,6 @@ if (option('baseline')) {
   }
   assert.ok(preserved > 10);
 }
-const report = {version:manifest.version,files:names.size,bytes,sourceMatches,motionMediaFiles:motion.names.length,animeVideoExcluded:true,puppetFiles:puppet.names.length,preservedArtworkAndCpuFiles:preserved,noModelsCredentialsOrCli:true,accounts:false,hardware:false,passed:true};
+const report = {version:manifest.version,files:names.size,bytes,sourceMatches,motionMediaFiles:motion.names.length,animeVideoExcluded:true,sourceAvatarExcluded:true,puppetFiles:puppet.names.length,preservedArtworkAndCpuFiles:preserved,noModelsCredentialsOrCli:true,accounts:false,hardware:false,passed:true};
 await writeRunReport(output,report);
 console.log(JSON.stringify({output,...report}));

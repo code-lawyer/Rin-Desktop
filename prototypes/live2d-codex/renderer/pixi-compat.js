@@ -1,4 +1,4 @@
-// Adapted from Agent Avatar's MIT-licensed desktop/src/pixi.ts.
+// Adapted from Agent Avatar's desktop/src/pixi.ts under licenses/agent-avatar-LICENSE.
 // Pixi's static shader polyfills avoid eval under the renderer's strict CSP.
 import 'pixi.js/unsafe-eval';
 import { loadTextures, TextureSource } from 'pixi.js';

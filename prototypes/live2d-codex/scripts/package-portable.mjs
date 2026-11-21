@@ -6,7 +6,7 @@ import { writeManifest } from '../../../tools/release/manifest.mjs';
 import { releaseVersion, requireFreshDirectory, reserveFreshDirectory } from '../../../tools/release/release-inputs.mjs';
 import { inspectMotionAssets, copyMotionAssets } from '../../../tools/release/motion-assets.mjs';
 import { inspectPuppetAssets, copyPuppetAssets } from '../../../tools/release/puppet-assets.mjs';
-import { retiredWallpaperAsset } from '../../../tools/release/resource-assets.mjs';
+import { retiredWallpaperAsset, sourceAvatarAsset } from '../../../tools/release/resource-assets.mjs';
 import { copyAgentDependencies } from './copy-agent-dependencies.mjs';
 import catalog from '../backend/agent-catalog.cjs';
 import { buildRemoteHelper } from '../backend/remote-native.mjs';
@@ -25,12 +25,14 @@ const puppetDirectory = join(root, 'assets/scene/rin-poses');
 await inspectPuppetAssets(puppetDirectory);
 await reserveFreshDirectory(output);
 const appDir = join(output,'resources/app'); await mkdir(appDir,{recursive:true});
-const clean = source => !/(^|[/\\])(__pycache__|cache|\.cache|\.git)([/\\]|$)/.test(relative(resources,source)) && !/\.(pyc|pyo|log|tmp)$/.test(source);
 await cp(join(root,'node_modules/electron/dist'),output,{recursive:true,filter:src=>!src.endsWith('electron.exe')});
 await cp(join(root,'node_modules/electron/dist/electron.exe'),join(output,'VibeVoice.exe'));
 for (const file of ['main.cjs','preload.cjs','voice-resources.json']) await cp(join(root,file),join(appDir,file));
-for (const dir of ['backend','renderer','dist']) await cp(join(root,dir),join(appDir,dir),{recursive:true,filter:src=>!src.includes('__pycache__') && !src.endsWith('dots.mjs') && src!==join(root,'dist/avatar.js') && !/[/\\]anime-(catalog|player)\.mjs$/.test(src)});
-for (const dir of ['vendor']) await cp(join(resources,dir),join(appDir,dir),{recursive:true,filter:clean});
+for (const dir of ['backend','renderer','dist']) await cp(join(root,dir),join(appDir,dir),{
+  recursive:true,
+  filter:src=>!src.includes('__pycache__') && !src.endsWith('dots.mjs') &&
+    !sourceAvatarAsset(join('resources/app', relative(root, src))) && !/[/\\]anime-(catalog|player)\.mjs$/.test(src),
+});
 await mkdir(join(appDir,'runtime'),{recursive:true});
 await cp(await buildRemoteHelper(join(root,'native/rc003-helper.cs'),join(workspace,'work/build/remote')),join(appDir,'runtime/rc003-helper.exe'));
 await cp(join(resources,'runtime/node.exe'),join(appDir,'runtime/node.exe'));
@@ -55,7 +57,14 @@ const cliGuide = (await readFile(join(root,'CLI-AGENTS.md'),'utf8'))
 await writeFile(join(output,'CLI-AGENTS.md'), cliGuide);
 await cp(join(root,'THIRD-PARTY-NOTICES.md'),join(output,'THIRD-PARTY-NOTICES.md'));
 await cp(join(workspace,'LICENSE'),join(output,'LICENSE-VibeVoice.txt'));
-await cp(join(root,'licenses'),join(output,'licenses'),{recursive:true});
+await cp(join(root,'licenses'),join(output,'licenses'),{
+  recursive:true,
+  filter:src=>!sourceAvatarAsset(relative(root, src)),
+});
+const licenseIndex = JSON.parse(await readFile(join(root, 'licenses/SOURCES.json'), 'utf8'));
+await writeFile(join(output, 'licenses/SOURCES.json'), JSON.stringify(
+  licenseIndex.filter(entry => !sourceAvatarAsset(`licenses/${entry.file}`)), null, 2,
+));
 execFileSync(join(appDir,'runtime/node.exe'),['--input-type=module','-e',`await import(${JSON.stringify(pathToFileURL(join(appDir,'backend/codex.mjs')).href)});await import(${JSON.stringify(pathToFileURL(join(appDir,'backend/resident-speech.mjs')).href)});`],{windowsHide:true,stdio:'pipe'});
 execFileSync(join(appDir,'runtime/node.exe'),['--input-type=module','-e',`const {default:input}=await import(${JSON.stringify(pathToFileURL(join(appDir,'backend/remote-input.cjs')).href)});new input.RemoteInput().initialize();await import(${JSON.stringify(pathToFileURL(join(appDir,'backend/remote-controller.mjs')).href)});`],{windowsHide:true,stdio:'pipe'});
 execFileSync(join(appDir,'runtime/rc003-helper.exe'),['--self-check'],{windowsHide:true,stdio:'pipe'});

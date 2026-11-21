@@ -54,7 +54,7 @@ RC003 输入层还使用锁定的 Koffi 3.3.3 和 `@koromix/koffi-win32-x64` 预
 npm run resources
 ```
 
-这条命令按 `tools/release/resource-manifest.json` 下载基础安装包，校验 SHA-256 后以不注册安装项的方式解包到 `work/release-resources/版本号`。不下载语音模型或 CLI。源码树缺失的运行时与 Core 目录会连接到解包目录；壁纸资源递归补齐缺失文件，已有文件保留，且不写入目录联接指向的其他位置。补齐后校验动态媒体的大小与哈希，不能只因目录或清单已存在就跳过视频。请先阅读第三方许可。
+这条命令按 `tools/release/resource-manifest.json` 下载基础安装包，校验 SHA-256 后以不注册安装项的方式解包到 `work/release-resources/版本号`。源码树缺失的运行时目录会连接到解包目录，壁纸资源递归补齐缺失文件，已有文件保留。补齐后校验动态媒体的大小与哈希。历史资源包若带有 Core，也可用于准备源码旧头像模式。
 
 当前清单锁定 0.6.3-rc.6 安装包，默认从保留的同版 Release 下载；已有同版安装包时可使用下列命令，仍须通过清单的大小和 SHA-256 校验，不能换成任意安装器。它仅提供锁定的视觉/基础运行资源，不会用安装包中的应用代码覆盖当前源码或 Electron 依赖。使用候选包提供资源不代表其已完成稳定版验收。
 
@@ -62,7 +62,7 @@ npm run resources
 npm run resources -- --installer="release/test-builds/v0.6.3-rc.6/Rin-Desktop-0.6.3-rc.6-Setup.exe"
 ```
 
-资源清单在安装器生成后更新到 `main`。从 Git 标签源码归档构建时，应先使用当前 `main` 的资源清单和本说明；标签保留安装器构建时的源码记录，可能仍包含已删除 Release 的历史资源链接。
+资源清单指向可下载的 GitHub 安装器。将新正式安装器加入清单前，先确认对应附件已公开且哈希一致。从 Git 标签源码归档构建时，应先使用当前 `main` 的资源清单和本说明。历史标签可能仍包含已删除的 Release 链接。
 
 准备好后，在仓库根目录运行：
 
@@ -75,7 +75,7 @@ npm start
 
 默认使用壁纸和上次选择的 Agent。`npm start -- --provider=codex` 可明确选择后端；`--project="项目路径"`、`--storage="数据路径"` 支持空格，相对路径以仓库根目录为准。参数名使用小写，未知参数会报错。源码默认沿用 `work/runtime/avatar`。在源码版选择已有数据副本时，选择记录也保存在该源码数据根，和安装版分开。显式 `--storage` 仍优先。双击入口等待构建及进程启动成功，失败时显示错误；启动器与应用日志均在 `work/runtime/launcher`。需要实时看错误时使用终端 `npm start`。切换已运行的安装版和源码版前先从托盘退出原实例。
 
-`npm run start:avatar` 需要本地旧 Hiyori 素材；`npm run start:dots` 需要本地私人桥接。它们不构成公开安装版的新功能。`npm run remote:diagnose` 是需要单独准备环境的硬件诊断，不会随正常启动自动运行。
+`npm run start:avatar` 需要本地旧 Hiyori 素材和 `prototypes/live2d-codex/vendor/live2dcubismcore.min.js`。需要手动准备时，请从 [Live2D Cubism SDK for Web](https://www.live2d.com/en/sdk/download/web/) 获取并保留其许可。`npm run start:dots` 需要本地私人桥接。`npm run remote:diagnose` 需要单独准备硬件环境。
 
 壁纸风格切换回归先运行 `npm run build`，再执行 `npm run qa:stills -- --character-switch`。它使用生产页面、preload、真实存储与合成后端，在隔离 Electron 中验证当前图片失败、明确重试、声线保留、快速切换和新进程恢复；不需要 Playwright，不连接 CLI、账户或设备。结果保存在每次新建的 `work/qa/still-desktop/` 子目录，可追加 `--output=work/qa/新的目录`。旧 GUI character-switch 与 verify-character-switch 路径仍可带 `--run` 转发，默认仅帮助。旧 `--package` 已明确退役；安装包必须按当前发布验收清单单独验证，不能用源码 fixture 代替。动态媒体使用 `npm run qa:motion -- --run`。
 
@@ -86,7 +86,11 @@ $env:INNO_ISCC = 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe'
 npm run package
 ```
 
-打包始终写入新的版本目录，已有目录会被拒绝。输出独立基础安装器，先检查根目录与应用版本一致，并拒绝覆盖已有安装器输出，再将锁定哈希写入仓库内的 `tools/release/resource-manifest.json`，不将模型或 CLI 加入应用。运行源码可执行 `npm --prefix prototypes/live2d-codex start`；语音仍在应用内按需下载。
+打包要求根目录与应用版本一致，输出目录必须全新。`npm run package -- --preflight` 在 `work/qa/release-preflight/` 生成使用正式 AppId 的未签名预检包，文件名带 `Preflight`，适合本机隔离解包和兼容性检查。预检保留现有资源锁。预发布版本使用 `npm run package` 时仍更新资源锁。
+
+正式版本号使用 `X.Y.Z`。构建前配置两个环境变量。`RIN_RELEASE_SIGN_SCRIPT` 指向本机签名 PowerShell 脚本，脚本接受一个可执行文件路径，负责用发布者的代码签名身份签名并加时间戳，失败时应返回非零。`RIN_RELEASE_SUBJECT` 设为发布者证书的 Subject。签名脚本和签名服务配置放在本机受控位置。可接入 [Microsoft Artifact Signing](https://learn.microsoft.com/en-us/azure/artifact-signing/how-to-signing-integrations) 或其他 Windows 公开信任的代码签名服务。
+
+正式构建先签 `VibeVoice.exe` 和 `rc003-helper.exe` 再重建文件清单，随后由 Inno Setup 签安装器和卸载器。包外 `SHA256SUMS.txt` 绑定待验收安装器。完成 [正式候选包验收](../tools/release/TEST-ACCEPTANCE.md#正式候选包)后，把同一份安装器和对应源码归档发到该版本 Release。附件公开后可运行 `node tools/release/lock-resources.mjs` 将资源锁指向已发布安装器。
 
 当前两态动态分支还要求 `prototypes/live2d-codex/assets/motion/female/manifest.json` 与正式四段视频、两张回退图。清单沿用播放器的 `format: 1`、`clips`、`posters`，并增加 `integrity`：以六个媒体文件名为键，记录各自的正整数字节数 `bytes` 与小写 SHA-256 `sha256`。四个片段ID为 `work-loop`、`work-user`、`user-loop`、`user-work`；每个条目包含独立的 `.mp4` 文件名、实际 `duration` 与 `fps`，两张 `.png` 由 `posters.work/user` 指定。
 

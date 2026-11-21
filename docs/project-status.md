@@ -1,6 +1,6 @@
 # 当前项目状态
 
-当前候选版本为 [0.6.3-rc.8](https://github.com/code-lawyer/Rin-Desktop/releases/tag/v0.6.3-rc.8)。本版修复壁纸渲染器停止后的姿态菜单状态，并调整紧凑工作台的壁纸选项和设置保存反馈。测试版使用独立安装和数据目录。下载页同时提供安装器与第三方对应源码，构建资源按仓库清单单独校验。
+当前候选版本为 [0.6.3-rc.9](https://github.com/code-lawyer/Rin-Desktop/releases/tag/v0.6.3-rc.9)。本版精简安装包的旧 Live2D 依赖，并加强旧版数据升级和回退验收。测试版使用独立安装和数据目录。下载页同时提供安装器与第三方对应源码，构建资源按仓库清单单独校验。
 
 当前源码已兼容仅声明 `sessionCapabilities.resume` 的 ACP Agent：优先 load 回放，否则 resume 恢复原上下文并保留本机显示缓存；能力不足、恢复失败与认证错误分别提示。本机缓存不作为远端送达证据，不确定发送仍保留原稿。离线协议回归覆盖连续重连、消息及完成状态、失败时存储保护和其他 ACP Agent 的 load 路径；这项修复纳入 0.6.3-rc.4；真实 Agent 多轮上下文、GUI 完整退出重开和系统重启仍待独立验收。
 
@@ -28,7 +28,7 @@ Codex/Grok 的实际界面审批允许、拒绝和审批中停止，以及所属
 
 包内 Kokoro 与 SenseVoice 的 CPU 推理、现有 Qwen 的应用内推理已运行；使用的是固定合成音频，没有做麦克风或主观音质验收，识别仍出现个别错字。缺 CLI/模型、下载取消/失败、绘图中断及隐藏子进程 CUDA 的错误路径已验证；后几项使用明确的故障注入，不代替真实无 GPU 或网络环境矩阵。
 
-尚待完成：RC003 至少 100 次录音、50 条短语、200 次操作及 IME/键盘共存、音量与休眠重连；Claude 与 OpenCode 配置认证后的真实任务，以及各 CLI 矩阵尚未覆盖的交互；Windows 系统 DPI/锁屏/Explorer 恢复；新机器安装与持续使用；最终视觉认可、发布范围及许可复核。安装器仍未签名。执行时使用 [验收清单](../tools/release/TEST-ACCEPTANCE.md)，没有证据的栏位保留未测。
+rc.9 延续未签名预发布方式。当前源码提供 Authenticode 正式构建入口，正式候选包仍需要可用的发布者签名、分发许可复核和干净 Windows 的安装、升级、数据迁移、卸载及回退验收。Windows 系统 DPI、锁屏、Explorer 恢复、持续使用与视觉认可待补齐。Codex 及其他 CLI 的未覆盖交互按各自支持范围验收。RC003 的录音、按键、IME 共存、休眠重连矩阵仍未完成。执行时使用 [验收清单](../tools/release/TEST-ACCEPTANCE.md)。
 
 主应用保留 `prototypes/live2d-codex` 路径，源码默认数据为 `work/runtime/avatar`。模型、runtime、原始美术和私人 Dots 不进入公开源码。可复用验证在 `tools/qa` 与 `tools/probes`，运行输出在忽略的 `work/qa`。独立 `prototypes/video-companion` 的播放器仍被当前动态壁纸复用，不能按旧原型名称整目录删除。
 

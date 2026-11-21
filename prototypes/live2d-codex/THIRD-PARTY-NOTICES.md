@@ -11,9 +11,8 @@ Original application source is MIT. This distribution includes separately licens
 | Claude Agent SDK | `@anthropic-ai/claude-agent-sdk` 0.3.240; governed by [Anthropic Commercial Terms](https://www.anthropic.com/legal/commercial-terms), with the upstream README retained in the packaged dependency; native CLI optional packages are excluded |
 | Agent Client Protocol SDK | `@agentclientprotocol/sdk` 1.9.0; Apache-2.0; license retained in the packaged dependency |
 | Koffi | 3.3.3; MIT; Windows x64 prebuilt FFI for application-local input handling; `licenses/koffi-LICENSE.txt` and the source package's notices retained in this distribution |
-| PixiJS, marked, pixi-live2d-display | MIT; copies in `licenses/` |
+| marked | MIT; `licenses/marked-LICENSE` |
 | Rin animated painting | Project-generated complete scene and registered expression crops; artwork terms in `resources/app/assets/scene/rin-poses/README.md`; custom WebGL2 renderer and integration use the project MIT license; no LivLiv runtime or sample characters are bundled |
-| Live2D Cubism Core | Proprietary; unmodified runtime, `vendor/LICENSE-CubismCore.md` and `licenses/live2d-proprietary-agreement.html` |
 | Rainy-window scene | Project-generated artwork and custom rig; permitted for display, modification and redistribution with this application; no claim of exclusive rights over generated imagery |
 | Sherpa-onnx | 1.13.8; Apache-2.0 source with GPL-3.0-or-later eSpeak NG statically included in native speech binaries; see corresponding-source attachment |
 | ONNX Runtime | Model runtime licenses and third-party notices in `licenses/onnxruntime-*` |
@@ -27,9 +26,9 @@ Original application source is MIT. This distribution includes separately licens
 
 Hiyori and earlier scene revisions are not included in the public installer. No account credentials, personal sessions or voice recordings are bundled. Voice models and the Qwen Python runtime are separate optional downloads. Qwen remains unloaded until enabled.
 
-Rin Desktop 0.6.3-rc.4 retains the CPU speech components and independent worker from 0.3.1 unchanged. Their corresponding-source materials are available alongside the installer on the [current release page](https://github.com/code-lawyer/Rin-Desktop/releases/tag/v0.6.3-rc.4). Download `Third-Party-Corresponding-Source-0.3.1.zip` for the exact Sherpa tag, eSpeak/piper pins, native build files, dependencies and worker source. The archive version identifies the unchanged CPU speech components. These native components retain their licenses and modification rights; this project's MIT license does not replace them. Application users do not need this archive to install or run Rin Desktop.
+Rin Desktop retains the CPU speech components and independent worker from 0.3.1. Download `Third-Party-Corresponding-Source-0.3.1.zip` from the [Rin Desktop release](https://github.com/code-lawyer/Rin-Desktop/releases/tag/v0.6.3-rc.9) for the exact Sherpa tag, eSpeak/piper pins, native build files, dependencies and worker source. The archive version identifies the CPU speech components. Recipients retain their modification and redistribution rights under the applicable licenses.
 
-The CPU speech worker and linked Sherpa/eSpeak native components are conveyed as a GPL-3.0-or-later combination, with upstream Apache/MIT/BSD notices preserved. Recipients may modify, rebuild and redistribute that component under the GPL; the original MIT source files may also be used separately under MIT. The desktop/Live2D component is a separate program, communicating with the Node speech worker through JSON text and PCM. GPL and LGPL components are provided without warranty; see their full license texts. The corresponding-source archive includes the same-version worker source and build material.
+The CPU speech worker and linked Sherpa/eSpeak native components are conveyed as a GPL-3.0-or-later combination, with upstream Apache/MIT/BSD notices preserved. Recipients may modify, rebuild and redistribute that component under the GPL. The original MIT source files may also be used separately under MIT. The desktop application communicates with the independent Node speech worker through JSON text and PCM. GPL and LGPL components are provided without warranty. See their full license texts in `licenses/`.
 
 The Qwen Python environment, including its audio DLLs, is installed directly from upstream when requested by the user. It is not redistributed in the base installer or the project's release assets. Its packages keep their upstream licenses and notices.
 

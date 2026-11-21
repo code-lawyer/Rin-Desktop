@@ -19,7 +19,15 @@ AppId={{215174A1-C028-4225-947F-9B15787E578D}
 AppName=Rin Desktop
 DefaultDirName={localappdata}\Programs\RinDesktop
 DefaultGroupName=Rin Desktop
+#ifdef ReleasePreflight
+OutputBaseFilename=Rin-Desktop-{#Version}-Preflight-Setup
+#else
 OutputBaseFilename=Rin-Desktop-{#Version}-Setup
+#endif
+#endif
+#ifdef SignRelease
+SignTool=RinRelease
+SignedUninstaller=yes
 #endif
 AppVersion={#Version}
 AppPublisher=code-lawyer
@@ -46,11 +54,21 @@ Name: "desktopicon"; Description: "Create a desktop shortcut"; Flags: checkedonc
 [Files]
 Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 [InstallDelete]
-; Remove only the three retired application-owned artwork paths on upgrade.
-; User workspaces, models and other compatibility assets remain outside this list.
+; Retire only named files and folders owned by older application installers.
 Type: filesandordirs; Name: "{app}\resources\app\assets\rainy-window-male"
 Type: filesandordirs; Name: "{app}\resources\app\assets\stills\male"
 Type: files; Name: "{app}\resources\app\assets\character-previews\male.png"
+Type: files; Name: "{app}\resources\app\vendor\live2dcubismcore.min.js"
+Type: files; Name: "{app}\resources\app\vendor\LICENSE-CubismCore.md"
+Type: files; Name: "{app}\resources\app\vendor\LICENSE-AgentAvatar"
+Type: dirifempty; Name: "{app}\resources\app\vendor"
+Type: files; Name: "{app}\resources\app\renderer\avatar.js"
+Type: files; Name: "{app}\resources\app\renderer\pixi-compat.js"
+Type: files; Name: "{app}\resources\app\renderer\wallpaper.js"
+Type: files; Name: "{app}\resources\app\dist\avatar.js"
+Type: files; Name: "{app}\licenses\live2d-proprietary-agreement.html"
+Type: files; Name: "{app}\licenses\pixi-LICENSE"
+Type: files; Name: "{app}\licenses\pixi-live2d-LICENSE"
 [Icons]
 #ifdef TestBuild
 Name: "{group}\Rin Desktop Test"; Filename: "{app}\VibeVoice.exe"; Check: not IsPortableMode

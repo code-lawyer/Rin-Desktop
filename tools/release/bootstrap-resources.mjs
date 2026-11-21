@@ -35,7 +35,11 @@ const installer=manifest.files.find(file=>file.file.endsWith('.exe'));
 execFileSync(join(cache,installer.file),['/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/PORTABLE=1','/TASKS=',`/DIR=${target}`],{windowsHide:true,stdio:'inherit'});
 for(const name of ['runtime','vendor']) {
   const dest=join(root,'prototypes/live2d-codex',name);
-  try { await access(dest); } catch(error) { if(error.code!=='ENOENT')throw error; await symlink(join(target,'resources/app',name),dest,'junction'); }
+  const source=join(target,'resources/app',name);
+  if (name === 'vendor') {
+    try { await access(source); } catch (error) { if (error.code === 'ENOENT') continue; throw error; }
+  }
+  try { await access(dest); } catch(error) { if(error.code!=='ENOENT')throw error; await symlink(source,dest,'junction'); }
 }
 const assets=join(root,'prototypes/live2d-codex/assets');
 console.log(JSON.stringify(await fillMissingAssets(join(target,'resources/app/assets'),assets)));
