@@ -36,7 +36,6 @@ for (const dir of ['backend','renderer','dist']) await cp(join(root,dir),join(ap
 await mkdir(join(appDir,'runtime'),{recursive:true});
 await cp(await buildRemoteHelper(join(root,'native/rc003-helper.cs'),join(workspace,'work/build/remote')),join(appDir,'runtime/rc003-helper.exe'));
 await cp(join(resources,'runtime/node.exe'),join(appDir,'runtime/node.exe'));
-for (const name of ['rainy-window-v2-4k']) await cp(join(resources,'assets',name),join(appDir,'assets',name),{recursive:true});
 for (const name of ['character-previews','stills','ambience']) await cp(join(root,'assets',name),join(appDir,'assets',name),{
   recursive:true, filter:source=>!retiredWallpaperAsset(relative(join(root,'assets'),source)),
 });

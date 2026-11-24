@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { EventEmitter } from 'node:events';
 import { mkdir, mkdtemp, rm, writeFile, stat } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { join, resolve, sep, dirname } from 'node:path';
 import { VoiceResources, validateResourceManifest } from '../backend/voice-resources.mjs';
 import { readFileSync } from 'node:fs';
@@ -12,7 +13,7 @@ const body=Buffer.from('test-verified-resource'),sha256=createHash('sha256').upd
 const template=JSON.parse(readFileSync(new URL('../voice-resources.json',import.meta.url)));
 const manifest=()=>{const m=structuredClone(template);m.version='0.3.0';for(const p of m.packs){p.files=[{path:'fixture.bin',file:p.modelDirectory+'/fixture.bin',bytes:body.length,sha256,url:'https://huggingface.co/'+p.repo+'/resolve/'+p.revision+'/fixture.bin'}];p.required=[p.files[0].file];p.unpackedBytes=100;if(p.runtime){p.runtime.extraDiskBytes=0;for(const f of p.runtime.files)Object.assign(f,{bytes:body.length,sha256});}}return m;};
 const fixturePath=(path)=>join(path,'downloads/asr-hf-0.3.0',manifest().packs[0].files[0].file);
-async function directory(t){const base=resolve(import.meta.dirname,'../../../work/runtime/voice-resource-tests');await mkdir(base,{recursive:true});const path=await mkdtemp(join(base,'case-'));assert.ok(path.startsWith(base+sep));t.after(()=>rm(path,{recursive:true,force:true}));return path;}
+async function directory(t){const base=resolve(tmpdir());const path=await mkdtemp(join(base,'rin-voice-resources-'));assert.ok(path.startsWith(base+sep));t.after(()=>rm(path,{recursive:true,force:true}));return path;}
 async function install(pack,_cache,path){for(const f of pack.required){await mkdir(dirname(join(path,f)),{recursive:true});await writeFile(join(path,f),body);}}
 test('locked resources reject arbitrary hosts, traversal and duplicate components',()=>{
   for(const change of [m=>m.packs[0].files[0].url='https://example.com/asr.exe',m=>m.packs[0].required=['../outside'],m=>m.packs[0].files[0].file='../bad.exe',m=>m.packs[1].id='asr']){const m=manifest();change(m);assert.throws(()=>validateResourceManifest(m));}

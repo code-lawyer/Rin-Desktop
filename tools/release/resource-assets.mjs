@@ -7,8 +7,27 @@ import { join, relative } from 'node:path';
 export const retiredWallpaperAsset = path => /^(?:rainy-window-male(?:\/|$)|stills\/male(?:\/|$)|character-previews\/male\.png$)/i.test(path.replaceAll('\\', '/'));
 
 const sourceAvatarFiles = new Set([
+  'resources/app/backend/video-catalog.mjs',
+  'resources/app/backend/video-media.mjs',
+  'resources/app/backend/wallpaper-state.cjs',
+  'resources/app/renderer/action-assets.mjs',
+  'resources/app/renderer/action-motion.mjs',
+  'resources/app/renderer/action-rig.mjs',
   'resources/app/renderer/avatar.js',
   'resources/app/renderer/pixi-compat.js',
+  'resources/app/renderer/rig-warp.mjs',
+  'resources/app/renderer/scene-player.mjs',
+  'resources/app/renderer/still-preview.css',
+  'resources/app/renderer/still-preview.html',
+  'resources/app/renderer/still-preview.mjs',
+  'resources/app/renderer/still-scene-compose.mjs',
+  'resources/app/renderer/still-scene-preview.css',
+  'resources/app/renderer/still-scene-preview.html',
+  'resources/app/renderer/still-scene-preview.mjs',
+  'resources/app/renderer/typing-motion.mjs',
+  'resources/app/renderer/video-state.mjs',
+  'resources/app/renderer/video-wallpaper.js',
+  'resources/app/renderer/wallpaper-scenes.mjs',
   'resources/app/renderer/wallpaper.js',
   'resources/app/dist/avatar.js',
   'licenses/agent-avatar-LICENSE',
@@ -18,7 +37,13 @@ const sourceAvatarFiles = new Set([
 ]);
 export function sourceAvatarAsset(path) {
   const name = path.replaceAll('\\', '/');
-  return name === 'resources/app/vendor' || name.startsWith('resources/app/vendor/') || sourceAvatarFiles.has(name);
+  return (
+    name === 'resources/app/vendor' ||
+    name.startsWith('resources/app/vendor/') ||
+    name === 'resources/app/assets/rainy-window-v2-4k' ||
+    name.startsWith('resources/app/assets/rainy-window-v2-4k/') ||
+    sourceAvatarFiles.has(name)
+  );
 }
 
 async function inspect(path) {

@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdir, mkdtemp, rm, readFile, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { resolve, join, sep } from 'node:path';
 import { WorkspaceStore, draftKey } from '../backend/workspace-store.mjs';
 import { CodexCompanion } from '../backend/codex.mjs';
@@ -8,7 +9,7 @@ import { speechChunks } from '../renderer/speech-ui.js';
 import { LocalSpeech } from '../backend/speech.mjs';
 import { currentReply } from '../renderer/current-reply.mjs';
 async function fixture(t) {
-  const root = resolve(import.meta.dirname, '../../../work/qa/workbench-unit-tests'); await mkdir(root,{recursive:true}); const dir = await mkdtemp(join(root,'case-')); if (!dir.startsWith(root+sep)) throw new Error('Unexpected fixture path');
+  const root = resolve(tmpdir()); const dir = await mkdtemp(join(root,'rin-workbench-')); if (!dir.startsWith(root+sep)) throw new Error('Unexpected fixture path');
   t.after(() => rm(dir,{recursive:true,force:true})); const store = new WorkspaceStore(dir); await store.load(); const second = join(dir,'second'); await mkdir(second); return {dir,second,store};
 }
 test('project removal never deletes files; drafts remain isolated across projects and threads after restart',async t => {

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, writeFile, readFile, rm, symlink, access } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { fillMissingAssets } from '../tools/release/resource-assets.mjs';
+import { fillMissingAssets, sourceAvatarAsset } from '../tools/release/resource-assets.mjs';
 
 async function fixture(t){
   const root=await mkdtemp(join(tmpdir(),'rin-resource-assets-'));
@@ -51,4 +51,26 @@ test('restoring an old installer excludes retired male artwork and retains both 
   await fillMissingAssets(source,destination);
   for(const name of retired)await assert.rejects(access(join(destination,name)),{code:'ENOENT'});
   for(const name of current)assert.equal(await readFile(join(destination,name),'utf8'),'fixture');
+});
+
+test('source-only Live2D and authoring preview files stay excluded from packaged releases', () => {
+  for (const excluded of [
+    'resources/app/assets/rainy-window-v2-4k',
+    'resources/app/assets/rainy-window-v2-4k/model3.json',
+    'resources/app/vendor/live2dcubismcore.min.js',
+    'resources/app/renderer/action-rig.mjs',
+    'resources/app/renderer/still-preview.html',
+    'resources/app/renderer/video-wallpaper.js',
+    'resources/app/backend/video-catalog.mjs',
+  ]) {
+    assert.equal(sourceAvatarAsset(excluded), true, excluded);
+  }
+  for (const retained of [
+    'resources/app/assets/scene/rin-poses/scene.png',
+    'resources/app/renderer/app.js',
+    'resources/app/renderer/pcm-worklet.js',
+    'resources/app/backend/codex.mjs',
+  ]) {
+    assert.equal(sourceAvatarAsset(retained), false, retained);
+  }
 });
