@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdir, mkdtemp, readFile, writeFile, rm, access } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { resolve, join, sep } from 'node:path';
 import { WorkspaceStore } from '../backend/workspace-store.mjs';
 import { QwenSpeech } from '../backend/qwen-speech.mjs';
@@ -8,9 +9,8 @@ import { speechProfile } from '../backend/speech-plan.mjs';
 import { WallpaperScenes } from '../renderer/wallpaper-scenes.mjs';
 
 async function fixture(t) {
-  const base = resolve(import.meta.dirname, '../../../work/runtime/character-tests');
-  await mkdir(base, { recursive: true });
-  const dir = await mkdtemp(join(base, 'case-'));
+  const base = resolve(tmpdir());
+  const dir = await mkdtemp(join(base, 'rin-character-'));
   assert.ok(dir.startsWith(base + sep));
   t.after(() => rm(dir, { recursive: true, force: true }));
   const store = new WorkspaceStore(dir); await store.load();

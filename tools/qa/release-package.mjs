@@ -78,6 +78,7 @@ let preserved = 0;
 if (option('baseline')) {
   const previous = await json(join(resolve(option('baseline')), 'manifest.json'));
   for (const entry of previous.files.filter(item => /^resources\/app\/(assets\/|node_modules\/sherpa-onnx|backend\/speech-worker\.cjs$)/.test(item.file)
+    && !sourceAvatarAsset(item.file)
     && !retiredWallpaperAsset(item.file.replace(/^resources\/app\/assets\//, ''))
     && !item.file.startsWith('resources/app/assets/motion/anime/')
     && !revisedAssetMetadata.has(item.file.replace(/^resources\/app\//, '')))) {

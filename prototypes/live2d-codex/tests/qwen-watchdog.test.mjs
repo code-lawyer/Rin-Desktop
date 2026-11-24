@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {QwenSpeech, qwenPython, qwenAvailable} from '../backend/qwen-speech.mjs';
 import {mkdir, mkdtemp, writeFile, rm} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
 import {join, resolve, sep} from 'node:path';
 import {ResidentSpeech} from '../backend/resident-speech.mjs';
 
@@ -66,8 +67,8 @@ test('unloaded Qwen rejects synthesis without creating a dangling timed request'
 });
 
 test('portable Qwen works without the original virtual environment and prefers its own interpreter',async t=>{
-  const base=resolve(import.meta.dirname,'../../../work/qa/qwen-portable'); await mkdir(base,{recursive:true});
-  const root=await mkdtemp(join(base,'case-')); assert.ok(root.startsWith(base+sep));
+  const base=resolve(tmpdir());
+  const root=await mkdtemp(join(base,'rin-qwen-portable-')); assert.ok(root.startsWith(base+sep));
   t.after(()=>rm(root,{recursive:true,force:true}));
   for(const file of ['python/python.exe','.venv/Scripts/python.exe','models/Qwen3-TTS-12Hz-1.7B-CustomVoice/config.json','models/Qwen3-TTS-12Hz-1.7B-CustomVoice/model.safetensors','models/Qwen3-TTS-12Hz-1.7B-CustomVoice/speech_tokenizer/model.safetensors']){
     const dest=join(root,file); await mkdir(resolve(dest,'..'),{recursive:true}); await writeFile(dest,'fixture');
