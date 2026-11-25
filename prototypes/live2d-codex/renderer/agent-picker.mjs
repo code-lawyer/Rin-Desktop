@@ -1,8 +1,10 @@
 import catalog from '../backend/agent-catalog.cjs';
 
-export function populateAgentPicker(select, { dots = false, customAgents } = {}) {
-  if (customAgents) catalog.setCustomAgents(customAgents);
-  const choices = Object.entries(catalog.AGENTS).map(([id, spec]) => [id, spec.name + (spec.custom ? '（自定义 · 实验）' : spec.experimental ? '（实验）' : '')]);
+export function populateAgentPicker(select, { dots = false, annotate = true } = {}) {
+  const choices = Object.entries(catalog.AGENTS).map(([id, spec]) => {
+    const label = !annotate || !spec.experimental ? '' : id === 'claude' ? '（仅 API · 实验）' : '（实验）';
+    return [id, spec.name + label];
+  });
   if (dots) choices.push(['dots', '凛（Dots）']);
   const key = JSON.stringify(choices);
   if (select.dataset.agentChoices === key) return false;

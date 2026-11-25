@@ -55,6 +55,10 @@ Name: "desktopicon"; Description: "Create a desktop shortcut"; Flags: checkedonc
 Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 [InstallDelete]
 ; Retire only named files and folders owned by older application installers.
+Type: files; Name: "{app}\resources\app\backend\custom-agents.mjs"
+Type: files; Name: "{app}\resources\app\backend\agent-setup-prompt.mjs"
+Type: files; Name: "{app}\resources\app\renderer\custom-agent-settings.mjs"
+Type: filesandordirs; Name: "{app}\resources\app\node_modules\@anthropic-ai\claude-agent-sdk"
 Type: filesandordirs; Name: "{app}\resources\app\assets\rainy-window-male"
 Type: filesandordirs; Name: "{app}\resources\app\assets\rainy-window-v2-4k"
 Type: filesandordirs; Name: "{app}\resources\app\assets\stills\male"

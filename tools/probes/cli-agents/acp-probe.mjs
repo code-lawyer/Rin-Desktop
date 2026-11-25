@@ -1,24 +1,30 @@
 import { appDependency, outputRoot, requireLiveRun } from './paths.mjs';
-import { spawn, execFileSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
+import catalog from '../../../prototypes/live2d-codex/backend/agent-catalog.cjs';
+import { acpAgentEnvironment, agentCommand, spawnAgent, versionOf } from '../../../prototypes/live2d-codex/backend/agent-process.mjs';
 import { Readable, Writable } from 'node:stream';
 import { mkdir, writeFile, readFile, stat } from 'node:fs/promises';
 import { resolve, join, relative, isAbsolute } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { createSleeperFixture, waitForProbeSignal } from './fixture-control.mjs';
-requireLiveRun('node tools/probes/cli-agents/acp-probe.mjs grok|opencode --run [--full] [--only=test-name]');
+requireLiveRun('node tools/probes/cli-agents/acp-probe.mjs grok|antigravity|deepseek --run [--handshake | --full | --only=test-name]');
 const { ClientSideConnection, ndJsonStream } = await appDependency('@agentclientprotocol/sdk');
 
 const engine=process.argv[2];
-if(!['grok','opencode'].includes(engine))throw new Error('Usage: node acp-probe.mjs grok|opencode --run [--full]');
-const full=process.argv.includes('--full');
+if(catalog.AGENTS[engine]?.adapter!=='acp')throw new Error('Select grok, antigravity or deepseek.');
+const full=process.argv.includes('--full'), handshake=process.argv.includes('--handshake');
 const only=process.argv.find(a=>a.startsWith('--only='))?.slice(7).split(',');
+if ((full || only) && (handshake || engine !== 'grok')) throw new Error('Extended tool checks require Grok with prompts enabled.');
 const root=outputRoot;
 const runId=new Date().toISOString().replace(/[:.]/g,'-');
 const cwd=resolve(root,'fixtures',`${engine} 中文 path ${runId}`);
-const binary=engine==='grok'?(process.env.PROBE_GROK_BINARY||'grok.exe'):(process.env.PROBE_OPENCODE_BINARY||'opencode.exe');
+const childEnvironment=acpAgentEnvironment(engine);
+const override=process.env[`PROBE_${engine.toUpperCase()}_BINARY`];
+if (override) childEnvironment[catalog.AGENTS[engine].binaryEnv]=override;
+const {binary,args:binaryArgs}=agentCommand(engine,childEnvironment);
 const evidenceFile=resolve(root,'evidence',`${engine}-${runId}.json`);
 const nonce=`RIN-${randomUUID()}`;
-const report={engine,runId,cwd,sdk:'@agentclientprotocol/sdk@1.9.0',full,only,tests:[],events:[],processes:[],isolation:{scope:'Dedicated fixture and native CLI account/session storage; not an OS sandbox',approval:'Scripted allow_once/reject_once only; no durable grants',credentials:'Native CLI only; no credential file reads or token capture'}};
+const report={engine,runId,cwd,sdk:'@agentclientprotocol/sdk@1.9.0',full,only,handshake,tests:[],events:[],processes:[],isolation:{scope:'Dedicated fixture and native CLI account/session storage; not an OS sandbox',approval:'Scripted allow_once/reject_once only; no durable grants',credentials:'Native CLI only; no credential file reads or token capture'}};
 let client,stage='setup',policy='deny',active,inFlight,sessionId,pendingHold,sleeper,sleepCommand;
 const pause=ms=>new Promise(r=>setTimeout(r,ms));
 const safeError=e=>String(e?.message??e).replace(/(?:sk-ant-|xai-)[\w-]+/g,'[REDACTED]').replace(/Bearer\s+\S+/gi,'Bearer [REDACTED]').slice(0,1500);
@@ -29,11 +35,12 @@ function check(name,pass,details={}){const test={name,status:pass?'pass':'fail',
 function blocked(name,reason){const test={name,status:'blocked',reason};report.tests.push(test);console.log(JSON.stringify({test}));}
 async function timed(p,ms,label){let timer;try{return await Promise.race([p,new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error(`${label} timed out after ${ms}ms`)),ms);})]);}finally{clearTimeout(timer);}}
 function inside(path){if(typeof path!=='string')return false;const rel=relative(cwd,resolve(cwd,path));return !!rel&&!rel.startsWith('..')&&!isAbsolute(rel);}
-function guardCall(call){const input=call.rawInput??{};const command=input.command??input.cmd;const paths=(call.locations??[]).map(l=>l.path);for(const key of ['file_path','filePath','path'])if(typeof input[key]==='string')paths.push(input[key]);if(command){const dir=input.workdir??input.cwd??input.working_directory;return command===sleepCommand&&(!dir||resolve(dir)===cwd)&&input.is_background!==true&&input.run_in_background!==true;}if(paths.length)return paths.every(inside);return false;}
+function guardCall(call){const input=call.rawInput??{};const command=input.command??input.cmd;const paths=[...(call.locations??[]).map(l=>l.path),...(call.content??[]).filter(c=>c.type==='diff').map(c=>c.path)];for(const key of ['file_path','filePath','absolute_path','path'])if(typeof input[key]==='string')paths.push(input[key]);if(command){const dir=input.workdir??input.cwd??input.working_directory;return command===sleepCommand&&(!dir||resolve(dir)===cwd)&&input.is_background!==true&&input.run_in_background!==true;}if(paths.length)return paths.every(inside);return false;}
 const sessionMeta=engine==='grok'?{yoloMode:false,autoMode:false,'x.ai/hooks':{pre_tool_use:[{hookCallbackIds:['fixture-guard']}]}}:{};
 async function open(){
-  const args=engine==='grok'?['--no-auto-update','--permission-mode','default','--no-subagents','--disable-web-search','--tools','Read,Write,Edit,Bash,AskUserQuestion','agent','--no-leader','stdio']:['acp'];
-  const child=spawn(binary,args,{cwd,env:{...process.env,GROK_LOGIN_ENV:'0'},windowsHide:true,shell:false,stdio:['pipe','pipe','pipe']});
+  const args = [...catalog.AGENTS[engine].acpArgs];
+  if (engine === 'grok') args.splice(args.indexOf('agent'), 0, '--disable-web-search', '--tools', 'Read,Write,Edit,Bash,AskUserQuestion');
+  const child=spawnAgent(binary,[...binaryArgs,...args],cwd,childEnvironment);
   const record={pid:child.pid,startedAt:new Date().toISOString()};report.processes.push(record);
   let stderr='';child.stderr.on('data',b=>{record.stderrBytes=(record.stderrBytes??0)+b.length;stderr=(stderr+b.toString()).slice(-12000);});
   const exited=new Promise(resolveExit=>child.once('exit',(code,signal)=>{Object.assign(record,{exitCode:code,signal,exitedAt:new Date().toISOString()});resolveExit();}));
@@ -42,7 +49,6 @@ async function open(){
   client={child,record,close,stderrSummary:()=>safeError(stderr)};
   const conn=new ClientSideConnection(()=>({
     sessionUpdate({update}){
-      if(update.sessionUpdate==='session_info_update'&&update._meta?.['opencode/retry'])log('provider-retry',{retry:update._meta['opencode/retry']});
       if(update.sessionUpdate==='agent_message_chunk'&&update.content?.type==='text'){if(active){active.text+=update.content.text;active.chunks++;}else report.replayChunks=(report.replayChunks??0)+1;}
       if(['tool_call','tool_call_update'].includes(update.sessionUpdate))log('tool',{id:update.toolCallId,kind:update.kind,title:update.title,status:update.status});
     },
@@ -102,24 +108,29 @@ await mkdir(cwd,{recursive:true});await mkdir(resolve(root,'evidence'),{recursiv
 execFileSync('git.exe',['-c','init.defaultBranch=probe','init','--quiet',cwd],{windowsHide:true,stdio:'ignore'});
 await writeFile(join(cwd,'AGENTS.md'),'Isolated protocol validation only. Never access files outside this directory, credentials, network tools or subagents. Follow each single-step request exactly. Stop the current turn after a denied action; never retry or work around it. Later user turns may authorize separate independent tests.\n');
 await mkdir(join(cwd,'.grok'),{recursive:true});await writeFile(join(cwd,'.grok','config.toml'),'[ui]\npermission_mode = "ask"\nremember_tool_approvals = false\n[permission]\nask = ["Read", "Write", "Edit", "Bash"]\ndeny = ["Agent", "WebFetch", "WebSearch", "MCPTool(*)"]\n');
-await writeFile(join(cwd,'opencode.json'),JSON.stringify({snapshots:false,permissions:[{action:'*',resource:'*',effect:'deny'},...['read','edit','shell'].map(action=>({action,resource:'*',effect:'ask'})),{action:'question',resource:'*',effect:'allow'},{action:'external_directory',resource:'*',effect:'deny'}],policies:[{action:'integration.use',resource:'*',effect:'deny'}]},null,2));
 try{
-  report.cliVersion=execFileSync(binary,['--version'],{encoding:'utf8',windowsHide:true,timeout:15000}).trim();
-  if(engine==='opencode'){const listing=execFileSync(binary,['auth','list'],{encoding:'utf8',windowsHide:true,timeout:15000});report.existingAuthenticatedIntegration=!listing.includes('No authenticated integrations');if(!report.existingAuthenticatedIntegration)blocked('existing-login-reuse','Native auth list: No authenticated integrations. Free built-in model tests do not prove login reuse.');}
+  report.cliVersion=await versionOf(binary,binaryArgs,childEnvironment);
   await open();check('acp-initialize',true);await save();
   const session=await timed(client.conn.newSession({cwd,mcpServers:[],_meta:sessionMeta}),30000,'session/new');sessionId=session.sessionId;report.sessionId=sessionId;report.sessionConfiguration=session;log('session-created',{sessionId,configOptions:session.configOptions});await save();
   if(engine==='grok'){await client.conn.extNotification('_x.ai/yolo_mode_changed',{yolo_mode:false,auto_mode:false,permission_mode:'ask'});log('session-permission-override',{yolo_mode:false,auto_mode:false,scope:'Dedicated no-leader process only'});}
   let baseline;
-  try{baseline=await turn(`不要调用工具。记住本次会话标记 ${nonce}，用中文确认并原样重复标记。`,'login-stream');const ok=baseline.text.includes(nonce)&&baseline.chunks>0;check('native-model-stream',ok,{chunks:baseline.chunks});if(engine==='grok')check('existing-login-reuse',ok,{authMethod:'cached_token'});}
+  if (!handshake) try{baseline=await turn(`不要调用工具。记住本次会话标记 ${nonce}，用中文确认并原样重复标记。`,'login-stream');const ok=baseline.text.includes(nonce)&&baseline.chunks>0;check('native-model-stream',ok,{chunks:baseline.chunks});if(engine==='grok')check('existing-login-reuse',ok,{authMethod:'cached_token'});}
   catch(e){report.blockedReason='native-request-failed';blocked('native-model-stream',safeError(e));}
   await save();
   if((full||only)&&baseline?.text.includes(nonce))await extended();
-  if(client.init.agentCapabilities?.sessionCapabilities?.list){const listed=await timed(client.conn.listSessions({cwd}),15000,'session/list');check('session-list',listed.sessions?.some(s=>s.sessionId===sessionId),{scopedCount:listed.sessions?.length});}
+  if (client.init.agentCapabilities?.sessionCapabilities?.list) {
+    const listed = await timed(client.conn.listSessions({ cwd }), 15000, 'session/list');
+    check('session-list', Array.isArray(listed.sessions), { includesActiveSession: listed.sessions?.some(item => item.sessionId === sessionId) });
+  }
   const oldPid=client.child.pid;await client.close();check('stdin-eof-process-exit',!client.record.forcedCleanup,{pid:oldPid,exitCode:client.record.exitCode});client=null;await save();
-  await open();stage='load-after-process-exit';report.replayChunks=0;
-  const loaded=await timed(client.conn.loadSession({sessionId,cwd,mcpServers:[],_meta:sessionMeta}),30000,'session/load');report.loadedConfiguration=loaded;check('session-load-after-process-exit',true,{replayChunks:report.replayChunks});
+  await open();stage='restore-after-process-exit';report.replayChunks=0;
+  const params={sessionId,cwd,mcpServers:[],_meta:sessionMeta};
+  const canLoad=client.init.agentCapabilities?.loadSession;
+  const restoreMethod=canLoad?'session/load':'session/resume';
+  const loaded=await timed(canLoad?client.conn.loadSession(params):client.conn.resumeSession(params),30000,restoreMethod);
+  report.loadedConfiguration=loaded;check('session-restore-after-process-exit',true,{restoreMethod,replayChunks:report.replayChunks});
   if(engine==='grok')await client.conn.extNotification('_x.ai/yolo_mode_changed',{yolo_mode:false,auto_mode:false,permission_mode:'ask'});
   if(baseline?.text.includes(nonce)){const resumed=await turn('不要读文件或使用工具。只输出本会话最开始记住的完整 RIN- 标记。','resume');check('resume-context',resumed.text.includes(nonce));}
-  else blocked('resume-context','Native model request unavailable; load handshake alone is not context continuity proof.');
+  else if (!handshake) blocked('resume-context','Native model request unavailable; load handshake alone is not context continuity proof.');
 }catch(e){report.fatalError=safeError(e);report.errorCode=e.code;report.errorData=e.data?JSON.parse(JSON.stringify(e.data)):undefined;log('probe-stopped',{error:report.fatalError,code:report.errorCode,data:report.errorData});if(client?.record.exitCode!==undefined)report.startupStderr=client.stderrSummary();process.exitCode=1;}
 finally{await sleeper?.close();if(client)await client.close();report.finishedAt=new Date().toISOString();process.exitCode=report.fatalError||report.tests.some(t=>t.status==='fail')?1:report.tests.some(t=>t.status==='blocked')?2:0;await save();console.log(JSON.stringify({evidenceFile,tests:report.tests,blockedReason:report.blockedReason,fatalError:report.fatalError}));}

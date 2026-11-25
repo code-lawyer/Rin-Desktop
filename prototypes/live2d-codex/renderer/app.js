@@ -148,9 +148,10 @@ function renderApproval(approvals) {
   heading.append(history); host.append(heading);
   const body = element('div', 'approval-body'); host.append(body);
   // Keep the operation and its scope ahead of explanatory prose and actions.
-  if (request.command || request.details) body.append(element('pre', 'approval-operation', request.command || request.details));
+  const operation = [request.command, request.paths?.join('\n')].filter(Boolean).join('\n');
+  if (operation || request.details) body.append(element('pre', 'approval-operation', operation || request.details));
   if (request.cwd) body.append(element('p', 'approval-directory', `目录：${request.cwd}`));
-  const explanation = [request.reason, request.command && request.details].filter(Boolean);
+  const explanation = [request.reason, operation && request.details].filter(Boolean);
   if (request.kind === 'questions') {
     if (request.reason) body.append(element('p', '', request.reason));
   } else if (explanation.length) {
@@ -232,6 +233,11 @@ function render(state) {
   $('cancel-login-button').hidden = !state.loginPending;
   $('provider-select').value = state.provider ?? 'codex';
   $('provider-select').disabled = sending || active || state.connection === 'connecting';
+  const claude = state.provider === 'claude';
+  $('provider-api-note').hidden = !claude;
+  $('provider-api-note').textContent = claude ? catalog.CLAUDE_API_NOTE : '';
+  if (claude) $('provider-select').setAttribute('aria-describedby', 'provider-api-note');
+  else $('provider-select').removeAttribute('aria-describedby');
   $('agent-context').hidden = dots; $('dots-help').hidden = !dots;
   $('open-dot').hidden = !dots; $('reconnect-dot').hidden = false;
   $('reconnect-dot').disabled = sending || active || state.connection === 'connecting';
@@ -240,7 +246,8 @@ function render(state) {
   $('bubble-status').hidden = !active && state.connection === 'ready';
   $('connection-signal').setAttribute('aria-label', $('bubble-status').textContent);
   $('connection-signal').title = $('bubble-status').textContent;
-  $('connection-label').textContent = dots ? (state.connection === 'ready' ? '已连接 · 私人 dot 通道' : 'Dots 连接需要处理') : state.connection === 'ready' ? `已连接 · ${codex ? '现有 ChatGPT 登录' : state.login || 'CLI 原生认证'}` : state.connection === 'authentication' ? `${name} 需要登录` : state.connection === 'error' ? `${name} 连接需要处理` : `正在连接 ${name}`;
+  const authentication = codex ? '现有 ChatGPT 登录' : state.login || (claude ? 'API 认证' : state.provider === 'deepseek' ? 'Harness ACP 配置' : 'CLI 原生认证');
+  $('connection-label').textContent = dots ? (state.connection === 'ready' ? '已连接 · 私人 dot 通道' : 'Dots 连接需要处理') : state.connection === 'ready' ? `已连接 · ${authentication}` : state.connection === 'authentication' ? `${name} 需要认证` : state.connection === 'error' ? `${name} 连接需要处理` : `正在连接 ${name}`;
   $('connection-label').title = [state.version, state.permissionHint].filter(Boolean).join('\n');
   $('project-name').textContent = state.projectName; $('choose-project').title = state.cwd;
   $('current-target').hidden = dots;
@@ -299,9 +306,7 @@ if (isWallpaper) {
   installRemoteNavigation(api,{notice:error,compose:(action,active)=>composerControls?.action(action,active)});
   api.onRemoteText(value=>drafts.appendExternal(value).then(()=>{composerControls?.refresh();}).catch(()=>error('听写文字已保存在草稿中，请重新打开这段对话。')));
   const showAgentChoices = value => {
-    const changed = populateAgentPicker($('provider-select'), { dots: value.legacyDotsAvailable, customAgents: value.customAgents ?? [] });
-    $('agent-config-error').textContent = value.agentConfigError || '';
-    $('agent-config-error').hidden = !value.agentConfigError;
+    const changed = populateAgentPicker($('provider-select'), { dots: value.legacyDotsAvailable });
     if (changed && current) render(current);
   };
   api.workspace().then(r => { if (r.ok) showAgentChoices(r.value); });

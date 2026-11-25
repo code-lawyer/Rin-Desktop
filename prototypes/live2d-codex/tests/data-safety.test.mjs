@@ -79,15 +79,23 @@ test('concurrent dictation and draft mutations retain each accepted recording ex
 
 test('legacy projects, paths, voices, Codex IDs and all provider drafts survive adoption without copying or editing the source', async t => {
   const { root, store, target } = await fixture(t);
-  for (const provider of ['codex','claude','grok','opencode']) await store.saveDraft({ ...target, provider }, provider + ' text');
+  const providers = ['codex', 'antigravity', 'grok', 'claude', 'deepseek', 'opencode', 'custom-legacy'];
+  for (const provider of providers) await store.saveDraft({ ...target, provider }, provider + ' text');
   await store.remember({ ...target });
+  const retired = join(store.file, '..', 'agents/custom-legacy');
+  await fs.mkdir(retired, { recursive: true });
+  await fs.writeFile(join(retired, 'session.json'), 'opaque legacy session data');
   const before = await fs.readFile(store.file);
   const pointer = join(root, 'new-default', 'data-location.json');
   const selected = await selectDataDirectory(join(store.file, '..'), pointer);
   assert.equal(selected, await fs.realpath(join(store.file, '..')));
   assert.deepEqual(await fs.readFile(store.file), before);
   const reopened = new WorkspaceStore(selected); await reopened.load();
-  for (const provider of ['codex','claude','grok','opencode']) assert.equal(reopened.draft({ ...target, provider }), provider + ' text');
+  for (const provider of providers) assert.equal(reopened.draft({ ...target, provider }), provider + ' text');
+  await reopened.updateSettings({ autoSpeak: true });
+  const savedAgain = new WorkspaceStore(selected); await savedAgain.load();
+  for (const provider of providers) assert.equal(savedAgain.draft({ ...target, provider }), provider + ' text');
+  assert.equal(await fs.readFile(join(retired, 'session.json'), 'utf8'), 'opaque legacy session data');
   assert.equal(reopened.data.projects[0].lastThreadId, 'saved');
 });
 

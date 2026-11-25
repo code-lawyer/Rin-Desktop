@@ -167,6 +167,7 @@ button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-
 .size-controls { display: flex; align-items: center; gap: 14px; margin-top: 5px; }
 #avatar-size { flex: 1; min-width: 0; accent-color: var(--accent); cursor: pointer; }
 .interaction-help { font-size: 11px; color: var(--muted); line-height: 1.8; margin: 9px 0 0; }
+#provider-api-note { margin-bottom: 8px; }
 #connection-label { flex: 1 1 140px;overflow-wrap:anywhere;line-height:1.7; }
 #session-label { font-size: 10px; font-variant-numeric: tabular-nums; }
 .approval { display:flex;flex-direction:column;flex: 0 0 auto; margin: 8px 0 12px; padding: 14px; background: var(--approval-surface); border-radius: 12px; font-size: 12px; overflow-wrap:anywhere; }

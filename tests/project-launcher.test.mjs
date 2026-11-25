@@ -55,11 +55,16 @@ test('an omitted provider preserves the saved selection; explicit modes are reta
   assert.ok(plan.args.includes('--shortcut=off'));
 });
 
-test('the root launcher forwards custom provider IDs without treating them as builtin adapters', () => {
-  const plan = launchPlan(['--provider=custom-example', '--check']);
-  assert.equal(plan.provider, 'custom-example');
-  assert.ok(plan.args.includes('--provider=custom-example'));
-  for (const provider of ['custom-../outside', 'custom-UPPER', 'custom-']) assert.throws(() => launchPlan([`--provider=${provider}`]));
+test('the root launcher accepts the fixed CLI list and rejects retired providers', () => {
+  for (const provider of ['codex', 'antigravity', 'grok', 'claude', 'deepseek']) {
+    const option = `--provider=${provider}`;
+    const plan = launchPlan([option, '--check']);
+    assert.equal(plan.provider, provider);
+    assert.ok(plan.args.includes(option));
+  }
+  for (const provider of ['opencode', 'custom-example', 'custom-../outside', 'constructor']) {
+    assert.throws(() => launchPlan([`--provider=${provider}`]), /Unknown provider/);
+  }
 });
 
 test('ambiguous or invalid launch options fail before starting an application', () => {

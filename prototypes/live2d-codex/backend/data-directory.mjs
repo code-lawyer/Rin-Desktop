@@ -1,4 +1,4 @@
-import { realpath, stat, readdir } from 'node:fs/promises';
+import { realpath, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { readJson, writeJson } from './durable-json.mjs';
 import { validateWorkspace } from './workspace-store.mjs';
@@ -9,13 +9,9 @@ export async function validateDataDirectory(candidate) {
   if (!(await stat(directory)).isDirectory()) throw new Error('请选择数据文件夹。');
   const workspace = await readJson(join(directory, 'workspaces.json'), validateWorkspace);
   if (!workspace) throw new Error('该目录没有工作台记录。');
-  // Validate the old Codex location and each provider's isolated records before
-  // changing the pointer. Never migrate by overwriting either directory.
-  let entries;
-  try { entries = await readdir(join(directory, 'agents'), { withFileTypes: true }); }
-  catch (error) { if (error.code !== 'ENOENT') throw error; entries = []; }
-  const custom = entries.filter(entry => (entry.isDirectory() || entry.isSymbolicLink()) && catalog.isCustomAgentId(entry.name)).map(entry => entry.name);
-  for (const provider of ['codex', 'claude', 'grok', 'opencode', ...custom]) {
+  // An inactive provider's files stay in place and have no bearing on whether
+  // the current application can open the selected data folder.
+  for (const provider of Object.keys(catalog.AGENTS)) {
     const root = provider === 'codex' ? directory : join(directory, 'agents', provider);
     for (const name of provider === 'codex' ? ['session'] : ['session', 'index']) {
       const saved = await readJson(join(root, name + '.json'));

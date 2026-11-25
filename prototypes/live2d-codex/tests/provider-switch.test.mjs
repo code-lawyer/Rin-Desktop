@@ -11,7 +11,7 @@ const quit = main.slice(main.indexOf("  app.on('before-quit'"), main.indexOf("  
 const gate = () => { let resolve; const promise = new Promise(r => resolve = r); return { promise, resolve }; };
 const tick = () => new Promise(resolve => setImmediate(resolve));
 
-for (const stage of ['construct', 'old-close', 'mkdir', 'write', 'connect']) {
+for (const stage of ['construct', 'save', 'old-close', 'connect']) {
   test(`quit during provider ${stage} waits for ownership and never revives a closed backend`, async () => {
     const entered = gate(), release = gate(), disposed = gate(), events = [];
     const pause = async name => { if (stage === name) { entered.resolve(); await release.promise; } };
@@ -23,11 +23,11 @@ for (const stage of ['construct', 'old-close', 'mkdir', 'write', 'connect']) {
     };
     let beforeQuit;
     const context = vm.createContext({
-      closing: false, quitting: false, pendingDataSelection: null, pendingRelaunch: null, flushChatDraft: async () => {}, backend: old, store: {}, provider: 'codex', changingProvider: false, providerChange: null, customAgentStore: null, changingAgentConfig: false,
+      closing: false, quitting: false, pendingDataSelection: null, pendingRelaunch: null, flushChatDraft: async () => {}, backend: old, store: {}, provider: 'codex', changingProvider: false, providerChange: null,
       captureTarget: null, avatar: null, chat: null, workbench: null, previousState: null, rememberedTarget: null,
-      tray: null, storageDir: 'fixture', stopSpeech() {}, isCliAgent: () => true, bindBackend() {},
+      tray: null, storageDir: 'fixture', stopSpeech() {}, isSupportedProvider: () => true, bindBackend() {},
       makeBackend: async () => { await pause('construct'); return replacement; },
-      mkdir: () => pause('mkdir'), writeFile: () => pause('write'), join: (...parts) => parts.join('/'), agentName: kind => kind,
+      writeProviderSelection: () => pause('save'), agentName: kind => kind,
       app: { on: (_name, fn) => beforeQuit = fn, exit: () => events.push('exit') },
       globalShortcut: { unregisterAll() {} }, clearTimeout() {}, captureTimer: null, ambientBarrier: {close() {}}, cancelWallpaperCommit() {},
       remote: null, voiceResources: null, speech: null, wallpaperHost: null, characterBox: null
@@ -54,10 +54,10 @@ test('a failed quit preparation does not strand an already running provider swit
   const replacement = { closed: false, snapshot: () => ({}), async close() { this.closed = true; }, async connect() { events.push('connected'); } };
   let beforeQuit;
   const context = vm.createContext({
-    closing: false, quitting: false, pendingDataSelection: null, pendingRelaunch: null, backend: old, store: {}, provider: 'codex', changingProvider: false, providerChange: null, customAgentStore: null, changingAgentConfig: false,
+    closing: false, quitting: false, pendingDataSelection: null, pendingRelaunch: null, backend: old, store: {}, provider: 'codex', changingProvider: false, providerChange: null,
     captureTarget: null, avatar: null, chat: null, workbench: null, previousState: null, rememberedTarget: null,
-    tray: null, storageDir: 'fixture', stopSpeech() {}, isCliAgent: () => true, bindBackend() {},
-    makeBackend: async () => replacement, mkdir: async () => {}, writeFile: async () => {}, join: (...parts) => parts.join('/'), agentName: kind => kind,
+    tray: null, storageDir: 'fixture', stopSpeech() {}, isSupportedProvider: () => true, bindBackend() {},
+    makeBackend: async () => replacement, writeProviderSelection: async () => {}, agentName: kind => kind,
     app: { on: (_name, fn) => beforeQuit = fn, exit: () => events.push('exit') },
     globalShortcut: { unregisterAll() {} }, registerShortcuts() {}, clearTimeout() {}, captureTimer: null, ambientBarrier: { close() {} }, cancelWallpaperCommit() {},
     flushChatDraft: async () => { throw new Error('draft write failed'); }, dialog: { showErrorBox() {} },
@@ -69,4 +69,31 @@ test('a failed quit preparation does not strand an already running provider swit
   assert.equal(context.quitting, false); assert.equal(context.closing, false);
   release.resolve(); await switching;
   assert.equal(context.backend, replacement); assert.equal(replacement.closed, false); assert.deepEqual(events, ['connected']);
+});
+
+test('a failed provider preference write preserves the active backend and accepts a later retry', async () => {
+  const events = [];
+  const old = { busy: false, removeAllListeners() { events.push('unbind'); }, async close() { events.push('close'); } };
+  let fail = true;
+  const context = vm.createContext({
+    closing: false, quitting: false, changingProvider: false, providerChange: null, captureTarget: null,
+    backend: old, store: {}, provider: 'codex', stopSpeech() {}, isSupportedProvider: () => true,
+    previousState: null, rememberedTarget: null, avatar: null, chat: null, workbench: null, tray: null, agentName: id => id,
+    writeProviderSelection: async id => {
+      if (fail) throw new Error('disk full');
+      events.push(`save:${id}`);
+    },
+    makeBackend: async () => ({ async close() { events.push('dispose'); }, async connect() { events.push('connect'); } }),
+    bindBackend() { events.push('bind'); },
+  });
+  vm.runInContext(change, context);
+  await assert.rejects(context.changeProvider('grok'), /disk full/);
+  assert.equal(context.backend, old);
+  assert.equal(context.provider, 'codex');
+  assert.equal(context.changingProvider, false);
+  assert.deepEqual(events, ['dispose']);
+  fail = false;
+  await context.changeProvider('grok');
+  assert.equal(context.provider, 'grok');
+  assert.deepEqual(events, ['dispose', 'save:grok', 'unbind', 'close', 'bind', 'connect']);
 });
