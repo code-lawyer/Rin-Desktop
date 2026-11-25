@@ -44,6 +44,6 @@ node --test tests/remote-buttons.test.mjs
 work/runtime/rc003-probe/Scripts/python.exe tests/remote-atvv-test.py
 ```
 
-`button-state.mjs` normalizes first-down/final-up edges, filters stale generations, and cancels held buttons on disconnect. This addresses the actual F5 auto-repeat observed during a long voice press; it does not yet change the application's input implementation.
+`button-state.mjs` normalizes first-down/final-up edges, filters stale generations, and cancels held buttons on disconnect. This addresses the actual F5 auto-repeat observed during a long voice press; this standalone diagnostic copy remains separate from the main application's integrated input layer (`backend/remote-input.cjs` and `backend/remote-config.mjs`).
 
 Two successful test recordings are smoke-test evidence only. This does not establish 100-cycle reliability, sleep/reconnect behavior, cross-firmware support, production packaging, or safe integration with an active coding session. The current application source now includes its own connection ownership, capability reporting and draft/target safeguards; see [current support boundaries](../../docs/project-status.md). This independent probe remains a diagnostic, and its results do not establish application hardware acceptance.
