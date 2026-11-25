@@ -18,6 +18,7 @@
 | `npm run qa:motion -- --run` | 当前正式动态媒体播放；不等于实机长时间或美术验收 |
 | `npm run qa:remote-component` | 编译 RC003 组件、管道与输入绑定加载，不扫描或连接设备 |
 | `npm run qa:data-agent` | 立即执行合成协议与数据契约检查，创建报告目录 |
+| `npm run qa:release-package -- --package="<展开的包目录>"` | 校验包清单、文件哈希及与构建时源码一致的文件。已发布的包使用相应标签的源码运行。可加 `--baseline="<旧包目录>"` 比较沿用的素材与 CPU 语音组件 |
 | `npm run qa:installer -- -Run -Setup "<测试 Setup>" -PreviousSetup "<旧测试 Setup>" -Lifecycle` | 标准用户下提取、注册、升级、卸载；仅当同 AppId/快捷方式不存在时运行注册检查。安装目录在本次 QA 输出内，不启动账户或硬件 |
 | `npm run qa:upgrade-data -- --run --setup="<候选 Setup>" --previous-setup="<旧 Setup>" --source="<已关闭的数据副本>"` | 在隔离路径运行旧包、覆盖升级包和从升级前备份回退的旧包，核对项目和草稿。加 `--release-channel` 测试两份正式通道安装器。运行副本关闭模型、遥控器和环境音，应用安装不注册 |
 | `npm run qa:data-copy -- --run --package="<测试包目录>" --source="<已关闭的应用数据>"` | 完整副本逐文件哈希、数据目录验证、损坏副本恢复与包内工作台启动；源应用必须完全退出。原目录不写入，运行副本禁用 RC003 自动连接 |
