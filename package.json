@@ -37,6 +37,7 @@
     "test": "npm --prefix prototypes/live2d-codex test && node --test tests/*.test.mjs",
     "test:agents": "node --test prototypes/live2d-codex/tests/agent-catalog.test.mjs prototypes/live2d-codex/tests/agent-contract.test.mjs prototypes/live2d-codex/tests/agent-protocol.test.mjs prototypes/live2d-codex/tests/provider-switch.test.mjs prototypes/live2d-codex/tests/submission-safety.test.mjs prototypes/live2d-codex/tests/data-safety.test.mjs tests/project-launcher.test.mjs",
     "build": "npm --prefix prototypes/live2d-codex run build",
+    "setup:electron": "node prototypes/live2d-codex/node_modules/electron/install.js",
     "resources": "node tools/release/bootstrap-resources.mjs",
     "source:archive": "node tools/release/archive-third-party-source.mjs",
     "package": "node tools/release/build.mjs",

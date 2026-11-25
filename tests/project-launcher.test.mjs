@@ -128,7 +128,9 @@ test('read-only launch inspection never loads Electron installation hooks', asyn
   await writeFile(join(electronRoot, 'package.json'), JSON.stringify({ name: 'electron', main: 'index.js' }));
   await writeFile(join(electronRoot, 'index.js'), `require('node:fs').writeFileSync(${JSON.stringify(marker)}, 'unexpected install'); throw new Error('Installer must never execute');`);
   const options = { platform: 'win32', nodeVersion: '24.0.0', env: {} };
-  assert.equal(inspectLaunch(plan, options).electron, null);
+  const unprepared = inspectLaunch(plan, options);
+  assert.equal(unprepared.electron, null);
+  assert.match(unprepared.problems.join('\n'), /npm run setup:electron/);
   await writeFile(join(electronRoot, 'path.txt'), 'electron.exe');
   assert.equal(inspectLaunch(plan, options).electron, null);
   await mkdir(join(electronRoot, 'dist'));
@@ -136,6 +138,8 @@ test('read-only launch inspection never loads Electron installation hooks', asyn
   assert.equal(inspectLaunch(plan, options).electron, binary);
   const override = join(fixture.root, 'override'); await mkdir(override);
   await writeFile(join(override, 'electron.exe'), 'fixture override');
+  assert.equal(inspectLaunch(plan, { ...options, env: { ELECTRON_OVERRIDE_DIST_PATH: override } }).electron, join(override, 'electron.exe'));
+  await rm(join(electronRoot, 'path.txt'));
   assert.equal(inspectLaunch(plan, { ...options, env: { ELECTRON_OVERRIDE_DIST_PATH: override } }).electron, join(override, 'electron.exe'));
   assert.equal(existsSync(marker), false, 'metadata checks must not invoke the package entry point');
 });

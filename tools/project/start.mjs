@@ -65,9 +65,9 @@ export function inspectLaunch(plan, { platform = process.platform, nodeVersion =
     const pathFile = join(electronRoot, 'path.txt');
     const executable = existsSync(pathFile) ? readFileSync(pathFile, 'utf8').trim() : '';
     if (!executable && !env.ELECTRON_OVERRIDE_DIST_PATH) throw new Error('missing executable path');
-    electron = join(env.ELECTRON_OVERRIDE_DIST_PATH || join(electronRoot, 'dist'), executable || 'electron');
+    electron = join(env.ELECTRON_OVERRIDE_DIST_PATH || join(electronRoot, 'dist'), executable || 'electron.exe');
     if (!statSync(electron).isFile()) throw new Error('missing executable');
-  } catch { electron = null; problems.push('Electron is unavailable. Run npm --prefix prototypes/live2d-codex ci without ELECTRON_SKIP_BINARY_DOWNLOAD.'); }
+  } catch { electron = null; problems.push('Electron is unavailable. Install the app dependencies if needed, then run npm run setup:electron.'); }
   const resources = [];
   if (plan.mode === 'avatar') resources.push('vendor/live2dcubismcore.min.js', 'assets/hiyori/Hiyori.model3.json');
   else {
@@ -133,6 +133,7 @@ export async function start(args = process.argv.slice(2)) {
     console.log(`Rin Desktop source launcher
   npm start                               Build and launch the current source
   npm start -- --check                     Inspect only; no build, app, model or network
+  npm run setup:electron                   Prepare the pinned Electron binary after npm ci
   npm start -- --provider=codex            Select a provider explicitly
   npm run start:avatar                     Legacy local Hiyori mode
   npm run start:dots                       Private Dots mode, when locally present

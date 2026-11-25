@@ -49,6 +49,8 @@ npm run build
 
 单元测试和前端构建不需要语音模型。Windows 设备组件可执行 `npm run qa:remote-component` 编译并检查管道，不访问设备。源码初次连接时自动准备组件。打包脚本使用 Windows 自带 .NET Framework 4.8 和 WinMetadata 预编译到 runtime，不依赖 Python 或 Windows SDK。
 
+首次运行 Electron 界面、执行桌面 QA 或构建安装包前，在应用依赖安装完成后执行 `npm run setup:electron`。该命令调用锁定版本自带的安装器，下载并校验对应的 Electron 可执行文件。只运行单元测试和前端构建可跳过这一步。见 [Electron 的安装说明](https://www.electronjs.org/docs/latest/faq/#how-are-electron-binaries-downloaded)。
+
 用户自行安装所选 Agent 的 CLI。协议依赖锁定在应用目录的 `package-lock.json`。应用包收集 ACP SDK 及其依赖，Claude Agent SDK 由安装版用户从 npm 单独安装。覆盖升级会清理旧应用目录里的自定义 Agent 模块和旧版随 Claude SDK 打包的专属依赖。安装准备见 [CLI Agent 说明](../prototypes/live2d-codex/CLI-AGENTS.md)。真实账户和主应用验收范围见 [项目状态](project-status.md)。
 
 应用的 Node 运行时与真人壁纸媒体从锁定的基础安装包获取（历史锁包若含 Cubism Core，也可供源码旧头像模式复用）。安装包从 `assets/scene/rin-poses` 和 `assets/scene/rin-male-poses` 的资源清单打包两套动漫原画，另含 `assets/motion/female` 真人视频、`assets/ambience` 环境音和 `assets/character-previews`、`assets/stills` 预览与兼容回退图。覆盖升级时，`[InstallDelete]` 清理已移除的旧 `Cubism Core`、旧雨夜 Live2D 模型、旧男士壁纸及仅源码使用的历史原型和预览模块。
