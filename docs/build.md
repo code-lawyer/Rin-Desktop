@@ -21,6 +21,21 @@ Windows x64，Node.js 24 或更高，npm，Inno Setup 6.7.3。安装器构建使
 
 清理时可移除已保留安装器的重复展开包及可重建缓存；先确认没有运行进程、目录联接或资源引用。模型、运行环境、用户数据、原始美术和私人 Dots 保持原位。
 
+## 系统架构与核心模块
+
+主应用采用 Electron 多进程隔离架构，源码位于 `prototypes/live2d-codex`，通过明确的子进程与存储契约隔离桌面渲染、外部 CLI、本地语音和蓝牙硬件：
+
+| 层级 | 核心文件 | 职责与边界 |
+| --- | --- | --- |
+| Electron 主进程 | `main.cjs`、`preload.cjs` | 单实例锁、特权只读协议 `app://local`（仅允许访问 `renderer/`、`dist/`、`assets/`、`vendor/`）、窗口 CSP 与 IPC 来源校验、壁纸两阶段原子提交（画面解码并暂存设置后再落盘切换，保留声线）、退出前草稿刷盘确认（`draft:flush`）及全部后台子进程托管 |
+| 沙盒渲染窗口 | `renderer/index.html`、`renderer/workbench.html`、`dist/app.js`、`dist/workbench.js` | 开启 `contextIsolation` 与 `sandbox`，仅经 `window.companion` 窄接口通信。承载桌面壁纸视图（`still-wallpaper.js`、`puppet-wallpaper.mjs` WebGL2 五种可选姿态及思考原画像素重组、`motion-wallpaper.mjs` 真人两态视频）、悬浮对话气泡（`app.js`、`speech-ui.js`）与项目/设置工作台（`workbench.js`、`custom-agent-settings.mjs`） |
+| 桌面层与点击宿主 | `backend/wallpaper-host.cjs`、`scripts/wallpaper-host.ps1`、`scripts/wallpaper-pose-input.cs` | 将应用自有壁纸窗口挂载至 Windows `Progman`/`WorkerW` 桌面图标层后方；动漫模式空闲时通过低层鼠标观察判断桌面露出人物单击并原样放行系统鼠标事件 |
+| 多 Agent 协议适配 | `backend/codex.mjs`、`backend/acp-agent.mjs`、`backend/claude-agent.mjs`、`backend/native-agent.mjs`、`backend/custom-agents.mjs` | 以 `shell: false` 调用用户本机原生 CLI：Codex 使用 `app-server` stdio JSON-RPC，Grok Build / OpenCode V2 / 自定义接入使用 ACP v1 stdio，Claude 使用官方 Agent SDK（仅限 API / 官方云 API 认证）。凭据与完整历史归属原生 CLI，应用仅缓存最近 200 条显示消息 |
+| 本地语音与资源 | `backend/resident-speech.mjs`、`backend/speech-worker.cjs`、`backend/qwen-speech.mjs`、`backend/qwen-worker.py`、`backend/voice-resources.mjs` | 独立 `runtime/node.exe` 子进程加载 `sherpa-onnx-node`（GPL-3.0-or-later 组合边界，仅交换 JSON 与 PCM）执行 SenseVoice 听写和 Kokoro 朗读；可选独立 Python 3.12 环境运行 Qwen3-TTS GPU 合成；上游模型按固定 revision 与 SHA-256 校验下载 |
+| RC003 遥控器层 | `backend/remote-controller.mjs`、`backend/remote-input.cjs`、`backend/remote-native.mjs`、`native/rc003-helper.cs` | C# 原生辅助进程（`runtime/rc003-helper.exe`）负责 BLE GATT/ATVV 16 kHz ADPCM 语音流，Koffi 绑定 Win32 Raw Input 区分遥控器按键与普通键盘/输入法 |
+| 持久化与回执保护 | `backend/workspace-store.mjs`、`backend/submission-guard.mjs`、`backend/durable-json.mjs`、`backend/data-recovery.mjs` | 按 `[provider, cwd, threadId]` 隔离草稿，写入使用临时文件 `fsync`、`.bak` 备份与原子重命名（自定义 Agent 配置另带 `.lock` 排他写锁）；发送前记录基线，断线回执不明时保留原稿供核查，绝不自动重发 |
+| 工程与发布工具链 | `tools/project/*`、`tools/release/*`、`tools/qa/*`、`tools/probes/*` | 统一启动器、文档链接与版本一致性检查（`check:project`）、工作区与 Git 暂存区隐私/密钥审计（`check:public`）、Inno Setup 打包与产物字节级校验 |
+
 ## 准备与验证
 
 ```powershell
@@ -32,7 +47,7 @@ npm test
 npm run build
 ```
 
-单元测试和前端构建不需要语音模型。Windows 设备组件可执行 `npm run qa:remote-component` 编译并检查管道，不访问设备。源码初次连接时自动准备组件；打包脚本预编译到 runtime，使用 Windows 自带 .NET Framework 4.8 和 WinMetadata，不依赖 Python 或 Windows SDK。用户自行安装所选 Agent 的 Windows 原生 CLI：Codex、Claude Code、Grok Build 或 OpenCode V2。新版协议依赖锁定在应用目录的 `package-lock.json`；发布脚本收集 SDK 及必要依赖，不打包 CLI 程序或账号。新增 Agent 的使用和手动验收见 [CLI Agent 说明](../prototypes/live2d-codex/CLI-AGENTS.md)；基础构建通过不等于新增后端完成主应用验收，当前范围见[项目状态](project-status.md)。应用的 Node 运行时、默认女性壁纸与 Cubism Core 从锁定的基础安装包获取。正式壁纸仅使用 `assets/scene/rin-poses` 动漫原画姿态与 `assets/motion/female` 真人视频，并保留 `assets/stills` 兼容素材与回退图；男士资源已删除，旧安装包恢复工具会过滤它们，打包保留兼容女生素材并明确排除男士资源。
+单元测试和前端构建不需要语音模型。Windows 设备组件可执行 `npm run qa:remote-component` 编译并检查管道，不访问设备。源码初次连接时自动准备组件；打包脚本预编译到 runtime，使用 Windows 自带 .NET Framework 4.8 和 WinMetadata，不依赖 Python 或 Windows SDK。用户自行安装所选 Agent 的 Windows 原生 CLI：Codex、Claude Code、Grok Build 或 OpenCode V2。新版协议依赖锁定在应用目录的 `package-lock.json`；发布脚本收集 SDK 及必要依赖，不打包 CLI 程序或账号。新增 Agent 的使用和手动验收见 [CLI Agent 说明](../prototypes/live2d-codex/CLI-AGENTS.md)；基础构建通过不等于新增后端完成主应用验收，当前范围见[项目状态](project-status.md)。应用的 Node 运行时与默认女性壁纸媒体从锁定的基础安装包获取（历史锁包若含 Cubism Core，也可供源码旧头像模式复用）。正式安装包仅打包 `assets/scene/rin-poses` 动漫原画姿态、`assets/motion/female` 真人视频、`assets/ambience` 环境音及 `assets/character-previews`、`assets/stills` 预览与兼容回退图；已剔除旧 `Cubism Core`、旧雨夜 Live2D 模型（`assets/rainy-window-v2-4k`）、男士资源及仅源码使用的历史原型/预览模块，并在覆盖升级时通过 `[InstallDelete]` 自动清理这些旧残留文件。
 
 RC003 输入层还使用锁定的 Koffi 3.3.3 和 `@koromix/koffi-win32-x64` 预编译包，通过上述 npm 安装。不要省略 Windows 本平台的 optional dependency。打包脚本显式复制该原生包及许可，并在输出目录加载输入模块；组件检查还在独立副本中用 Electron 的 Node 模式核对加载。连接、按钮设置、麦克风和待验收范围见 [项目状态](project-status.md)。
 
@@ -94,7 +109,7 @@ npm run package
 
 当前两态动态分支还要求 `prototypes/live2d-codex/assets/motion/female/manifest.json` 与正式四段视频、两张回退图。清单沿用播放器的 `format: 1`、`clips`、`posters`，并增加 `integrity`：以六个媒体文件名为键，记录各自的正整数字节数 `bytes` 与小写 SHA-256 `sha256`。四个片段ID为 `work-loop`、`work-user`、`user-loop`、`user-work`；每个条目包含独立的 `.mp4` 文件名、实际 `duration` 与 `fps`，两张 `.png` 由 `posters.work/user` 指定。
 
-正式/测试/便携打包入口在写入新包之前校验这些文件，缺失或哈希不符会停止；只收集六个媒体和规范化运行清单，不把生成账户响应、母片或制作目录整体打包。复制后的字节再次校验，最后才写运行清单。安装包核查还将这六个媒体与当前源码资源逐项比较。完整性校验不代表接缝、4K效果或许可验收。源代码、媒体完整性与实际安装验收分别记录。已发布0.5.0的基础资源不包含本次四段视频；0.6.0旧候选也不包含2026-10-28后续代码与安全修复，不能用版本号代替包内容核对。
+正式/测试/便携打包入口在写入新包之前校验这些文件，缺失或哈希不符会停止；只收集六个媒体和规范化运行清单，不把生成账户响应、母片或制作目录整体打包。复制后的字节再次校验，最后才写运行清单。安装包核查还将这六个媒体与当前源码资源逐项比较。完整性校验不代表接缝、4K效果或许可验收。源代码、媒体完整性与实际安装验收分别记录。早期 0.5.0 / 0.6.0 旧包不包含当前四段视频及后续数据安全修复，不能用版本号代替包内容核对。
 
 内部验收使用 `npm run package:test -- --id=<新的测试标识>`，需要相同资源、Inno Setup 和 Windows tar。该命令生成独立 ZIP 与测试安装器、文件/源码指纹、离线检查、数据恢复和验收表，输出 `release/test-builds/<标识>`；不修改正式资源清单、基础版本或已有产物。测试安装器使用独立 AppId/目录/快捷方式，测试数据默认隔离。构建不启动真实 Agent 或硬件，人工验收按[测试清单](../tools/release/TEST-ACCEPTANCE.md)进行。
 

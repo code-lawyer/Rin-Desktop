@@ -10,4 +10,4 @@
 
 测试分层、证据要求及副作用见[贡献流程](../../CONTRIBUTING.md)。设备验证在 [remote-diagnostics](../remote-diagnostics/README.md)，已知业务缺陷的无真实账户复现在 [qa](../qa/README.md)。
 
-上述 Codex/Windows 工具每次在 `work/qa` 创建唯一运行目录，报告名为 `result.json`。Node 工具可传 `--output=work/qa/新的目录`，PowerShell 用 `-OutputDirectory work/qa/新的目录`；拒绝已有目录和 QA 目录外路径。旧 `docs/evidence` 中的日期报告保持原样。CLI 版本可以用 `--expected-version` 锁定；历史版本的通过不代表其他版本兼容。
+上述 Codex/Windows 工具每次在 `work/qa` 创建唯一运行目录，报告名为 `result.json`。Node 工具可传 `--output=work/qa/新的目录`，PowerShell 用 `-OutputDirectory work/qa/新的目录`；拒绝已有目录和 QA 目录外路径。历史验证记录已归档，不再保存在公开文档目录。CLI 版本可以用 `--expected-version` 锁定；历史版本的通过不代表其他版本兼容。

@@ -29,10 +29,10 @@ assert.equal(manifest.version, (await json(join(root, 'package.json'))).version)
 assert.equal(manifest.version, (await json(join(directory, 'resources/app/package.json'))).version);
 assert.equal(manifest.version, (await json(join(directory, 'resources/app/portable.json'))).version);
 const names = new Set(), forbidden = /\.(onnx|safetensors|wav|pcm)$|(^|\/)(codex|claude|grok|opencode)\.exe$|^resources\/app\/(models|runtime\/qwen|agents)\/|(^|\/)custom-agents\.json(?:\..*)?$|(^|\/)(workspaces|session|auth|provider|appearance)\.json$/i;
-// These two source-owned descriptions intentionally changed when male assets
-// retired. Verify them against current source; compare all other assets to the
-// previous package byte-for-byte.
-const revisedAssetMetadata = new Set(['assets/stills/manifest.json', 'assets/stills/README.md']);
+// Source-owned asset metadata and READMEs intentionally updated since earlier
+// baselines: verify them against current source, and compare all other assets
+// to the baseline package byte-for-byte.
+const revisedAssetMetadata = new Set(['assets/stills/manifest.json', 'assets/stills/README.md', 'assets/ambience/README.md']);
 const wallpaperScripts = new Set(['scripts/wallpaper-host.ps1', 'scripts/wallpaper-pose-input.cs']);
 let bytes = 0, sourceMatches = 0;
 for (const entry of manifest.files) {
