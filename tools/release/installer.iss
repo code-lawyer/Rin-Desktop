@@ -58,7 +58,107 @@ Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs 
 Type: files; Name: "{app}\resources\app\backend\custom-agents.mjs"
 Type: files; Name: "{app}\resources\app\backend\agent-setup-prompt.mjs"
 Type: files; Name: "{app}\resources\app\renderer\custom-agent-settings.mjs"
-Type: filesandordirs; Name: "{app}\resources\app\node_modules\@anthropic-ai\claude-agent-sdk"
+; Packages unique to the former bundled SDK in the previous installer manifest.
+; Keep the SDK entry last so the legacy-install check stays true for its dependencies.
+Type: filesandordirs; Name: "{app}\resources\app\node_modules\@anthropic-ai\sdk"; Check: HasBundledClaudeSdk
+Type: filesandordirs; Name: "{app}\resources\app\node_modules\@babel\runtime"; Check: HasBundledClaudeSdk
+Type: filesandordirs; Name: "{app}\resources\app\node_modules\@hono\node-server"; Check: HasBundledClaudeSdk
+Type: filesandordirs; Name: "{app}\resources\app\node_modules\@modelcontextprotocol\sdk"; Check: HasBundledClaudeSdk
+Type: filesandordirs; Name: "{app}\resources\app\node_modules\@opentelemetry\api"; Check: HasBundledClaudeSdk
+Type: filesandordirs; Name: "{app}\resources\app\node_modules\@stablelib\base64"; Check: HasBundledClaudeSdk
+Type: filesandordirs; Name: "{app}\resources\app\node_modules\accepts"; Check: HasBundledClaudeSdk
+Type: filesandordirs; Name: "{app}\resources\app\node_modules\ajv"; Check: HasBundledClaudeSdk
+Type: filesandordirs; Name: "{app}\resources\app\node_modules\ajv-formats"; Check: HasBundledClaudeSdk
+Type: filesandordirs; Name: "{app}\resources\app\node_modules\body-parser"; Check: HasBundledClaudeSdk
+Type: filesandordirs; Name: "{app}\resources\app\node_modules\bytes"; Check: HasBundledClaudeSdk
+Type: filesandordirs; Name: "{app}\resources\app\node_modules\call-bind-apply-helpers"; Check: HasBundledClaudeSdk
+Type: filesandordirs; Name: "{app}\resources\app\node_modules\call-bound"; Check: HasBundledClaudeSdk
+Type: filesandordirs; Name: "{app}\resources\app\node_modules\content-disposition"; Check: HasBundledClaudeSdk
+Type: filesandordirs; Name: "{app}\resources\app\node_modules\content-type"; Check: HasBundledClaudeSdk
+Type: filesandordirs; Name: "{app}\resources\app\node_modules\cookie"; Check: HasBundledClaudeSdk
+Type: filesandordirs; Name: "{app}\resources\app\node_modules\cookie-signature"; Check: HasBundledClaudeSdk
+Type: filesandordirs; Name: "{app}\resources\app\node_modules\cors"; Check: HasBundledClaudeSdk
+Type: filesandordirs; Name: "{app}\resources\app\node_modules\cross-spawn"; Check: HasBundledClaudeSdk
+Type: filesandordirs; Name: "{app}\resources\app\node_modules\debug"; Check: HasBundledClaudeSdk
+Type: filesandordirs; Name: "{app}\resources\app\node_modules\depd"; Check: HasBundledClaudeSdk
+Type: filesandordirs; Name: "{app}\resources\app\node_modules\dunder-proto"; Check: HasBundledClaudeSdk
+Type: filesandordirs; Name: "{app}\resources\app\node_modules\ee-first"; Check: HasBundledClaudeSdk
+Type: filesandordirs; Name: "{app}\resources\app\node_modules\encodeurl"; Check: HasBundledClaudeSdk
+Type: filesandordirs; Name: "{app}\resources\app\node_modules\es-define-property"; Check: HasBundledClaudeSdk
+Type: filesandordirs; Name: "{app}\resources\app\node_modules\es-errors"; Check: HasBundledClaudeSdk
+Type: filesandordirs; Name: "{app}\resources\app\node_modules\es-object-atoms"; Check: HasBundledClaudeSdk
+Type: filesandordirs; Name: "{app}\resources\app\node_modules\escape-html"; Check: HasBundledClaudeSdk
+Type: filesandordirs; Name: "{app}\resources\app\node_modules\etag"; Check: HasBundledClaudeSdk
+Type: filesandordirs; Name: "{app}\resources\app\node_modules\eventsource"; Check: HasBundledClaudeSdk
+Type: filesandordirs; Name: "{app}\resources\app\node_modules\eventsource-parser"; Check: HasBundledClaudeSdk
+Type: filesandordirs; Name: "{app}\resources\app\node_modules\express"; Check: HasBundledClaudeSdk
+Type: filesandordirs; Name: "{app}\resources\app\node_modules\express-rate-limit"; Check: HasBundledClaudeSdk
+Type: filesandordirs; Name: "{app}\resources\app\node_modules\fast-deep-equal"; Check: HasBundledClaudeSdk
+Type: filesandordirs; Name: "{app}\resources\app\node_modules\fast-sha256"; Check: HasBundledClaudeSdk
+Type: filesandordirs; Name: "{app}\resources\app\node_modules\fast-uri"; Check: HasBundledClaudeSdk
+Type: filesandordirs; Name: "{app}\resources\app\node_modules\finalhandler"; Check: HasBundledClaudeSdk
+Type: filesandordirs; Name: "{app}\resources\app\node_modules\forwarded"; Check: HasBundledClaudeSdk
+Type: filesandordirs; Name: "{app}\resources\app\node_modules\fresh"; Check: HasBundledClaudeSdk
+Type: filesandordirs; Name: "{app}\resources\app\node_modules\function-bind"; Check: HasBundledClaudeSdk
+Type: filesandordirs; Name: "{app}\resources\app\node_modules\get-intrinsic"; Check: HasBundledClaudeSdk
+Type: filesandordirs; Name: "{app}\resources\app\node_modules\get-proto"; Check: HasBundledClaudeSdk
+Type: filesandordirs; Name: "{app}\resources\app\node_modules\gopd"; Check: HasBundledClaudeSdk
+Type: filesandordirs; Name: "{app}\resources\app\node_modules\has-symbols"; Check: HasBundledClaudeSdk
+Type: filesandordirs; Name: "{app}\resources\app\node_modules\hasown"; Check: HasBundledClaudeSdk
+Type: filesandordirs; Name: "{app}\resources\app\node_modules\hono"; Check: HasBundledClaudeSdk
+Type: filesandordirs; Name: "{app}\resources\app\node_modules\http-errors"; Check: HasBundledClaudeSdk
+Type: filesandordirs; Name: "{app}\resources\app\node_modules\iconv-lite"; Check: HasBundledClaudeSdk
+Type: filesandordirs; Name: "{app}\resources\app\node_modules\inherits"; Check: HasBundledClaudeSdk
+Type: filesandordirs; Name: "{app}\resources\app\node_modules\ip-address"; Check: HasBundledClaudeSdk
+Type: filesandordirs; Name: "{app}\resources\app\node_modules\ipaddr.js"; Check: HasBundledClaudeSdk
+Type: filesandordirs; Name: "{app}\resources\app\node_modules\is-promise"; Check: HasBundledClaudeSdk
+Type: filesandordirs; Name: "{app}\resources\app\node_modules\isexe"; Check: HasBundledClaudeSdk
+Type: filesandordirs; Name: "{app}\resources\app\node_modules\jose"; Check: HasBundledClaudeSdk
+Type: filesandordirs; Name: "{app}\resources\app\node_modules\json-schema-to-ts"; Check: HasBundledClaudeSdk
+Type: filesandordirs; Name: "{app}\resources\app\node_modules\json-schema-traverse"; Check: HasBundledClaudeSdk
+Type: filesandordirs; Name: "{app}\resources\app\node_modules\json-schema-typed"; Check: HasBundledClaudeSdk
+Type: filesandordirs; Name: "{app}\resources\app\node_modules\math-intrinsics"; Check: HasBundledClaudeSdk
+Type: filesandordirs; Name: "{app}\resources\app\node_modules\media-typer"; Check: HasBundledClaudeSdk
+Type: filesandordirs; Name: "{app}\resources\app\node_modules\merge-descriptors"; Check: HasBundledClaudeSdk
+Type: filesandordirs; Name: "{app}\resources\app\node_modules\mime-db"; Check: HasBundledClaudeSdk
+Type: filesandordirs; Name: "{app}\resources\app\node_modules\mime-types"; Check: HasBundledClaudeSdk
+Type: filesandordirs; Name: "{app}\resources\app\node_modules\ms"; Check: HasBundledClaudeSdk
+Type: filesandordirs; Name: "{app}\resources\app\node_modules\negotiator"; Check: HasBundledClaudeSdk
+Type: filesandordirs; Name: "{app}\resources\app\node_modules\object-assign"; Check: HasBundledClaudeSdk
+Type: filesandordirs; Name: "{app}\resources\app\node_modules\object-inspect"; Check: HasBundledClaudeSdk
+Type: filesandordirs; Name: "{app}\resources\app\node_modules\on-finished"; Check: HasBundledClaudeSdk
+Type: filesandordirs; Name: "{app}\resources\app\node_modules\once"; Check: HasBundledClaudeSdk
+Type: filesandordirs; Name: "{app}\resources\app\node_modules\parseurl"; Check: HasBundledClaudeSdk
+Type: filesandordirs; Name: "{app}\resources\app\node_modules\path-key"; Check: HasBundledClaudeSdk
+Type: filesandordirs; Name: "{app}\resources\app\node_modules\path-to-regexp"; Check: HasBundledClaudeSdk
+Type: filesandordirs; Name: "{app}\resources\app\node_modules\pkce-challenge"; Check: HasBundledClaudeSdk
+Type: filesandordirs; Name: "{app}\resources\app\node_modules\proxy-addr"; Check: HasBundledClaudeSdk
+Type: filesandordirs; Name: "{app}\resources\app\node_modules\qs"; Check: HasBundledClaudeSdk
+Type: filesandordirs; Name: "{app}\resources\app\node_modules\range-parser"; Check: HasBundledClaudeSdk
+Type: filesandordirs; Name: "{app}\resources\app\node_modules\raw-body"; Check: HasBundledClaudeSdk
+Type: filesandordirs; Name: "{app}\resources\app\node_modules\require-from-string"; Check: HasBundledClaudeSdk
+Type: filesandordirs; Name: "{app}\resources\app\node_modules\router"; Check: HasBundledClaudeSdk
+Type: filesandordirs; Name: "{app}\resources\app\node_modules\safer-buffer"; Check: HasBundledClaudeSdk
+Type: filesandordirs; Name: "{app}\resources\app\node_modules\send"; Check: HasBundledClaudeSdk
+Type: filesandordirs; Name: "{app}\resources\app\node_modules\serve-static"; Check: HasBundledClaudeSdk
+Type: filesandordirs; Name: "{app}\resources\app\node_modules\setprototypeof"; Check: HasBundledClaudeSdk
+Type: filesandordirs; Name: "{app}\resources\app\node_modules\shebang-command"; Check: HasBundledClaudeSdk
+Type: filesandordirs; Name: "{app}\resources\app\node_modules\shebang-regex"; Check: HasBundledClaudeSdk
+Type: filesandordirs; Name: "{app}\resources\app\node_modules\side-channel"; Check: HasBundledClaudeSdk
+Type: filesandordirs; Name: "{app}\resources\app\node_modules\side-channel-list"; Check: HasBundledClaudeSdk
+Type: filesandordirs; Name: "{app}\resources\app\node_modules\side-channel-map"; Check: HasBundledClaudeSdk
+Type: filesandordirs; Name: "{app}\resources\app\node_modules\side-channel-weakmap"; Check: HasBundledClaudeSdk
+Type: filesandordirs; Name: "{app}\resources\app\node_modules\standardwebhooks"; Check: HasBundledClaudeSdk
+Type: filesandordirs; Name: "{app}\resources\app\node_modules\statuses"; Check: HasBundledClaudeSdk
+Type: filesandordirs; Name: "{app}\resources\app\node_modules\toidentifier"; Check: HasBundledClaudeSdk
+Type: filesandordirs; Name: "{app}\resources\app\node_modules\ts-algebra"; Check: HasBundledClaudeSdk
+Type: filesandordirs; Name: "{app}\resources\app\node_modules\type-is"; Check: HasBundledClaudeSdk
+Type: filesandordirs; Name: "{app}\resources\app\node_modules\unpipe"; Check: HasBundledClaudeSdk
+Type: filesandordirs; Name: "{app}\resources\app\node_modules\vary"; Check: HasBundledClaudeSdk
+Type: filesandordirs; Name: "{app}\resources\app\node_modules\which"; Check: HasBundledClaudeSdk
+Type: filesandordirs; Name: "{app}\resources\app\node_modules\wrappy"; Check: HasBundledClaudeSdk
+Type: filesandordirs; Name: "{app}\resources\app\node_modules\zod-to-json-schema"; Check: HasBundledClaudeSdk
+Type: filesandordirs; Name: "{app}\resources\app\node_modules\@anthropic-ai\claude-agent-sdk"; Check: HasBundledClaudeSdk
 Type: filesandordirs; Name: "{app}\resources\app\assets\rainy-window-male"
 Type: filesandordirs; Name: "{app}\resources\app\assets\rainy-window-v2-4k"
 Type: filesandordirs; Name: "{app}\resources\app\assets\stills\male"
@@ -104,6 +204,12 @@ Name: "{autodesktop}\Rin Desktop"; Filename: "{app}\VibeVoice.exe"; Tasks: deskt
 [Run]
 Filename: "{app}\VibeVoice.exe"; Description: "Open Rin Desktop"; Flags: nowait postinstall skipifsilent; Check: not IsPortableMode
 [Code]
+function HasBundledClaudeSdk: Boolean;
+begin
+  Result := FileExists(ExpandConstant('{app}\resources\app\portable.json')) and
+    FileExists(ExpandConstant('{app}\resources\app\node_modules\@anthropic-ai\claude-agent-sdk\package.json'));
+end;
+
 function IsPortableMode: Boolean;
 begin
   Result := ExpandConstant('{param:PORTABLE|0}') = '1';
