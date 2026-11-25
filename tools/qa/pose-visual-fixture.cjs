@@ -3,6 +3,8 @@ const { join, resolve, sep } = require('node:path');
 const { pathToFileURL } = require('node:url');
 const { writeFileSync, mkdirSync } = require('node:fs');
 const assert = require('node:assert/strict');
+const { characterProfile, ANIME_MALE_CHARACTER } = require('../../prototypes/live2d-codex/backend/character-profiles.cjs');
+const character = characterProfile(process.argv.includes('--anime-male') ? ANIME_MALE_CHARACTER : undefined);
 const root = resolve(__dirname, '../..'),
   output = resolve(process.argv[2]);
 if (!output.startsWith(join(root, 'work/qa') + sep)) throw Error('Use work/qa');
@@ -24,7 +26,7 @@ app
       if (/^\/assets\/[-a-zA-Z]+\.(png|json)$/.test(path))
         return net.fetch(
           pathToFileURL(
-            join(root, 'prototypes/live2d-codex/assets/scene/rin-poses', path.slice('/assets/'.length)),
+            join(root, 'prototypes/live2d-codex/assets/scene', character.poseDirectory, path.slice('/assets/'.length)),
           ).href,
         );
       return new Response('', { status: 404 });
@@ -63,11 +65,13 @@ app
         mouth,
         blink: 0,
       });
-    const invariants = await run(`(()=>{
+    const invariants = await run(`(async()=>{
     const w=preview.canvas.width,h=preview.canvas.height;
+    const checkSeating=${character.id === ANIME_MALE_CHARACTER};
     const render=(pose,opacity=1,blink=0,mouth=0,gaze=[0,0],effect)=>{preview.render(0,{frame:{pose,opacity,effect},blink,mouth,gaze});return preview.pixels();};
     const empty=render('attention',0),base=render('attention');
     let fixedChanged=0,emptyChanged=0,bodyChanged=0,blendFailures=0,pixelEndpointChanges=0,pixelBackgroundChanges=0;const expressions={},bottomCoverage={},pixelDifferences={};
+    let settledSeatChanges=0,settledLaptopChanges=0,armrestChanges=0;
     for(const pose of ${JSON.stringify(poses)}){
       const full=render(pose),zero=render(pose,0,1,.7),half=render(pose,.5);
       const pixelFull=render(pose,1,0,0,[0,0],'pixels'),pixelZero=render(pose,0,1,.7,[0,0],'pixels'),pixelHalf=render(pose,.5,0,0,[0,0],'pixels');
@@ -82,17 +86,29 @@ app
           if(Math.abs(pixelHalf[i+c]-half[i+c])>15)pixelDifference++;
           if(Math.abs(half[i+c]-(full[i+c]+empty[i+c])/2)>2)blendFailures++;
           if(x<530&&full[i+c]!==base[i+c])fixedChanged++;
+          if(checkSeating){
+            if(x>=625&&x<1205&&y>=675&&full[i+c]!==base[i+c])settledSeatChanges++;
+            if(x>=800&&x<945&&y>=430&&y<550&&full[i+c]!==base[i+c])settledLaptopChanges++;
+            if(x>=1270&&x<1460&&y>=655&&y<935&&(full[i+c]!==empty[i+c]||pixelHalf[i+c]!==empty[i+c]))armrestChanges++;
+          }
           if(full[i+c]!==animated[i+c]){changed++;if(x<face[0]-2||x>face[0]+face[2]+2||y<face[1]-2||y>face[1]+face[3]+2)bodyChanged++;}
         }
       }
       expressions[pose]=changed;
       pixelDifferences[pose]=pixelDifference;
-      // These authored poses have legs continuing beyond the lower frame edge.
-      // Registration must not introduce a transparent horizontal cut there.
-      const coverage=y=>{let count=0;for(let x=650;x<1100;x++){const i=((h-1-y)*w+x)*4;if(Math.max(...[0,1,2].map(c=>Math.abs(full[i+c]-empty[i+c])))>15)count++;}return count;};
-      bottomCoverage[pose]={last:coverage(h-1),above:coverage(h-10)};
+      // Use sprite alpha to detect a cut across the legs even when the trousers
+      // and chair are too close in color to distinguish by composite contrast.
+      const sprite=await createImageBitmap(await (await fetch('/assets/'+pose+'.png')).blob());
+      const edge=document.createElement('canvas');edge.width=450;edge.height=10;
+      const context=edge.getContext('2d');
+      context.drawImage(sprite,650,sprite.height-10,edge.width,edge.height,0,0,edge.width,edge.height);
+      sprite.close();
+      const alpha=context.getImageData(0,0,edge.width,edge.height).data;
+      const coverage=y=>{let count=0;for(let x=0;x<edge.width;x++)if(alpha[(y*edge.width+x)*4+3]>127)count++;return count;};
+      bottomCoverage[pose]={last:coverage(9),above:coverage(0)};
     }
-    return {width:w,height:h,fixedChanged,emptyChanged,bodyChanged,blendFailures,pixelEndpointChanges,pixelBackgroundChanges,pixelDifferences,expressions,bottomCoverage,textures:preview.player.textures.size,glError:preview.player.gl.getError()};
+    const seating=checkSeating?{settledSeatChanges,settledLaptopChanges,armrestChanges}:undefined;
+    return {width:w,height:h,fixedChanged,emptyChanged,bodyChanged,blendFailures,pixelEndpointChanges,pixelBackgroundChanges,pixelDifferences,expressions,bottomCoverage,seating,textures:preview.player.textures.size,glError:preview.player.gl.getError()};
   })()`);
     assert.equal(invariants.fixedChanged, 0, 'the fixed room never changes with a pose');
     assert.equal(invariants.emptyChanged, 0, 'every fully faded pose exposes the same empty scene');
@@ -104,6 +120,11 @@ app
       'pixel transitions preserve exact original and empty endpoints',
     );
     assert.equal(invariants.pixelBackgroundChanges, 0, 'pixel transitions never affect the fixed room');
+    if (character.id === ANIME_MALE_CHARACTER) {
+      assert.equal(invariants.seating.settledSeatChanges, 0, 'all poses keep the original lower body on the same seat');
+      assert.equal(invariants.seating.settledLaptopChanges, 0, 'the screen stays aligned on the same thigh');
+      assert.equal(invariants.seating.armrestChanges, 0, 'the foreground armrest occludes the actor during pixel transitions');
+    }
     for (const [pose, count] of Object.entries(invariants.pixelDifferences))
       assert.ok(count > 1000, pose + ' uses visible pixel reassembly rather than a plain fade');
     assert.equal(invariants.glError, 0);
@@ -153,7 +174,7 @@ app
     assert.deepEqual(errors, []);
     writeFileSync(
       join(output, 'result.json'),
-      JSON.stringify({ invariants, errors, physicalDisplayAcceptance: false, artApproval: false }, null, 2),
+      JSON.stringify({ character: character.id, invariants, errors, physicalDisplayAcceptance: false, artApproval: false }, null, 2),
     );
     win.destroy();
     app.exit(0);

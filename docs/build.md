@@ -51,13 +51,13 @@ npm run build
 
 用户自行安装所选 Agent 的 CLI。协议依赖锁定在应用目录的 `package-lock.json`。应用包收集 ACP SDK 及其依赖，Claude Agent SDK 由安装版用户从 npm 单独安装。覆盖升级会清理旧应用目录里的自定义 Agent 模块和旧版随 Claude SDK 打包的专属依赖。安装准备见 [CLI Agent 说明](../prototypes/live2d-codex/CLI-AGENTS.md)。真实账户和主应用验收范围见 [项目状态](project-status.md)。
 
-应用的 Node 运行时与默认女性壁纸媒体从锁定的基础安装包获取（历史锁包若含 Cubism Core，也可供源码旧头像模式复用）。正式安装包仅打包 `assets/scene/rin-poses` 动漫原画姿态、`assets/motion/female` 真人视频、`assets/ambience` 环境音及 `assets/character-previews`、`assets/stills` 预览与兼容回退图。覆盖升级时，`[InstallDelete]` 清理已移除的旧 `Cubism Core`、旧雨夜 Live2D 模型（`assets/rainy-window-v2-4k`）、男士资源及仅源码使用的历史原型和预览模块。
+应用的 Node 运行时与真人壁纸媒体从锁定的基础安装包获取（历史锁包若含 Cubism Core，也可供源码旧头像模式复用）。安装包从 `assets/scene/rin-poses` 和 `assets/scene/rin-male-poses` 的资源清单打包两套动漫原画，另含 `assets/motion/female` 真人视频、`assets/ambience` 环境音和 `assets/character-previews`、`assets/stills` 预览与兼容回退图。覆盖升级时，`[InstallDelete]` 清理已移除的旧 `Cubism Core`、旧雨夜 Live2D 模型、旧男士壁纸及仅源码使用的历史原型和预览模块。
 
 RC003 输入层还使用锁定的 Koffi 3.3.3 和 `@koromix/koffi-win32-x64` 预编译包，通过上述 npm 安装。不要省略 Windows 本平台的 optional dependency。打包脚本显式复制该原生包及许可，并在输出目录加载输入模块；组件检查还在独立副本中用 Electron 的 Node 模式核对加载。连接、按钮设置、麦克风和待验收范围见 [项目状态](project-status.md)。
 
 `assets/motion/anime` 的动漫动作视频仅保留为本地实验素材；正式入口不加载它们，打包不要求或复制这些媒体及实验播放器。已有原图、视频、提示词和通用模型输入包保持原位。详见[实验素材说明](../prototypes/live2d-codex/assets/motion/anime/README.md)。
 
-动漫原画姿态使用自有 WebGL2 渲染器，`assets/scene/rin-poses` 素材随源码提供并继续打包。维护者重建可使用 `npm run art:pose-avatar -- --run`，检查后加 `--install`；输入与条款见[完整姿态说明](../prototypes/live2d-codex/assets/scene/rin-poses/README.md)。Sharp 仅用于制作素材。旧 `rin` 目录和骨骼制作工具保留作为源文件，不在主应用加载。
+两套动漫原画使用自有 WebGL2 渲染器，运行素材随源码提供。女版维护者可用 `npm run art:pose-avatar -- --run` 重建，检查后加 `--install`。素材标准与条款见[女版原画](../prototypes/live2d-codex/assets/scene/rin-poses/README.md)和[男版原画](../prototypes/live2d-codex/assets/scene/rin-male-poses/README.md)。用 `npm run qa:poses -- --run --stills --anime-male` 检查男版画面、表情和转场不变量。Sharp 仅用于制作素材。
 
 构建后运行 `npm run qa:wallpaper-modes -- --run`，在隔离 Electron 中核对旧动漫视频设置兼容、五姿态、真人视频切换与暂停、新进程恢复及声线/项目/草稿保留。输出进入 `work/qa/wallpaper-modes`，使用实际素材与合成后端，不连接账户或挂载日用桌面。
 
@@ -65,7 +65,7 @@ RC003 输入层还使用锁定的 Koffi 3.3.3 和 `@koromix/koffi-win32-x64` 预
 
 需要比较切换节奏时，运行 `npm run qa:pose-options -- --run`。它使用相同原画渲染四种候选淡化，输出单独视频与同步四格对照至 `work/qa/pose-transition-options`。增加 `--cyber` 可生成像素、竖条、点阵和故障效果的 Canvas2D 转场原型，输出至 `work/qa/pose-cyber-options`。应用使用已选定的 A 像素重组，默认 1.1 秒分解、0.1 秒停顿、1.6 秒聚合；对照工具不会更改这些参数。这是独立视觉对照工具，需要本机 FFmpeg。
 
-构建内部测试包后，运行 `npm run qa:release-package -- --package=<包目录>` 核对全部字节、源码与许可，再运行 `npm run qa:puppet-package -- --run --package=<包目录>`。后者启动真正的测试包主程序，使用隔离数据与明确不可用的 CLI，不连接账户、不把测试壁纸挂到日用桌面；验证两种风格、声线、正常退出与新进程恢复。安装器可用 `/PORTABLE=1` 解包到新验证目录后再运行这些检查；这不等于新机器注册安装、卸载或物理显示验收。
+构建内部测试包后，运行 `npm run qa:release-package -- --package=<包目录>` 核对全部字节、源码与许可，再运行 `npm run qa:puppet-package -- --run --package=<包目录>`。后者以隔离数据运行测试包主程序，验证三种风格、声线、正常退出与新进程恢复。测试使用明确不可用的 CLI 和独立于日用桌面的壁纸窗口。安装器可用 `/PORTABLE=1` 解包到新验证目录后再运行这些检查。新机器的安装、卸载及物理显示按验收清单另行执行。
 
 真人视频的切换失败回退使用 `npm run qa:wallpaper-recovery -- --run --package=<测试包目录>`：在隔离渲染器中分别注入真实解码错误和首次播放失败，确认原画面与已保存设置不变，再验证显式重试和新进程恢复。测试不改写实际媒体，不连接账户或设备，输出在 `work/qa/wallpaper-recovery-package`。
 
@@ -75,13 +75,13 @@ npm run resources
 
 这条命令按 `tools/release/resource-manifest.json` 下载基础安装包，校验 SHA-256 后以不注册安装项的方式解包到 `work/release-resources/版本号`。源码树缺失的运行时目录会连接到解包目录，壁纸资源递归补齐缺失文件，已有文件保留。补齐后校验动态媒体的大小与哈希。历史资源包若带有 Core，也可用于准备源码旧头像模式。
 
-当前清单锁定 0.6.3-rc.6 安装包，默认从保留的同版 Release 下载；已有同版安装包时可使用下列命令，仍须通过清单的大小和 SHA-256 校验，不能换成任意安装器。它仅提供锁定的视觉/基础运行资源，不会用安装包中的应用代码覆盖当前源码或 Electron 依赖。使用候选包提供资源不代表其已完成稳定版验收。
+当前清单锁定 0.6.3-rc.12 安装包，默认从保留的同版 Release 下载；已有同版安装包时可使用下列命令，仍须通过清单的大小和 SHA-256 校验，不能换成任意安装器。它仅提供锁定的视觉/基础运行资源，不会用安装包中的应用代码覆盖当前源码或 Electron 依赖。使用候选包提供资源不代表其已完成稳定版验收。
 
 ```powershell
-npm run resources -- --installer="release/test-builds/v0.6.3-rc.6/Rin-Desktop-0.6.3-rc.6-Setup.exe"
+npm run resources -- --installer="release/test-builds/v0.6.3-rc.12/Rin-Desktop-0.6.3-rc.12-Setup.exe"
 ```
 
-资源清单指向可下载的 GitHub 安装器。将新正式安装器加入清单前，先确认对应附件已公开且哈希一致。从 Git 标签源码归档构建时，应先使用当前 `main` 的资源清单和本说明。历史标签可能仍包含已删除的 Release 链接。
+资源清单指向可下载的 GitHub 安装器。发布候选版时用已构建的安装器生成资源清单，标签包含最终清单。清理旧 Release 前验证新标签的资源恢复入口。从较早的 Git 标签源码归档构建时，若资源链接已失效，可使用当前 `main` 的资源清单和本说明。
 
 准备好后，在仓库根目录运行：
 
@@ -90,7 +90,7 @@ npm start -- --check
 npm start
 ```
 
-双击根目录 `启动 Rin Desktop.cmd` 使用同一启动器；旧“雨夜壁纸”和“整合壁纸”快捷入口也指向当前源码。`npm --prefix prototypes/live2d-codex start` 保留为兼容入口。所有这些入口都不会扫描 `release/` 并回退到旧可执行文件。只读检查不会启动 Electron 或下载模型；缺少条件会明确报错。
+双击根目录 `启动 Rin Desktop.cmd` 使用同一启动器；旧“雨夜壁纸”和“整合壁纸”快捷入口也指向当前源码。`npm --prefix prototypes/live2d-codex start` 保留为兼容入口。所有这些入口都不会扫描 `release/` 并回退到旧可执行文件。只读检查不会启动 Electron 或下载模型。缺少真人视频资源时，启动器提示 `npm run resources`，已准备就绪的动漫壁纸仍可启动。
 
 默认使用壁纸和上次选择的 Agent。`npm start -- --provider=codex` 可明确选择后端；`--project="项目路径"`、`--storage="数据路径"` 支持空格，相对路径以仓库根目录为准。参数名使用小写，未知参数会报错。源码默认沿用 `work/runtime/avatar`。在源码版选择已有数据副本时，选择记录也保存在该源码数据根，和安装版分开。显式 `--storage` 仍优先。双击入口等待构建及进程启动成功，失败时显示错误；启动器与应用日志均在 `work/runtime/launcher`。需要实时看错误时使用终端 `npm start`。切换已运行的安装版和源码版前先从托盘退出原实例。
 

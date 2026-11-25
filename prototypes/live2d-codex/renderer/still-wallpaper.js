@@ -56,6 +56,8 @@ export async function startStillWallpaper({ host, api }) {
     async load(key) {
       const revision = frameRevision;
       const [requestId, character, pose, animated, animePlayback] = JSON.parse(key);
+      const { poseDirectory } = characters.characterProfile(character);
+      const assetRoot = `app://local/assets/scene/${poseDirectory}/`;
       let catalog, image, motionLayer;
       if (animated) {
         catalog = await loadMotionCatalog(); image = await loadImage(pose, catalog.posters.work);
@@ -66,11 +68,11 @@ export async function startStillWallpaper({ host, api }) {
           throw error;
         }
       }
-      image ??= await loadImage('attention');
+      image ??= await loadImage('attention', character === characters.DEFAULT_CHARACTER ? undefined : assetRoot + 'scene.png');
       const frame = { frame: compose(image), frameRevision: revision, requestId, character, pose, animated, animePlayback, motion: motionLayer, catalog, sourceWidth: image.naturalWidth, sourceHeight: image.naturalHeight };
       if (!animated) {
         try {
-          frame.puppet = await PuppetWallpaper.prepare({ host, activityChanged() { updateAudio(); report(); }, changed(error) {
+          frame.puppet = await PuppetWallpaper.prepare({ host, assetRoot, activityChanged() { updateAudio(); report(); }, changed(error) {
             if (closed || shown !== frame) return;
             puppetError = error; host.dataset.error = error.message; report();
           } });

@@ -95,17 +95,30 @@ test('source preflight requires the active complete pose set and no retired skel
     'assets/ambience/soft-keyboard.ogg':'fixture',
   };
   for(const pose of ['attention','cup','work','thinking','window'])files[`assets/stills/female-v2-4k/${pose}.png`]='fixture';
-  for(const file of [...POSE_FILES,'manifest.json'])files[`assets/scene/rin-poses/${file}`]='fixture';
+  for(const directory of ['rin-poses','rin-male-poses']) {
+    for(const file of [...POSE_FILES,'manifest.json'])files[`assets/scene/${directory}/${file}`]='fixture';
+  }
   await writeFile(join(plan.root,'package.json'),files['package.json']);
   for(const [file,bytes] of Object.entries(files)){
     const path=join(plan.appRoot,file);await mkdir(resolve(path,'..'),{recursive:true});await writeFile(path,bytes);
   }
   const options={platform:'win32',nodeVersion:'24.0.0',env:{}};
-  assert.deepEqual(inspectLaunch(plan,options).problems,[]);
+  const animeOnly=inspectLaunch(plan,options);
+  assert.equal(animeOnly.ready,true);
+  assert.deepEqual(animeOnly.problems,[]);
+  assert.match(animeOnly.warnings.join('\n'),/Realistic wallpaper resources are incomplete/);
+  const motionDirectory=join(plan.appRoot,'assets/motion/female');
+  const manifest=await readFile(join(projectRoot,'prototypes/live2d-codex/assets/motion/female/manifest.json'),'utf8');
+  await mkdir(motionDirectory,{recursive:true});
+  await writeFile(join(motionDirectory,'manifest.json'),manifest);
+  for(const file of Object.keys(JSON.parse(manifest).integrity)) await writeFile(join(motionDirectory,file),'fixture');
+  assert.deepEqual(inspectLaunch(plan,options).warnings,[]);
   await rm(join(plan.appRoot,'assets/scene/rin-poses/cup-blink.png'));
+  await rm(join(plan.appRoot,'assets/scene/rin-male-poses/scene.png'));
   const missing=inspectLaunch(plan,options);
   assert.equal(missing.ready,false);
   assert.match(missing.problems.join('\n'),/rin-poses\/cup-blink\.png/);
+  assert.match(missing.problems.join('\n'),/rin-male-poses\/scene\.png/);
 });
 
 test('read-only launch inspection never loads Electron installation hooks', async t => {

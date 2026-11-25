@@ -18,7 +18,7 @@ const head = git('rev-parse', 'HEAD'), trackedMain = git('rev-parse', 'refs/remo
 const dirty = git('status', '--porcelain'), launch = inspectLaunch(launchPlan());
 const status = {
   root: projectRoot,
-  source: { version: launch.version, entry: 'npm start', mode: launch.mode, storage: launch.storage, ready: launch.ready, problems: launch.problems },
+  source: { version: launch.version, entry: 'npm start', mode: launch.mode, storage: launch.storage, ready: launch.ready, problems: launch.problems, warnings: launch.warnings },
   release: { version: manifest.version, repository: expectedRepository, url: `https://github.com/${expectedRepository}/releases/tag/v${manifest.version}` },
   git: {
     root: git('rev-parse', '--show-toplevel'), branch: git('branch', '--show-current'), head, origin: remote,
@@ -58,4 +58,5 @@ Independent RC003 diagnostic: ${status.components.remoteDiagnostics.present ? 'r
 Dots: ${status.components.privateDots.present ? 'local private adapter present' : 'private adapter not present'}
 Current scope and next steps: docs/project-status.md`);
   for (const problem of launch.problems) console.log(`Setup: ${problem}`);
+  for (const warning of launch.warnings) console.log(`Warning: ${warning}`);
 }

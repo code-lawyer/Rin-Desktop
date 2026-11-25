@@ -13,7 +13,7 @@ export { pathKey } from './path-identity.mjs';
 const { isCliAgent, isStoredCliAgent } = catalog;
 
 export const { DEFAULT_SHORTCUTS, DEFAULT_REMOTE_KEYS } = actions;
-const { DEFAULT_CHARACTER, characterProfile, isCharacter, isQwenVoice, isChineseVoice } = characters;
+const { DEFAULT_CHARACTER, characterProfile, isQwenVoice, isChineseVoice } = characters;
 const defaults = () => ({ format: 1, projects: [], drafts: {}, settings: { character: DEFAULT_CHARACTER, wallpaperKind: 'artwork', animePlayback: 'poses', completionSound: true, ttsResident: false, ttsEngine: 'qwen', qwenVoice: 'Serena', qwenRoot: '', autoSpeak: false, prepareSpeech: false, voice: 3, speed: 1, microphone: '', shortcuts: { ...DEFAULT_SHORTCUTS }, remoteEnabled: false, remoteKeys: { ...DEFAULT_REMOTE_KEYS } } });
 export const draftKey = target => {
   if (!target || typeof target.cwd !== 'string') throw new Error('草稿目标无效。');
@@ -83,13 +83,12 @@ export class WorkspaceStore {
       this.data.drafts = canonicalDrafts(saved.drafts);
       this.data.submissions ??= {};
       for (const submission of Object.values(this.data.submissions)) if (submission.status === 'pending') submission.status = 'unknown';
-      const profile = characterProfile(saved.settings?.character);
-      this.data.settings.character = profile.id;
-      // Removed male artwork migrates to anime stills. Keep valid custom voices,
-      // projects and drafts; loading alone never overwrites the original file.
       this.data.settings.wallpaperKind = 'artwork';
       Object.assign(this.data.settings, stills.stillSettings(saved.settings));
+      // The old Live2D setting stays mapped to the original anime wallpaper.
       if (saved.settings?.character === 'male') this.data.settings.wallpaperMotion = false;
+      const profile = characterProfile(this.data.settings.wallpaperMotion ? DEFAULT_CHARACTER : saved.settings?.character);
+      this.data.settings.character = profile.id;
       this.data.settings.rc003 = remoteSettings(saved.settings?.rc003);
       if (!isQwenVoice(saved.settings?.qwenVoice)) this.data.settings.qwenVoice = profile.qwenVoice;
       if (!isChineseVoice(saved.settings?.voice)) this.data.settings.voice = profile.voice;
@@ -195,19 +194,9 @@ export class WorkspaceStore {
   }
   applySettings(data, patch) {
     const next = data.settings;
-    Object.assign(next, stills.validateStillPatch(patch));
-    if ('wallpaperKind' in patch) {
-      if (!wallpaperChoices.isWallpaperKind(patch.wallpaperKind)) throw new Error('壁纸类型无效。');
-      next.wallpaperKind = patch.wallpaperKind;
-    } else if ('character' in patch && patch.character !== next.character) next.wallpaperKind = 'artwork';
+    const wallpaper = wallpaperChoices.wallpaperChoice(patch, next);
+    Object.assign(next, stills.validateStillPatch(patch), wallpaper);
     if ('rc003' in patch) next.rc003 = remoteSettings(patch.rc003);
-    if ('character' in patch) {
-      if (!isCharacter(patch.character)) throw new Error('请选择已支持的壁纸人物。');
-      if (patch.character !== next.character) {
-        const profile = characterProfile(patch.character);
-        next.character = profile.id; next.qwenVoice = profile.qwenVoice; next.voice = profile.voice;
-      }
-    }
     if ('completionSound' in patch) { if (typeof patch.completionSound !== 'boolean') throw new Error('提示音开关无效。'); next.completionSound = patch.completionSound; }
     if ('playbackVolume' in patch) { if (!Number.isFinite(patch.playbackVolume) || patch.playbackVolume < 0 || patch.playbackVolume > 1) throw new Error('播报音量应在 0–100% 之间。'); next.playbackVolume = patch.playbackVolume; }
     if ('ttsResident' in patch) { if (typeof patch.ttsResident !== 'boolean') throw new Error('常驻开关无效。'); next.ttsResident = patch.ttsResident; }

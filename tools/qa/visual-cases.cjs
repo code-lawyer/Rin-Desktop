@@ -150,6 +150,16 @@ module.exports=async function visualCases({open,evaluate,delay,output,extended=f
   const workbench=await open('workbench.html',1120,760);
   await capture(workbench,'conversations-standard',1120,760);
   await capture(workbench,'conversations-compact',760,540);
+  await verify(workbench,'unchanged wallpaper snapshots preserve project focus and live region text',`(()=>{
+    const row=document.querySelector('.project-row');row.focus();
+    const observer=new MutationObserver(()=>{});
+    for(const id of ['connection','character-status','still-status','ambience-status','tts-phase'])
+      observer.observe(document.getElementById(id),{childList:true,characterData:true,subtree:true});
+    interfaceFixture.emit('workspace',{});
+    const unchanged=observer.takeRecords().length===0;
+    observer.disconnect();
+    return unchanged&&document.activeElement===row;
+  })()`);
   await evaluate(workbench,`document.getElementById('settings-tab').click()`);
   const groups=await evaluate(workbench,`[...document.querySelectorAll('[data-setting-target]')].map(el=>el.dataset.settingTarget)`);
   for(const group of groups) {
@@ -228,7 +238,8 @@ module.exports=async function visualCases({open,evaluate,delay,output,extended=f
       await capture(workbench,'wallpaper-minimum-zoom-'+Math.round(zoom*100),760,540,zoom);
       if(zoom===2) {
         await reachable(workbench,'all settings categories are visible at 200%',groups.map(group=>`[data-setting-target="${group}"]`),{withoutScrolling:true});
-        await reachable(workbench,'both wallpaper styles remain reachable at 200%',['[name="wallpaper-style"][value="anime"]','[name="wallpaper-style"][value="realistic"]']);
+        await reachable(workbench,'all three wallpaper styles remain reachable at 200%',
+          ['anime','anime-male','realistic'].map(style=>`[name="wallpaper-style"][value="${style}"]`));
       }
       await reachable(workbench,'wallpaper controls at minimum window and '+Math.round(zoom*100)+'%',['#still-pose','#pause-stills']);
       await capture(workbench,'wallpaper-controls-minimum-zoom-'+Math.round(zoom*100),760,540,zoom);

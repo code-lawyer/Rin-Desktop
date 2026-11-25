@@ -6,6 +6,6 @@
 
 当前主应用的「动漫静态」模式由相邻的 [`rin-poses`](../scene/rin-poses/README.md) 自有 WebGL2 渲染器驱动（约 2.8 秒马赛克分解重组切换、眨眼、轻微视线与朗读口型），本目录的 `female-v2-4k/attention.png` 作为首帧及异常回退底图保留，`female-v2` 与 `scene-v3` 同时作为 `rin-poses` 重建输入和兼容回归素材保留。生成素材的面容、场景一致性和细节仍需结合实机显示验收确认，范围见[项目状态](../../../../docs/project-status.md)。
 
-旧 `female` 文件夹完整保留：work / attention 是此前已验收的3840×2400超分图，其他四张1586×992，旧提示词见 [prompts.json](prompts.json)。它们不再是女生的运行时姿态。2026-11-01已移除男士壁纸及其资源；现有女生原图和处理证据保持原样。
+旧 `female` 文件夹保存两张 3840 × 2400 超分图和四张 1586 × 992 原画，提示词见 [prompts.json](prompts.json)。现行男版使用独立的[原画包](../scene/rin-male-poses/README.md)。
 
 这些生成场景允许随本应用展示、修改和再分发，不声称享有排他版权。没有 Wallpaper Engine、视频播放器或外部壁纸素材依赖。

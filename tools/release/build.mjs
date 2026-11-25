@@ -6,6 +6,7 @@ import { execFileSync } from 'node:child_process';
 import { releaseVersion, requireFreshDirectory, reserveFreshDirectory } from './release-inputs.mjs';
 import { inspectMotionAssets } from './motion-assets.mjs';
 import { inspectPuppetAssets } from './puppet-assets.mjs';
+import characters from '../../prototypes/live2d-codex/backend/character-profiles.cjs';
 import { writeManifest } from './manifest.mjs';
 import { createRunDirectory } from '../qa/run-output.mjs';
 
@@ -24,7 +25,7 @@ if (sign) {
 }
 
 await inspectMotionAssets(join(app, 'assets/motion/female'));
-await inspectPuppetAssets(join(app, 'assets/scene/rin-poses'));
+for (const directory of characters.POSE_DIRECTORIES) await inspectPuppetAssets(join(app, 'assets/scene', directory));
 const resources = process.env.VIBE_RESOURCE_APP || app;
 await access(join(resources, 'runtime/node.exe'));
 await access(join(app, 'voice-resources.json'));

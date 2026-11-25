@@ -20,12 +20,18 @@ async function fixture(t) {
 test('wallpaper styles preserve independent voices and playback preferences across restart', async t => {
   const {store,dir}=await fixture(t);
   await store.updateSettings({ttsEngine:'kokoro',speed:.9,qwenVoice:'Dylan',voice:59});
-  for(const wallpaperMotion of [true,false,true]) {
+  for(const [patch, character, wallpaperMotion] of [
+    [{wallpaperMotion:true}, 'female', true],
+    [{character:'anime-male'}, 'anime-male', false],
+    [{wallpaperMotion:true}, 'female', true],
+    [{character:'anime-male',wallpaperMotion:false}, 'anime-male', false],
+    [{character:'female',wallpaperMotion:false}, 'female', false],
+  ]) {
     const before=speechProfile(store.data.settings);
-    await store.updateSettings({wallpaperMotion});
+    await store.updateSettings(patch);
     assert.equal(speechProfile(store.data.settings),before);
     const reload=new WorkspaceStore(dir);await reload.load();
-    for(const [key,value] of Object.entries({character:'female',wallpaperMotion,qwenVoice:'Dylan',voice:59,ttsEngine:'kokoro',speed:.9,ttsResident:false,autoSpeak:false}))assert.equal(reload.data.settings[key],value);
+    for(const [key,value] of Object.entries({character,wallpaperMotion,qwenVoice:'Dylan',voice:59,ttsEngine:'kokoro',speed:.9,ttsResident:false,autoSpeak:false}))assert.equal(reload.data.settings[key],value);
   }
 });
 
@@ -112,11 +118,11 @@ test('closing during a load disposes both active and late scenes without showing
   await scenes.select('anime'); assert.equal(scenes.current, null);
 });
 
-test('removed male wallpaper assets cannot be selected or shipped from the checkout', async () => {
+test('anime male uses its own pose pack and keeps the retired male Live2D assets out', async () => {
   const assets = resolve(import.meta.dirname, '../assets');
   for(const name of ['rainy-window-male','stills/male','character-previews/male.png'])await assert.rejects(access(join(assets,name)),{code:'ENOENT'});
   const profiles=(await import('../backend/character-profiles.cjs')).default;
-  assert.deepEqual(Object.keys(profiles.CHARACTERS),['female']);
+  assert.equal(profiles.characterProfile('anime-male').poseDirectory,'rin-male-poses');
   assert.equal(profiles.isCharacter('male'),false);
   const manifest=JSON.parse(await readFile(join(assets,'stills/manifest.json'),'utf8'));
   assert.deepEqual(Object.keys(manifest.active),['female']);

@@ -8,6 +8,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { createRunDirectory, requireLiveRun, writeRunReport } from './run-output.mjs';
 import { connectPage } from './cdp.mjs';
 import { inspectPuppetAssets } from '../release/puppet-assets.mjs';
+import characters from '../../prototypes/live2d-codex/backend/character-profiles.cjs';
 
 requireLiveRun(
   'npm run qa:puppet-package -- --run --package=<extracted test package>',
@@ -24,7 +25,7 @@ if (
 const directory = resolve(packages[0].slice(10));
 const portable = JSON.parse(await readFile(join(directory, 'resources/app/portable.json'), 'utf8'));
 assert.equal(portable.testBuild?.channel, 'internal-test', 'Use an isolated test build');
-await inspectPuppetAssets(join(directory, 'resources/app/assets/scene/rin-poses'));
+for (const name of characters.POSE_DIRECTORIES) await inspectPuppetAssets(join(directory, 'resources/app/assets/scene', name));
 const output = await createRunDirectory('puppet-package'),
   checks = [];
 const server = createServer();
@@ -168,25 +169,34 @@ try {
   await writeFile(legacyConfig, 'legacy config bytes');
   await launch();
   await checkFixedAgents();
+  const covers = await workspace.evaluate(`Promise.all([...document.querySelectorAll('.character-card img')].map(async img => {
+    await img.decode();
+    const head = await fetch(img.src, { method: 'HEAD' });
+    return [head.status, head.headers.get('content-type'), Number(head.headers.get('content-length')) > 0];
+  }))`);
+  assert.deepEqual(covers, [[200, 'image/webp', true], [200, 'image/webp', true], [200, 'image/png', true]]);
+  assert.equal(await workspace.evaluate("fetch('app://local/assets/scene/missing-cover.webp',{method:'HEAD'}).then(r=>r.status)"), 404);
+  checks.push('all three wallpaper covers decode through the packaged protocol, with accurate metadata and a missing-file response');
   assert.equal((await snapshot()).wallpaper.model, 'rin-scene');
   assert.equal(await wallpaper.evaluate('document.hidden'), false);
   checks.push('actual packaged main/preload/renderer default to original anime poses without an installed CLI');
   await workspace.evaluate("companion.saveSettings({stillPose:'window',qwenVoice:'Vivian',voice:48})");
   await until(() => wallpaper.evaluate(host + ".dataset.pose==='window'"), 'saved gaze');
-  for (const [motion, rig] of [
-    [true, 'motion-clips'],
-    [false, 'rin-scene'],
+  for (const [style, character, rig] of [
+    ['realistic', 'female', 'motion-clips'],
+    ['anime', 'female', 'rin-scene'],
+    ['anime-male', 'anime-male', 'rin-scene'],
   ]) {
-    assert.equal((await workspace.evaluate(`companion.saveSettings({wallpaperMotion:${motion}})`)).ok, true);
+    await workspace.evaluate(`document.querySelector('[name=wallpaper-style][value=${style}]').click()`);
     await until(async () => {
-      const { wallpaper: w } = await snapshot();
-      return w.phase === 'ready' && w.model === rig;
-    }, 'style ' + rig);
+      const { wallpaper: w, settings } = await snapshot();
+      return w.phase === 'ready' && w.model === rig && w.character === character && settings.character === character;
+    }, 'style ' + style);
   }
   const state = await snapshot();
   assert.equal(state.settings.qwenVoice, 'Vivian');
   assert.equal(state.settings.voice, 48);
-  checks.push('production settings transaction switches both styles and preserves custom voices');
+  checks.push('production settings transaction switches all three styles and preserves custom voices');
   const puppet = "document.querySelector('.wallpaper-puppet[data-active=true]')";
   for (const pose of ['cup','attention','work','thinking','window']) {
     assert.equal((await workspace.evaluate(`companion.saveSettings({stillPose:'${pose}'})`)).ok, true);
@@ -194,13 +204,15 @@ try {
   }
   assert.equal((await workspace.evaluate("companion.wallpaperControl('gesture','wave')")).ok,false);
   assert.equal(await workspace.evaluate("document.querySelectorAll('[data-gesture]').length"),0);
-  checks.push('all five complete poses settle through production IPC; retired skeletal gestures are rejected');
+  checks.push('all five male poses settle through production IPC; retired skeletal gestures are rejected');
   const shot = await wallpaper.send('Page.captureScreenshot', { format: 'png' });
-  await writeFile(join(output, 'packaged-rin.png'), Buffer.from(shot.data, 'base64'));
+  await writeFile(join(output, 'packaged-anime-male.png'), Buffer.from(shot.data, 'base64'));
   await quit();
   await launch();
   const restored = await snapshot();
   assert.equal(restored.wallpaper.model, 'rin-scene');
+  assert.equal(restored.settings.character, 'anime-male');
+  assert.equal(restored.wallpaper.character, 'anime-male');
   assert.equal(restored.settings.animePlayback, 'poses');
   assert.equal(restored.settings.stillPose, 'window');
   assert.equal(restored.settings.qwenVoice, 'Vivian');

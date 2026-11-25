@@ -7,8 +7,8 @@ const ROOT = 'app://local/assets/scene/rin-poses/';
 // Whole authored poses dissolve into pixels over one fixed room. Facial details stay local to
 // each pose; preparing a replacement retains the currently accepted scene.
 export class PuppetWallpaper {
-  static async prepare({ host, changed, activityChanged }) {
-    const scene = new PuppetWallpaper({ host, changed, activityChanged });
+  static async prepare({ host, assetRoot, changed, activityChanged }) {
+    const scene = new PuppetWallpaper({ host, assetRoot, changed, activityChanged });
     try {
       await scene.load();
       return scene;
@@ -17,8 +17,9 @@ export class PuppetWallpaper {
       throw error;
     }
   }
-  constructor({ host, changed, activityChanged }) {
+  constructor({ host, assetRoot = ROOT, changed, activityChanged }) {
     this.host = host;
+    this.assetRoot = assetRoot;
     this.changed = changed;
     this.closed = false;
     this.active = false;
@@ -43,7 +44,7 @@ export class PuppetWallpaper {
     this.fallback.className = 'rin-character rin-fallback';
     this.fallback.alt = '';
     this.fallback.setAttribute('aria-hidden', 'true');
-    this.fallback.src = ROOT + 'scene.png';
+    this.fallback.src = this.assetRoot + 'scene.png';
     this.canvas = document.createElement('canvas');
     this.canvas.className = 'rin-character';
     this.canvas.setAttribute('aria-hidden', 'true');
@@ -95,7 +96,7 @@ export class PuppetWallpaper {
     let timer;
     try {
       await Promise.race([
-        Promise.all([this.fallback.decode(), this.player.load(ROOT, this.abort.signal)]),
+        Promise.all([this.fallback.decode(), this.player.load(this.assetRoot, this.abort.signal)]),
         new Promise((_, reject) => {
           timer = setTimeout(() => {
             const error = new Error('角色素材加载超时，请重试。');

@@ -203,7 +203,7 @@ main { min-width: 0; min-height: 0; }
 .setting-section p { margin: 11px 0; }
 .setting-section p:empty { display: none; }
 .settings input[readonly] { caret-color: transparent; }
-.character-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.character-options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
 .character-option { position: relative; cursor: pointer; min-width: 0; }
 .character-option input { position: absolute; right: 13px; top: 13px; width: 18px; height: 18px; min-height: 0; margin: 0; z-index: 1; accent-color: var(--accent); cursor: pointer; }
 .character-card { display: block; overflow: hidden; border: 2px solid var(--line); border-radius: 9px; background: var(--input); transition: border-color 160ms ease-out; }
@@ -215,7 +215,15 @@ main { min-width: 0; min-height: 0; }
 .character-option input:checked + .character-card { border-color: var(--accent); background: #e5edf0; }
 .character-option input:focus-visible + .character-card { outline: 2px solid var(--focus); outline-offset: 3px; }
 .character-option input:disabled + .character-card { opacity: .65; cursor: wait; }
-@container settings-content (max-width: 38rem) {
+@container settings-content (30rem < width <= 38rem) {
+  #wallpaper-settings { padding-block: 20px; }
+  .character-options { gap: 10px; }
+  .character-card { height: 100%; }
+  .character-card img { max-height: 82px; object-position: right 33%; }
+  .character-caption { padding: 8px 10px; }
+  .character-option input { top: 8px; right: 8px; }
+}
+@container settings-content (max-width: 30rem) {
   .character-options { grid-template-columns: minmax(0, 1fr); gap: 8px; }
   .character-card { display: grid; grid-template-columns: clamp(72px, 27%, 112px) minmax(0, 1fr); align-items: center; min-height: 64px; }
   .character-card img { align-self: stretch; aspect-ratio: auto; height: 60px; min-height: 100%; object-position: right center; }

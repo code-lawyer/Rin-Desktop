@@ -1,11 +1,17 @@
 // Shared by settings, the wallpaper renderer and the synthesis boundary.
 const DEFAULT_CHARACTER = 'female';
+const ANIME_MALE_CHARACTER = 'anime-male';
 const CHARACTERS = Object.freeze({
   female: Object.freeze({
-    id: 'female', label: '窗边女生', model: 'rainy-window-v2-4k',
+    id: 'female', label: '窗边女生', model: 'rainy-window-v2-4k', poseDirectory: 'rin-poses',
+    sourceWidth: 3840, sourceHeight: 2400, qwenVoice: 'Serena', voice: 3,
+  }),
+  [ANIME_MALE_CHARACTER]: Object.freeze({
+    id: ANIME_MALE_CHARACTER, label: '窗边男生', poseDirectory: 'rin-male-poses',
     sourceWidth: 3840, sourceHeight: 2400, qwenVoice: 'Serena', voice: 3,
   }),
 });
+const POSE_DIRECTORIES = Object.freeze(Object.values(CHARACTERS).map(profile => profile.poseDirectory));
 const QWEN_VOICES = Object.freeze({
   Serena: { label: 'Serena · 温柔女声', gender: 'female' },
   Vivian: { label: 'Vivian · 明亮女声', gender: 'female' },
@@ -26,4 +32,4 @@ function qwenSynthesisVoice(settings = {}) {
     : '年轻成年女性，声音清澈，语气平静克制、清冷自信';
   return { speaker, instruct: `用标准普通话自然地交谈。${persona}，语速适中，随语意自然停顿，句尾放松。` };
 }
-module.exports = { DEFAULT_CHARACTER, CHARACTERS, QWEN_VOICES, characterProfile, isCharacter, isQwenVoice, isChineseVoice, qwenSynthesisVoice };
+module.exports = { DEFAULT_CHARACTER, ANIME_MALE_CHARACTER, CHARACTERS, POSE_DIRECTORIES, QWEN_VOICES, characterProfile, isCharacter, isQwenVoice, isChineseVoice, qwenSynthesisVoice };

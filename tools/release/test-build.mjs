@@ -7,6 +7,7 @@ import { writeManifest } from './manifest.mjs';
 import { releaseVersion, requireFreshDirectory, reserveFreshDirectory } from './release-inputs.mjs';
 import { inspectMotionAssets } from './motion-assets.mjs';
 import { inspectPuppetAssets } from './puppet-assets.mjs';
+import characters from '../../prototypes/live2d-codex/backend/character-profiles.cjs';
 
 const root = resolve(import.meta.dirname, '../..'), app = join(root, 'prototypes/live2d-codex');
 const id = process.argv.find(arg => arg.startsWith('--id='))?.slice(5) || new Date().toISOString().replace(/[-:TZ.]/g,'').slice(0,14) + '-data-agent';
@@ -15,7 +16,7 @@ const version = await releaseVersion(root);
 const name = `Rin-Desktop-${version}-Test-${id}`, output = join(root,'release','test-builds',id), stage = join(output,name);
 await requireFreshDirectory(output);
 await inspectMotionAssets(join(app, 'assets/motion/female'));
-await inspectPuppetAssets(join(app, 'assets/scene/rin-poses'));
+for (const directory of characters.POSE_DIRECTORIES) await inspectPuppetAssets(join(app, 'assets/scene', directory));
 const compiler = process.env.INNO_ISCC || join(root,'work/release-build/tools/inno/ISCC.exe'); await access(compiler);
 execFileSync(process.execPath,[join(root,'tools/release/audit-public.mjs'),'--worktree'],{cwd:root,windowsHide:true,stdio:'inherit'});
 const git = args => execFileSync('git',['-c',`safe.directory=${root}`,...args],{cwd:root,encoding:'utf8'}).trim();

@@ -9,6 +9,7 @@ import { inspectPuppetAssets, copyPuppetAssets } from '../../../tools/release/pu
 import { retiredWallpaperAsset, sourceAvatarAsset } from '../../../tools/release/resource-assets.mjs';
 import { copyAgentDependencies } from './copy-agent-dependencies.mjs';
 import catalog from '../backend/agent-catalog.cjs';
+import characters from '../backend/character-profiles.cjs';
 import { buildRemoteHelper } from '../backend/remote-native.mjs';
 const root = resolve(import.meta.dirname,'..'), workspace = resolve(root,'../..');
 const version = await releaseVersion(workspace);
@@ -21,8 +22,8 @@ await requireFreshDirectory(output);
 const resources = resolve(process.env.VIBE_RESOURCE_APP || root);
 const motionDirectory = join(root, 'assets/motion/female');
 await inspectMotionAssets(motionDirectory);
-const puppetDirectory = join(root, 'assets/scene/rin-poses');
-await inspectPuppetAssets(puppetDirectory);
+const poseDirectories = characters.POSE_DIRECTORIES.map(directory => `assets/scene/${directory}`);
+for (const directory of poseDirectories) await inspectPuppetAssets(join(root, directory));
 await reserveFreshDirectory(output);
 const appDir = join(output,'resources/app'); await mkdir(appDir,{recursive:true});
 await cp(join(root,'node_modules/electron/dist'),output,{recursive:true,filter:src=>!src.endsWith('electron.exe')});
@@ -40,7 +41,7 @@ for (const name of ['character-previews','stills','ambience']) await cp(join(roo
   recursive:true, filter:source=>!retiredWallpaperAsset(relative(join(root,'assets'),source)),
 });
 await copyMotionAssets(motionDirectory, join(appDir, 'assets/motion/female'));
-await copyPuppetAssets(puppetDirectory, join(appDir, 'assets/scene/rin-poses'));
+for (const directory of poseDirectories) await copyPuppetAssets(join(root, directory), join(appDir, directory));
 await mkdir(join(appDir,'scripts'),{recursive:true});
 for (const file of ['wallpaper-host.ps1', 'wallpaper-pose-input.cs'])
   await cp(join(root, 'scripts', file), join(appDir, 'scripts', file));

@@ -4,7 +4,9 @@ import { createRequire } from 'node:module';
 import { resolve, join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import stills from '../../prototypes/live2d-codex/backend/still-settings.cjs';
+import characters from '../../prototypes/live2d-codex/backend/character-profiles.cjs';
 import { POSE_FILES } from '../../prototypes/live2d-codex/renderer/pose-assets.mjs';
+import { motionCatalog } from '../../prototypes/live2d-codex/renderer/motion-catalog.mjs';
 import catalog from '../../prototypes/live2d-codex/backend/agent-catalog.cjs';
 
 export const projectRoot = resolve(import.meta.dirname, '../..');
@@ -44,7 +46,7 @@ export function launchPlan(args = [], root = projectRoot) {
 }
 
 export function inspectLaunch(plan, { platform = process.platform, nodeVersion = process.versions.node, env = process.env } = {}) {
-  const problems = [], appRequire = createRequire(join(plan.appRoot, 'package.json'));
+  const problems = [], warnings = [], appRequire = createRequire(join(plan.appRoot, 'package.json'));
   let version = null, electron = null;
   if (platform !== 'win32') problems.push('Rin Desktop currently requires Windows x64.');
   if (Number(nodeVersion.split('.')[0]) < 24) problems.push('Node.js 24 or newer is required.');
@@ -70,8 +72,19 @@ export function inspectLaunch(plan, { platform = process.platform, nodeVersion =
   if (plan.mode === 'avatar') resources.push('vendor/live2dcubismcore.min.js', 'assets/hiyori/Hiyori.model3.json');
   else {
     for (const pose of stills.POSES) resources.push(`assets/stills/female-v2-4k/${pose}.png`);
-    for (const file of [...POSE_FILES, 'manifest.json']) resources.push(`assets/scene/rin-poses/${file}`);
+    for (const directory of characters.POSE_DIRECTORIES) {
+      for (const file of [...POSE_FILES, 'manifest.json']) resources.push(`assets/scene/${directory}/${file}`);
+    }
     resources.push('assets/ambience/light-rain.ogg', 'assets/ambience/soft-keyboard.ogg');
+    const motion = join(plan.appRoot, 'assets/motion/female');
+    try {
+      const source = JSON.parse(readFileSync(join(motion, 'manifest.json'), 'utf8'));
+      const { clips } = motionCatalog(source);
+      const files = [...clips.values()].map(clip => clip.file).concat(source.posters.work, source.posters.user);
+      if (!files.every(file => statSync(join(motion, file)).isFile())) throw new Error('Incomplete media files');
+    } catch {
+      warnings.push('Realistic wallpaper resources are incomplete. Run npm run resources to restore them.');
+    }
   }
   const missing = resources.filter(name => !existsSync(join(plan.appRoot, name)));
   if (missing.length) problems.push(`Missing visual resources: ${missing.join(', ')}. Wallpaper resources: npm run resources. Hiyori is a local-only legacy asset.`);
@@ -79,7 +92,7 @@ export function inspectLaunch(plan, { platform = process.platform, nodeVersion =
   if (plan.provider === 'dots' && (!existsSync(join(plan.root, 'prototypes/dots-bridge/src/client.mjs')) || !existsSync(join(plan.appRoot, 'backend/dots.mjs')))) problems.push('The private Dots adapter is not present in this checkout. Use a CLI provider.');
   const adapter = { claude: 'claude-agent.mjs', acp: 'acp-agent.mjs' }[catalog.AGENTS[plan.provider]?.adapter];
   if (adapter && !existsSync(join(plan.appRoot, 'backend', adapter))) problems.push(`The ${plan.provider} adapter is not present in this source version.`);
-  return { ...plan, version, nodeVersion, electron, ready: problems.length === 0, problems };
+  return { ...plan, version, nodeVersion, electron, ready: problems.length === 0, problems, warnings };
 }
 
 export function electronEnvironment(env = process.env) {
@@ -134,6 +147,7 @@ Use npm run status to inspect the repository and release relationship.`);
   const plan = inspectLaunch(launchPlan(args));
   if (plan.check) { console.log(JSON.stringify(plan, null, 2)); return plan.ready ? 0 : 1; }
   if (!plan.ready) throw new Error(plan.problems.join('\n'));
+  for (const warning of plan.warnings) console.warn(warning);
   console.log(`[Rin Desktop ${plan.version}] working-tree source; mode=${plan.mode}; provider=${plan.provider}`);
   console.log(`Application: ${plan.appRoot}\nData: ${plan.storage}`);
   return buildAndLaunch(plan);

@@ -94,7 +94,7 @@ app.whenReady().then(async()=>{
   handler('remote:command',()=>remote);handler('workbench:list',()=>({data:[],nextCursor:null}));handler('workbench:draft',()=>({text:''}));handler('workbench:learn-key',()=>{});
   handler('speech:stop',()=>{});handler('speech:volume',async(_e,value)=>{await store.updateSettings({playbackVolume:value});notify();return snapshot();});
   let synthesisGate;
-  handler('speech:synthesize',async()=>{if(synthesisGate)await synthesisGate;return {samples:Float32Array.from({length:24000*2},(_,i)=>puppetRun && Math.floor(i/4800)%2===0 ? .14*Math.sin(2*Math.PI*220*i/24000) : 0),sampleRate:24000};});
+  handler('speech:synthesize',async()=>{if(synthesisGate)await synthesisGate;return {samples:Float32Array.from({length:24000*2},(_,i)=>(puppetRun || modesRun) && Math.floor(i/4800)%2===0 ? .14*Math.sin(2*Math.PI*220*i/24000) : 0),sampleRate:24000};});
   const playbackContext=vm.createContext({ipcMain,trusted:()=>true,Date,handler,replyNarration,
     suspended:false,screenLocked:false,notifyPresentation:sendPresentation,applyAmbientBeforeAudio:()=>barrier.wait()});
   Object.defineProperties(playbackContext,{
@@ -140,7 +140,13 @@ app.whenReady().then(async()=>{
   const host="document.getElementById('wallpaper-view')";
   await until(wallpaper,host+".dataset.ready==='true'");
   if(modesRun || modesRestore) {
-    await require('./wallpaper-modes-cases.cjs')({wallpaper,chat,workbench,host,store,present,checks,js,until,delay,capture,notify,restore:modesRestore,withdrawnRequests,output});
+    await require('./wallpaper-modes-cases.cjs')({
+      wallpaper, chat, workbench, host, store, state, present, checks, js, until, delay, capture, notify,
+      restore: modesRestore, withdrawnRequests, output, sendPresentation, replyNarration,
+      failAsset(path) { blocked = path; expectedFailure = !!path; },
+      synthesis(value) { synthesisGate = value; },
+      completeReply: reply => replyNarration.complete(reply, { available: true, ...store.data.settings }),
+    });
     assert.deepEqual(errors,[]);
     writeFileSync(join(output,modesRestore?'modes-restore.json':'modes.json'),JSON.stringify({checks,errors,actualMedia:true,accounts:false,hardware:false},null,2));
     barrier.close();for(const win of windows)win.destroy();app.exit(0);return;
@@ -327,7 +333,7 @@ app.whenReady().then(async()=>{
     const waitHeld=async()=>{for(let i=0;i<120;i++){if(characterFault.releases.length)return;await delay(50);}throw new Error('No held wallpaper image request: '+JSON.stringify(characterRequests));};
     const arm=(character,hold=false)=>{expectedFailure=true;characterFault={character,hold,hits:0,releases:[]};return characterFault;};
     await js(workbench,"document.getElementById('settings-tab').click()");
-    assert.deepEqual(await js(workbench,"[...document.querySelectorAll('[name=wallpaper-style]')].map(r=>r.value)"),['anime','realistic']);
+    assert.deepEqual(await js(workbench,"[...document.querySelectorAll('[name=wallpaper-style]')].map(r=>r.value)"),['anime','anime-male','realistic']);
     const pixels=await js(wallpaper,"document.querySelector('.wallpaper-still').toDataURL()");
     const fault=arm('realistic',true);
     await pick('realistic');await waitHeld();await assertCharacter('female','Vivian',48);

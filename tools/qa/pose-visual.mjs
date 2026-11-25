@@ -3,11 +3,12 @@ import { createRequire } from 'node:module';
 import { join, resolve } from 'node:path';
 import { createRunDirectory, requireLiveRun } from './run-output.mjs';
 requireLiveRun(
-  'npm run qa:poses -- --run [--stills]',
+  'npm run qa:poses -- --run [--stills] [--anime-male]',
   'isolated complete-pose rendering with local artwork; no accounts or hardware',
 );
-if (process.argv.slice(2).some((arg) => !['--run', '--stills'].includes(arg)))
-  throw Error('Use --run and optionally --stills');
+const options = process.argv.slice(2).filter(arg => arg !== '--run');
+if (options.some(arg => !['--stills', '--anime-male'].includes(arg)))
+  throw Error('Use --run with optional --stills and --anime-male');
 const root = resolve(import.meta.dirname, '../..'),
   output = await createRunDirectory('pose-visual');
 const require = createRequire(join(root, 'prototypes/live2d-codex/package.json'));
@@ -22,7 +23,7 @@ delete env.ELECTRON_RUN_AS_NODE;
 const stills = process.argv.includes('--stills');
 await command(
   join(root, 'prototypes/live2d-codex/node_modules/electron/dist/electron.exe'),
-  [join(import.meta.dirname, 'pose-visual-fixture.cjs'), output, ...(stills ? ['--stills'] : [])],
+  [join(import.meta.dirname, 'pose-visual-fixture.cjs'), output, ...options],
   env,
 );
 if (!stills)

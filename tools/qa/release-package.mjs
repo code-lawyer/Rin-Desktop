@@ -9,6 +9,7 @@ import { inspectMotionAssets } from '../release/motion-assets.mjs';
 import { inspectPuppetAssets } from '../release/puppet-assets.mjs';
 import { retiredWallpaperAsset, sourceAvatarAsset } from '../release/resource-assets.mjs';
 import catalog from '../../prototypes/live2d-codex/backend/agent-catalog.cjs';
+import characters from '../../prototypes/live2d-codex/backend/character-profiles.cjs';
 
 const option = key => process.argv.find(arg => arg.startsWith(`--${key}=`))?.slice(key.length + 3);
 if (!option('package') || process.argv.includes('--help')) {
@@ -22,9 +23,14 @@ const hash = async file => { const h = createHash('sha256'); for await (const ch
 const manifest = await json(join(directory, 'manifest.json'));
 const motion = await inspectMotionAssets(join(directory, 'resources/app/assets/motion/female'));
 const sourceMotion = await inspectMotionAssets(join(root, 'prototypes/live2d-codex/assets/motion/female'));
-const puppet = await inspectPuppetAssets(join(directory, 'resources/app/assets/scene/rin-poses'));
-const sourcePuppet = await inspectPuppetAssets(join(root, 'prototypes/live2d-codex/assets/scene/rin-poses'));
-assert.deepEqual(puppet.manifest, sourcePuppet.manifest, 'Packaged character differs from the source rig');
+let puppetFiles = 0;
+for (const name of characters.POSE_DIRECTORIES) {
+  const assetPath = join('assets/scene', name);
+  const puppet = await inspectPuppetAssets(join(directory, 'resources/app', assetPath));
+  const sourcePuppet = await inspectPuppetAssets(join(root, 'prototypes/live2d-codex', assetPath));
+  assert.deepEqual(puppet.manifest, sourcePuppet.manifest, 'Packaged character differs from the source rig: ' + name);
+  puppetFiles += puppet.names.length;
+}
 assert.deepEqual(motion.manifest, sourceMotion.manifest, 'Packaged motion media differs from the current approved runtime files');
 assert.equal(manifest.version, (await json(join(root, 'package.json'))).version);
 assert.equal(manifest.version, (await json(join(directory, 'resources/app/package.json'))).version);
@@ -94,6 +100,6 @@ if (option('baseline')) {
   }
   assert.ok(preserved > 10);
 }
-const report = {version:manifest.version,files:names.size,bytes,sourceMatches,backends:portable.backends,claudeSdkSuppliedByUser:true,motionMediaFiles:motion.names.length,animeVideoExcluded:true,sourceAvatarExcluded:true,puppetFiles:puppet.names.length,preservedArtworkAndCpuFiles:preserved,noModelsCredentialsOrCli:true,accounts:false,hardware:false,passed:true};
+const report = {version:manifest.version,files:names.size,bytes,sourceMatches,backends:portable.backends,claudeSdkSuppliedByUser:true,motionMediaFiles:motion.names.length,animeVideoExcluded:true,sourceAvatarExcluded:true,puppetFiles,preservedArtworkAndCpuFiles:preserved,noModelsCredentialsOrCli:true,accounts:false,hardware:false,passed:true};
 await writeRunReport(output,report);
 console.log(JSON.stringify({output,...report}));

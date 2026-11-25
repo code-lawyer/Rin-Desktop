@@ -43,6 +43,10 @@ function markSettingsDirty(dirty) {
   $('save-settings').hidden = !dirty;
 }
 const node = (tag, text, cls) => { const n = document.createElement(tag); if (text !== undefined) n.textContent = text; if (cls) n.className = cls; return n; };
+function setStatusText(id, text) {
+  const status = $(id);
+  if (status.textContent !== text) status.textContent = text;
+}
 for (const [id, voice] of Object.entries(characters.QWEN_VOICES)) $('qwen-voice').append(Object.assign(node('option', voice.label), { value: id }));
 function notice(text) {
   clearTimeout(noticeTimer);
@@ -67,7 +71,7 @@ function updateActivity() {
   const name = catalog.agentName(current?.provider);
   const connection = current?.connection;
   const sessionError = connection === 'ready' && current?.status === 'error';
-  $('connection').textContent = current?.provider === 'dots' ? '请选择一个 CLI Agent' : sessionError ? `${name} · 会话需要处理` : connection === 'ready' ? `${name} · 已连接` : connection === 'authentication' ? `${name} · 需要认证` : connection === 'error' ? `${name} · 连接需要处理` : `正在连接 ${name}…`;
+  setStatusText('connection', current?.provider === 'dots' ? '请选择一个 CLI Agent' : sessionError ? `${name} · 会话需要处理` : connection === 'ready' ? `${name} · 已连接` : connection === 'authentication' ? `${name} · 需要认证` : connection === 'error' ? `${name} · 连接需要处理` : `正在连接 ${name}…`);
   $('connection').title = connection === 'ready' && !sessionError ? `${name} · 本机工作区\n${current?.cwd || ''}` : current?.error || $('connection').textContent;
   $('connection').dataset.state = sessionError ? 'error' : connection || 'connecting';
   $('agent-select').value = current?.provider ?? 'codex';
@@ -193,25 +197,32 @@ function fillVoices() {
   $('voice').value = String(s.voice);
   if (!$('voice').value) { const o = node('option',`${s.voice >= 58 ? '男声' : '女声'} · ${s.voice}`); o.value = s.voice; $('voice').append(o); $('voice').value = s.voice; }
 }
+function wallpaperStyle({ character, wallpaperMotion }) {
+  if (wallpaperMotion) return 'realistic';
+  return character === characters.ANIME_MALE_CHARACTER ? 'anime-male' : 'anime';
+}
 function updateCharacterStatus() {
   const status = workspace.wallpaper;
-  const animated = status?.phase === 'loading' ? status.wallpaperMotion : workspace.settings.wallpaperMotion;
-  for (const radio of document.querySelectorAll('[name="wallpaper-style"]')) radio.checked = radio.value === (animated ? 'realistic' : 'anime');
+  const style = wallpaperStyle(status?.phase === 'loading' ? status : workspace.settings);
+  const radios = document.querySelectorAll('[name="wallpaper-style"]');
+  for (const radio of radios) radio.checked = radio.value === style;
+  const label = document.querySelector('[name="wallpaper-style"]:checked + .character-card strong').textContent;
   $('character-status').dataset.phase = status?.phase || '';
-  $('character-status').textContent = status?.phase === 'error' ? status.error : status?.phase === 'loading' ? '正在载入壁纸…' : '当前风格：' + (animated ? '真人视频' : '动漫静态');
+  setStatusText('character-status', status?.phase === 'error' ? status.error : status?.phase === 'loading' ? '正在载入壁纸…' : '当前风格：' + label);
   $('retry-character').hidden = status?.phase !== 'error';
 }
-async function saveWallpaperStyle(wallpaperMotion) {
-  try { acceptWorkspace(await run(api.saveSettings({ wallpaperMotion }))); }
+async function saveWallpaperStyle(style) {
+  const character = style === 'anime-male' ? characters.ANIME_MALE_CHARACTER : characters.DEFAULT_CHARACTER;
+  try { acceptWorkspace(await run(api.saveSettings({ character, wallpaperMotion: style === 'realistic' }))); }
   finally { updateCharacterStatus(); fillStills(); }
 }
 function fillSettings() {
+  fillStills();
   // Replacing a focused input does not reliably emit blur. Preserve the key
   // learner through backend updates until the user explicitly leaves it.
   if (document.activeElement?.matches('#shortcuts input,#remote-keys input')) { updateSpeechStatus(); return; }
   const s = workspace.settings; $('auto-speak').checked = s.autoSpeak; $('speed').value = String(s.speed); $('remote-enabled').checked = s.remoteEnabled;
   fillVoices();
-  fillStills();
   keyFields('shortcuts',s.shortcuts); keyFields('remote-keys',s.remoteKeys); fillModels();
   $('tts-engine').value = s.ttsEngine || 'qwen';
   updateSpeechStatus();
@@ -226,7 +237,7 @@ function updateSpeechStatus() {
   const speech = workspace.speech ?? {}, phase = speech.phase ?? 'unloaded', qwen = $('tts-engine').value === 'qwen';
   $('completion-sound').checked = workspace.settings.completionSound !== false;
   $('tts-resident').checked = workspace.settings.ttsResident === true;
-  $('tts-phase').textContent = ({unloaded:'未加载',loading:'加载中…',ready:'已常驻 · 可朗读',generating:'正在合成',stopping:'正在停止合成…',unloading:'正在释放…',error:'加载需要处理'})[phase] || '未加载';
+  setStatusText('tts-phase', ({unloaded:'未加载',loading:'加载中…',ready:'已常驻 · 可朗读',generating:'正在合成',stopping:'正在停止合成…',unloading:'正在释放…',error:'加载需要处理'})[phase] || '未加载');
   $('tts-phase').dataset.phase = phase;
   $('tts-error').hidden = !speech.error; $('tts-error').textContent = speech.error || '';
   $('retry-tts').hidden = phase !== 'error' || !workspace.settings.ttsResident;
@@ -264,7 +275,7 @@ function updateResourceStatus() {
   }
   const phases = {downloading:'正在下载',verifying:'正在校验',installing:'正在准备模型文件',runtime:'正在准备语音运行环境',loading:'正在载入模型',ready:'模型已载入，可以使用语音功能',cancelled:'已取消，已下载的内容会保留'};
   $('resource-progress').hidden = resource.phase === 'idle';
-  $('resource-progress').textContent = resource.error || `${resource.stage || phases[resource.phase] || ''}${resource.phase === 'downloading' && resource.total ? ` · ${Math.min(100,Math.floor(100 * resource.received / resource.total))}% · ${format(resource.received)} / ${format(resource.total)}` : ''}`;
+  setStatusText('resource-progress', resource.error || `${resource.stage || phases[resource.phase] || ''}${resource.phase === 'downloading' && resource.total ? ` · ${Math.min(100,Math.floor(100 * resource.received / resource.total))}% · ${format(resource.received)} / ${format(resource.total)}` : ''}`);
   $('resource-meter').hidden = !active;
   if (resource.phase === 'downloading' && resource.total) $('resource-meter').value = Math.min(1, resource.received / resource.total);
   else $('resource-meter').removeAttribute('value');
@@ -310,10 +321,10 @@ $('search').oninput = () => { clearTimeout(searchTimer); searchTimer = setTimeou
 function showSettings() { closeNavigation(); $('settings').hidden = false; $('conversations').hidden = true; $('settings-tab').setAttribute('aria-pressed','true'); renderProjects(); if (!settingsDirty) fillSettings(); }
 $('settings-tab').onclick = showSettings;
 $('manage-agents').onclick = () => { showSettings(); document.querySelector('[data-setting-target="agent-settings"]').click(); };
-for (const radio of document.querySelectorAll('[name="wallpaper-style"]')) radio.onchange = act(() => saveWallpaperStyle(radio.value === 'realistic'));
-$('retry-character').onclick = act(() => saveWallpaperStyle(workspace.wallpaper.wallpaperMotion === true));
+for (const radio of document.querySelectorAll('[name="wallpaper-style"]')) radio.onchange = act(() => saveWallpaperStyle(radio.value));
+$('retry-character').onclick = act(() => saveWallpaperStyle(wallpaperStyle(workspace.wallpaper)));
 let stillSaving = 0;
-let previewCharacter;
+let previewMotion;
 function fillStills() {
   if(stillSaving) return;
   const s=stills.stillSettings(workspace.settings);
@@ -322,12 +333,11 @@ function fillStills() {
   $('still-pose').value=s.stillPose;
   for(const option of $('still-pose').options) option.disabled=!allowed.includes(option.value);
   if(!allowed.includes(s.stillPose)) $('still-pose').value='auto';
-  const character='female';
   $('still-help').textContent=animated
       ? '点击小图可固定朝向；选择“自动”随工作与对话切换。工作与看向你各自循环播放，在动作接点转身。'
       : '五种完整坐姿保留眨眼和轻微视线变化，用约 2.8 秒的马赛克分解、聚合切换姿态，背景保持固定。呼出对话、听写或朗读时切到看向你，结束后恢复所选姿态；朗读口型随声音变化。系统减少动态效果时直接切换姿态。';
-  if(previewCharacter!==`${character}:${animated}`) {
-    previewCharacter=`${character}:${animated}`;
+  if(previewMotion!==animated) {
+    previewMotion=animated;
     $('still-previews').replaceChildren();
     for(const pose of animated?['work','attention']:stills.POSES) {
       const label=animated?(pose==='work'?'专注工作':'看向你'):stills.POSE_LABELS[pose];
@@ -343,15 +353,15 @@ function fillStills() {
   updateAmbienceStatus();
 }
 function updateStillStatus() {
-  const character='female', shown=workspace.wallpaper;
+  const character=workspace.settings.character, shown=workspace.wallpaper;
   const poseLabel=shown?.model==='motion-clips'?(shown?.pose==='attention'?'看向你':'专注工作'):stills.POSE_LABELS[shown?.pose];
   const phase=shown?.motionPhase==='transition'?(shown.model==='motion-clips'?'正在转身':'正在像素重组'):shown?.model==='motion-clips' && shown.motionPhase==='loop'?'循环播放 · ':'';
-  $('still-status').textContent=shown?.character===character && poseLabel && shown?.activity
-    ? `当前画面：${poseLabel} · ${phase}${shown.motionPhase==='transition'?'':stills.ACTIVITY_LABELS[shown.activity] || '等待状态更新'}` : '等待壁纸画面就绪…';
+  setStatusText('still-status', shown?.character===character && poseLabel && shown?.activity
+    ? `当前画面：${poseLabel} · ${phase}${shown.motionPhase==='transition'?'':stills.ACTIVITY_LABELS[shown.activity] || '等待状态更新'}` : '等待壁纸画面就绪…');
 }
 function updateAmbienceStatus() {
   const status=workspace.ambience;
-  $('ambience-status').textContent=status?.phase==='error'?status.error:workspace.wallpaperPaused?'壁纸和环境音已暂停。':!workspace.settings.ambienceEnabled?'环境音已关闭。':status?.phase==='loading'?'正在载入声音…':status?.phase==='ready'?'已开启 · 小雨和轻敲将随当前状态播放。':'等待壁纸声音就绪…';
+  setStatusText('ambience-status', status?.phase==='error'?status.error:workspace.wallpaperPaused?'壁纸和环境音已暂停。':!workspace.settings.ambienceEnabled?'环境音已关闭。':status?.phase==='loading'?'正在载入声音…':status?.phase==='ready'?'已开启 · 小雨和轻敲将随当前状态播放。':'等待壁纸声音就绪…');
   $('retry-ambience').hidden=status?.phase!=='error';
   $('pause-stills').setAttribute('aria-pressed',String(!!workspace.wallpaperPaused));
   $('pause-stills').textContent=workspace.wallpaperPaused?'继续壁纸与环境音':'暂停壁纸与环境音';
@@ -401,7 +411,18 @@ api.onState(state => {
   updateActivity(); if (changedModel) fillModels();
   if (ready && (changedProvider || !wasReady) && available()) refreshWorkspace().then(() => refreshThreads()).catch(() => {});
 });
-api.onWorkspace(value => { const settingsChanged = JSON.stringify(value.settings) !== JSON.stringify(workspace.settings), characterChanged = value.settings.character !== workspace.settings.character; if (!acceptWorkspace(value) || !ready) return; renderProjects(); if (!projectId) refreshWorkspace().catch(() => {}); if (characterChanged) { fillVoices(); fillStills(); } if (settingsChanged && !settingsDirty) fillSettings(); else updateSpeechStatus(); });
+api.onWorkspace(value => {
+  const previous = workspace;
+  if (!acceptWorkspace(value) || !ready) return;
+  if (JSON.stringify(value.projects) !== JSON.stringify(previous.projects)) renderProjects();
+  if (!projectId) refreshWorkspace().catch(() => {});
+  const settingsChanged = JSON.stringify(value.settings) !== JSON.stringify(previous.settings);
+  if (settingsChanged && !settingsDirty) fillSettings();
+  else {
+    if (wallpaperStyle(value.settings) !== wallpaperStyle(previous.settings)) fillStills();
+    updateSpeechStatus();
+  }
+});
 api.onWorkbenchRefresh(page => { refreshWorkspace().then(() => { if (['speech','remote','wallpaper'].includes(page)) { showSettings(); settingsNavigation.show(page === 'remote' ? 'remote-settings' : page === 'wallpaper' ? 'wallpaper-settings' : 'playback-settings'); } else if ($('settings').hidden) return refreshThreads(); }).catch(() => {}); });
 try { current = await run(api.snapshot()); await refreshWorkspace(); ready = true; } catch { ready = true; }
 import inputActions from '../backend/input-actions.cjs';

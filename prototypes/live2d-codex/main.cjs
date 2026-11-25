@@ -1,7 +1,7 @@
 const { app, BrowserWindow, ipcMain, protocol, screen, Tray, Menu, nativeImage, dialog, globalShortcut, shell, net, session, powerMonitor } = require('electron');
 const { AGENTS, isCliAgent, agentName } = require('./backend/agent-catalog.cjs');
 const { join, resolve, relative, extname, sep } = require('node:path');
-const { readFile, writeFile, mkdir, rename } = require('node:fs/promises');
+const { readFile, writeFile, mkdir, rename, stat } = require('node:fs/promises');
 const { pathToFileURL } = require('node:url');
 const { bubbleLayout } = require('./backend/bubble-layout.cjs');
 const { avatarScale: normalizeAvatarScale, avatarBounds } = require('./backend/avatar-window.cjs');
@@ -387,8 +387,15 @@ else {
         const file = resolve(root, name), rel = relative(root, file);
         if (rel.startsWith('..' + sep) || rel === '..' || rel.startsWith(sep)) return new Response('', { status: 403 });
         if (!['renderer/', 'dist/', 'assets/', 'vendor/'].some(prefix => rel.split(sep).join('/').startsWith(prefix))) return new Response('', { status: 403 });
-        const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.png': 'image/png', '.ogg': 'audio/ogg', '.moc3': 'application/octet-stream' };
-        return new Response(request.method === 'HEAD' ? null : await readFile(file), { headers: { 'Content-Type': types[extname(file)] ?? 'application/octet-stream', 'X-Content-Type-Options': 'nosniff' } });
+        const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.png': 'image/png', '.webp': 'image/webp', '.ogg': 'audio/ogg', '.moc3': 'application/octet-stream' };
+        const headers = { 'Content-Type': types[extname(file)] ?? 'application/octet-stream', 'X-Content-Type-Options': 'nosniff' };
+        if (request.method === 'HEAD') {
+          const info = await stat(file);
+          if (!info.isFile()) return new Response(null, { status: 404 });
+          return new Response(null, { headers: { ...headers, 'Content-Length': String(info.size) } });
+        }
+        const body = await readFile(file);
+        return new Response(body, { headers: { ...headers, 'Content-Length': String(body.byteLength) } });
       } catch { return new Response('', { status: 404 }); }
     });
     const { readJson, writeJson } = await import(pathToFileURL(join(root, 'backend/durable-json.mjs')).href);
@@ -649,7 +656,6 @@ else {
     handler('workbench:settings', async (_event, patch) => {
       if (!patch || typeof patch !== 'object') throw new Error('设置无效。');
       const choice = wallpaperMode ? wallpaperChoice(patch, store.data.settings) : null;
-      if (choice) cancelWallpaperCommit();
       // Character selection is a load request; a decoded frame must commit its
       // settings before the renderer replaces the currently visible canvas.
       if (choice) { patch = { ...patch }; delete patch.character; delete patch.wallpaperKind; delete patch.wallpaperMotion; delete patch.animePlayback; }
@@ -666,6 +672,7 @@ else {
       if (patch.completionSound === false) chat.webContents.send('notification:sound', { action: 'stop' });
       if (!closing && !voiceResources.active && (changesEngine || patch.ttsResident === true && speech.phase === 'error')) speech.configure(next);
       if (choice) {
+        cancelWallpaperCommit();
         wallpaperStatus = { phase: 'loading', ...choice, requestId: wallpaperStatus.requestId + 1 };
         recoverWallpaperRenderer();
       }
