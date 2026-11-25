@@ -3,9 +3,8 @@ import { existsSync } from 'node:fs';
 import { readFile, cp, mkdir } from 'node:fs/promises';
 import { dirname, join, relative, resolve, sep } from 'node:path';
 
-// Preserve npm's nested layout and package assets for Agent SDKs and the Windows
-// input bridge. Optional native CLI packages are not redistributed; only the
-// explicitly selected Windows x64 Koffi binary is bundled with its license.
+// Preserve npm's nested layout for the ACP SDK and Windows input bridge.
+// The Claude Agent SDK is installed directly from upstream by its users.
 export async function copyAgentDependencies(root, destination) {
   const seen = new Set();
   async function copy(name, from) {
@@ -23,5 +22,5 @@ export async function copyAgentDependencies(root, destination) {
       await copy(dependency, folder);
     }
   }
-  for (const name of ['@anthropic-ai/claude-agent-sdk', '@agentclientprotocol/sdk', 'koffi', '@koromix/koffi-win32-x64']) await copy(name, root);
+  for (const name of ['@agentclientprotocol/sdk', 'koffi', '@koromix/koffi-win32-x64']) await copy(name, root);
 }

@@ -12,7 +12,7 @@ if (packages.length !== 1 || !packages[0].slice(10) || args.some(arg => arg !== 
 const directory = resolve(packages[0].slice(10)), output = await createRunDirectory('wallpaper-recovery-package');
 const report = { output, package: directory, accounts: false, hardware: false, checks: [], passed: false };
 let session;
-const launch = () => packagedSession({ directory, output, env: { VIBE_AGENT_CONFIG: join(output, 'custom-agents.json') } });
+const launch = () => packagedSession({ directory, output });
 const faultScript = kind => `window.recoveryFault=${JSON.stringify(kind)};window.recoveryFailures=[];
   const load=HTMLMediaElement.prototype.load,play=HTMLMediaElement.prototype.play;
   HTMLMediaElement.prototype.load=function(){

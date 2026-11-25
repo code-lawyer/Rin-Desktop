@@ -140,6 +140,13 @@ module.exports=async function visualCases({open,evaluate,delay,output,extended=f
   await emit(chat,'state',{connection:'ready',error:null,messages:[{role:'assistant',turnId:'visual-ready-reply',text:'可以用，中文显示和回复都正常。',complete:true}]});
   await capture(chat,'bubble-zoom-125',560,620,1.25);
   await capture(chat,'bubble-zoom-150',560,620,1.5);
+  await emit(chat,'state',{provider:'claude'});
+  await evaluate(chat,`document.getElementById('settings-button').click()`);
+  await capture(chat,'agent-claude-bubble-compact',360,480);
+  await reachable(chat,'Claude Agent, model and composer remain reachable in the compact bubble',['#provider-select','#reconnect-dot','#model-select','#prompt']);
+  await verify(chat,'Claude picker describes API-only billing',`document.getElementById('provider-select').getAttribute('aria-describedby')==='provider-api-note'&&document.getElementById('provider-api-note').textContent.includes('单独计费')`);
+  await evaluate(chat,`document.getElementById('settings-button').click();document.getElementById('bubble-card').scrollTop=0`);
+  await emit(chat,'state',{provider:'codex'});
   const workbench=await open('workbench.html',1120,760);
   await capture(workbench,'conversations-standard',1120,760);
   await capture(workbench,'conversations-compact',760,540);
@@ -204,6 +211,12 @@ module.exports=async function visualCases({open,evaluate,delay,output,extended=f
   })()`);
   for(const entry of wallpaperStyles)if(entry.contrast<4.5)failures.push({name:'wallpaper text contrast',...entry});
   if(extended) {
+    await evaluate(workbench,`document.querySelector('[data-setting-target="agent-settings"]').click();document.querySelector('.settings-scroll').scrollTop=0`);
+    await capture(workbench,'agent-settings-minimum-zoom-200',760,540,2);
+    await reachable(workbench,'all Agent actions and setup instructions remain reachable at 200%',
+      ['#agent-setup-guide',...['codex','antigravity','grok','claude','deepseek'].map(id=>`.agent-connect[data-agent-id="${id}"]`)]);
+    await evaluate(workbench,`document.querySelector('.agent-connect[data-agent-id="claude"]').scrollIntoView({block:'center'})`);
+    await capture(workbench,'agent-claude-minimum-zoom-200',760,540,2);
     for(const zoom of [1.25,1.5,2]) {
       await evaluate(workbench,`document.querySelector('[data-setting-target="playback-settings"]').click();document.querySelector('.settings-scroll').scrollTop=0`);
       await evaluate(workbench,`(()=>{const speed=document.getElementById('speed');speed.value=speed.value==='1.1'?'1':'1.1';speed.dispatchEvent(new Event('change',{bubbles:true}));})()`);

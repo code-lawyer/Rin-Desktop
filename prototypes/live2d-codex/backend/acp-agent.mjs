@@ -1,20 +1,28 @@
 import { Readable, Writable } from 'node:stream';
 import { randomUUID } from 'node:crypto';
 import { NativeAgent, historyTurns, pathKey } from './native-agent.mjs';
-import { spawnAgent, agentEnvironment, closeChild, deadline, explicitAgentBinary } from './agent-process.mjs';
+import { acpAgentEnvironment, spawnAgent, closeChild, deadline } from './agent-process.mjs';
 import { questionsView, questionAnswers, formView, formAnswer } from './agent-questions.mjs';
 import { restoreHistory } from './reply-state.mjs';
 import packageInfo from '../package.json' with { type: 'json' };
 
 const flatten = options => (options ?? []).flatMap(o => o.options ? flatten(o.options) : [o]);
 const timestamp = value => typeof value === 'number' ? (value > 1e12 ? value / 1000 : value) : Date.parse(value) / 1000 || 0;
+const nonEmptyText = value => typeof value === 'string' && value.trim();
+function mergeToolDetails(previous, update) {
+  const tool = { ...previous };
+  for (const field of ['title', 'kind', 'rawInput', 'locations', 'content']) {
+    if (update?.[field] != null) tool[field] = update[field];
+  }
+  return tool;
+}
 function markToolPreamble(message) {
   if (message?.role === 'assistant') Object.assign(message, { complete: true, phase: 'commentary' });
 }
 function replayMessage(messages, update) {
   const previous = messages.at(-1);
   if (update.sessionUpdate === 'tool_call') { markToolPreamble(previous); return; }
-  if (!['user_message_chunk', 'agent_message_chunk'].includes(update.sessionUpdate) || update.content?.type !== 'text' || update._meta?.['opencode/child-session']) return;
+  if (!['user_message_chunk', 'agent_message_chunk'].includes(update.sessionUpdate) || update.content?.type !== 'text') return;
   const role = update.sessionUpdate === 'user_message_chunk' ? 'user' : 'assistant';
   if (previous?.role === role && previous.phase !== 'commentary') previous.text += update.content.text;
   else messages.push({ id: randomUUID(), role, text: update.content.text, complete: true });
@@ -23,22 +31,16 @@ function replayMessage(messages, update) {
 export class AcpCompanion extends NativeAgent {
   constructor(options) {
     super(options); this.endpoints = new Set(); this.spawn = options.spawnAgent ?? spawnAgent;
-    this.launch = options.launch;
-    if (this.spec.custom && (!this.launch || this.launch.id !== this.provider || this.launch.protocol !== 'acp')) throw new Error('缺少自定义 Agent 的 ACP 启动配置。');
+    if (this.spec.adapter !== 'acp') throw new Error('此 Agent 不使用 ACP。');
   }
-  async prepareNative() {
-    if (!this.spec.custom) return super.prepareNative();
-    // A bridge may be hosted by node.exe or another interpreter. Its version
-    // comes from ACP initialize, not from running the host with --version.
-    this.binary = explicitAgentBinary(this.launch.command);
-  }
+  nativeEnvironment() { return acpAgentEnvironment(this.provider); }
   sessionMeta() { return this.provider === 'grok' ? { yoloMode: false, autoMode: false, 'x.ai/hooks': { pre_tool_use: [{ hookCallbackIds: ['rin-permission-mode'] }] } } : {}; }
   async endpoint(cwd, { history = false, onUpdate } = {}) {
     const { ClientSideConnection, ndJsonStream } = await import('@agentclientprotocol/sdk');
     if (this.closed) throw new Error('Agent 已关闭。');
-    const args = this.spec.custom ? this.launch.args : this.provider === 'grok' ? ['--no-auto-update', '--permission-mode', 'default', '--no-subagents', 'agent', '--no-leader', 'stdio'] : ['acp'];
-    const child = this.spawn(this.binary, args, cwd, { ...agentEnvironment(), ...(this.provider === 'grok' ? { GROK_LOGIN_ENV: '0' } : {}) });
-    const ep = { child, history, closing: false, sessionId: null }; this.endpoints.add(ep);
+    const args = [...(this.binaryArgs ?? []), ...this.spec.acpArgs];
+    const child = this.spawn(this.binary, args, cwd, this.nativeEnvironment());
+    const ep = { child, history, closing: false, sessionId: null, tools: new Map() }; this.endpoints.add(ep);
     child.stderr.on('data', () => {});
     const processFailed = error => { if (!ep.closing && !history && this.active === ep) { this.cancelApprovals(); this.report(error, { connection: true }); } };
     child.on('error', () => processFailed(new Error(`无法启动 ${this.spec.name}，请检查程序路径。`)));
@@ -50,11 +52,11 @@ export class AcpCompanion extends NativeAgent {
         if (onUpdate) onUpdate(update);
         else if (this.active === ep) this.update(update);
       },
-      requestPermission: p => ep.closing || this.closed || !this.acceptingUpdates || history || this.active !== ep || p.sessionId !== ep.sessionId ? { outcome: { outcome: 'cancelled' } } : this.permission(p, conn.signal),
-      createElicitation: p => ep.closing || this.closed || !this.acceptingUpdates || history || this.active !== ep || p.sessionId && p.sessionId !== ep.sessionId ? { action: 'cancel' } : this.elicitation(p, conn.signal),
+      requestPermission: p => ep.closing || this.closed || this.stopRequested || !this.acceptingUpdates || history || this.active !== ep || p.sessionId !== ep.sessionId ? { outcome: { outcome: 'cancelled' } } : this.permission(ep, p, conn.signal),
+      createElicitation: p => ep.closing || this.closed || this.stopRequested || !this.acceptingUpdates || history || this.active !== ep || p.sessionId && p.sessionId !== ep.sessionId ? { action: 'cancel' } : this.elicitation(p, conn.signal),
       extMethod: (method, p) => this.extension(ep, method.replace(/^_/, ''), p),
       extNotification: (method, p) => {
-        if (!ep.closing && !this.closed && !history && this.active === ep && method.replace(/^_/, '') === 'x.ai/model_state_changed') this.models({ models: p.modelState ?? p });
+        if (this.provider === 'grok' && !ep.closing && !this.closed && !history && this.active === ep && method.replace(/^_/, '') === 'x.ai/model_state_changed') this.models({ models: p.modelState ?? p });
       },
     }), ndJsonStream(Writable.toWeb(child.stdin), Readable.toWeb(child.stdout)));
     ep.conn = conn;
@@ -62,10 +64,6 @@ export class AcpCompanion extends NativeAgent {
     try {
       ep.init = await deadline(conn.initialize({ protocolVersion: 1, clientInfo: { name: 'rin-desktop', version: packageInfo.version }, clientCapabilities: { fs: { readTextFile: false, writeTextFile: false }, terminal: false, elicitation: { form: {} } }, _meta: { clientIdentifier: 'rin-desktop', startupHints: { nonInteractive: false } } }), 45000, 'ACP 初始化');
       if (ep.init.protocolVersion !== 1) throw new Error('该 CLI 的 ACP 协议版本不受支持。');
-      if (this.spec.custom && this.launch.authMethodId) {
-        if (!ep.init.authMethods?.some(method => method.id === this.launch.authMethodId)) throw new Error('Agent 未声明配置中的 authMethodId，请检查认证配置。');
-        await deadline(conn.authenticate({ methodId: this.launch.authMethodId }), 30000, '自定义 Agent 认证');
-      }
       if (this.provider === 'grok') {
         if (!ep.init.authMethods?.some(m => m.id === 'cached_token')) throw new Error('Grok login required：请先在终端运行 grok 完成登录。');
         await deadline(conn.authenticate({ methodId: 'cached_token', _meta: { headless: true } }), 30000, 'Grok 登录复用');
@@ -82,9 +80,7 @@ export class AcpCompanion extends NativeAgent {
     return ep.disposal;
   }
   async openNative() {
-    if (this.provider === 'opencode' && !/(?:^|\s|v)2\./.test(this.state.version ?? '')) throw new Error('此接入需要 OpenCode V2，请安装 V2 或通过 VIBE_OPENCODE_BINARY 指定其程序。');
     const ep = await this.endpoint(this.state.cwd); this.active = ep; const id = this.state.threadId;
-    if (this.spec.custom) this.state.version = ep.init.agentInfo?.version ?? null;
     const canLoad = !!ep.init.agentCapabilities?.loadSession;
     const canResume = !!ep.init.agentCapabilities?.sessionCapabilities?.resume;
     this.state.canResume = canLoad || canResume;
@@ -111,7 +107,7 @@ export class AcpCompanion extends NativeAgent {
       // The Grok process is dedicated (--no-leader); override auto-approve only
       // in that process, including after loading a previously saved session.
       if (this.provider === 'grok') await ep.conn.extNotification('_x.ai/yolo_mode_changed', { yolo_mode: false, auto_mode: false, permission_mode: 'ask' });
-      this.state.login = this.spec.custom ? '自定义 Agent 管理认证' : this.provider === 'grok' ? 'CLI 已保存的登录' : 'CLI 模型提供商认证';
+      this.state.login = this.provider === 'deepseek' ? '由 Harness 的 acp 配置管理' : '复用原生 CLI 认证';
     } finally { this.replay = null; }
   }
   models(result) {
@@ -134,13 +130,16 @@ export class AcpCompanion extends NativeAgent {
     if (type === 'config_option_update') { this.models(update); return; }
     if (type === 'session_info_update') {
       if (update.title && !this.cachedSession(this.state.cwd, this.state.threadId)?.alias) this.state.threadName = update.title;
-      if (update._meta?.['opencode/retry']) this.state.activity = '模型提供商暂时不可用，CLI 正在重试';
-      if (update._meta?.['opencode/compaction']?.status === 'started') this.state.activity = '正在整理会话上下文';
       this.changed(false); return;
     }
     if (!this.run || this.acceptingUpdates === false || this.stopRequested) return;
-    if (type === 'agent_message_chunk' && update.content?.type === 'text' && !update._meta?.['opencode/child-session']) this.appendText(update.content.text);
+    if (type === 'agent_message_chunk' && update.content?.type === 'text') this.appendText(update.content.text);
     else if (type === 'tool_call' || type === 'tool_call_update') {
+      const tools = this.active?.tools;
+      const id = update.toolCallId;
+      if (tools && typeof id === 'string') {
+        tools.set(id, mergeToolDetails(tools.get(id), update));
+      }
       this.receivedSubmission();
       const previous = this.state.messages.at(-1);
       if (type === 'tool_call' && previous?.turnId === this.state.turnId) markToolPreamble(previous);
@@ -148,10 +147,32 @@ export class AcpCompanion extends NativeAgent {
       this.changed(false);
     }
   }
-  permission(p, signal) {
-    const tool = p.toolCall ?? {}, allow = p.options?.find(o => o.kind === 'allow_once'), deny = p.options?.find(o => o.kind === 'reject_once');
-    const details = [JSON.stringify(tool.rawInput ?? {}, null, 2), ...(tool.content ?? []).map(c => c.type === 'diff' ? `${c.path}\n---\n${c.oldText || ''}\n+++\n${c.newText || ''}` : c.content?.text || '')].join('\n').slice(0, 256000);
-    return this.ask({ kind: tool.kind === 'edit' ? 'files' : 'command', reason: tool.title || 'Agent 请求执行工具', command: tool.rawInput?.command || '', details, allowDisabled: !allow }, answer => {
+  permission(ep, p, signal) {
+    // ACP permits a permission request to refer to a previous tool update by ID.
+    const tool = mergeToolDetails(ep.tools.get(p.toolCall?.toolCallId), p.toolCall);
+    const allow = p.options?.find(o => o.kind === 'allow_once');
+    const deny = p.options?.find(o => o.kind === 'reject_once');
+    const input = tool.rawInput;
+    const command = [input?.command, input?.cmd, input?.Command].find(nonEmptyText) || '';
+    const cwd = [input?.cwd, input?.workdir, input?.working_directory, input?.Cwd].find(nonEmptyText) || '';
+    const content = Array.isArray(tool.content) ? tool.content : [];
+    const locations = Array.isArray(tool.locations) ? tool.locations : [];
+    const paths = [...new Set([
+      ...locations.map(location => location?.path),
+      ...content.filter(item => item?.type === 'diff').map(item => item.path),
+      input?.path, input?.filePath, input?.file_path, input?.absolute_path, input?.Path,
+    ].filter(nonEmptyText))];
+    const inputProvided = typeof input === 'string' ? input.trim() : input && Object.keys(input).length;
+    if (!command && !paths.length && !(nonEmptyText(tool.title) && inputProvided)) {
+      this.state.activity = 'Agent 未提供操作详情，已拒绝工具请求';
+      this.changed(false);
+      return { outcome: deny ? { outcome: 'selected', optionId: deny.optionId } : { outcome: 'cancelled' } };
+    }
+    const details = [JSON.stringify(input ?? {}, null, 2), ...content.map(item =>
+      item?.type === 'diff' ? `${item.path}\n---\n${item.oldText || ''}\n+++\n${item.newText || ''}` : item?.content?.text || ''
+    )].join('\n').slice(0, 256000);
+    const kind = ['edit', 'delete', 'move'].includes(tool.kind) ? 'files' : 'command';
+    return this.ask({ kind, reason: tool.title || 'Agent 请求执行工具', command, cwd, paths, details, allowDisabled: !allow }, answer => {
       if (!['accept', 'decline'].includes(answer?.decision)) throw new Error('请选择允许或拒绝。');
       const selected = answer.decision === 'accept' ? allow : deny;
       if (answer.decision === 'accept' && !selected) throw new Error('该请求没有提供单次允许选项，请在原生 CLI 中处理。');
@@ -163,13 +184,13 @@ export class AcpCompanion extends NativeAgent {
     return this.ask({ kind: 'questions', reason: p.message || '', questions: formView(p.requestedSchema) }, answer => formAnswer(p.requestedSchema, answer), { action: 'cancel' }, signal);
   }
   extension(ep, method, p) {
-    if (this.spec.custom) throw new Error('此自定义接入不支持 Agent 私有扩展请求。');
+    if (this.provider !== 'grok') throw new Error('此 Agent 不支持该私有扩展请求。');
     if (method === 'x.ai/hooks/run') {
       if (this.closed || !this.acceptingUpdates || this.active !== ep || ep.history || this.stopRequested || ep.closing || /always|bypass/i.test(p.permissionMode ?? '')) return { decision: 'deny', systemMessage: 'Rin requires interactive permissions. Stop this action.' };
       return {};
     }
     if (method === 'x.ai/ask_user_question') {
-      if (this.closed || !this.acceptingUpdates || ep.closing || ep.history || this.active !== ep) return { outcome: 'cancelled' };
+      if (this.closed || this.stopRequested || !this.acceptingUpdates || ep.closing || ep.history || this.active !== ep) return { outcome: 'cancelled' };
       return this.ask({ kind: 'questions', questions: questionsView(p.questions) }, answer => ({ outcome: 'accepted', answers: questionAnswers(p.questions ?? [], answer, true) }), { outcome: 'cancelled' }, ep.conn.signal);
     }
     if (method === 'x.ai/folder_trust/request') return { outcome: 'reject' };
@@ -179,10 +200,11 @@ export class AcpCompanion extends NativeAgent {
   async promptNative(text) {
     const ep = this.active;
     if (!ep || ep.closing) throw new Error('ACP 连接已关闭。');
+    ep.tools.clear();
     this.acceptingUpdates = true;
     let result;
     try { result = await ep.conn.prompt({ sessionId: ep.sessionId, prompt: [{ type: 'text', text }] }); this.receivedSubmission(); }
-    finally { this.acceptingUpdates = false; }
+    finally { this.acceptingUpdates = false; ep.tools.clear(); }
     if (result.stopReason === 'cancelled') return { cancelled: true };
     if (result.stopReason !== 'end_turn') throw new Error(`Agent 提前结束本轮：${result.stopReason || '未知原因'}`);
     return { cancelled: false };
@@ -216,7 +238,17 @@ export class AcpCompanion extends NativeAgent {
       return { data: this.rememberList(Object.values(this.index).filter(s => pathKey(s.cwd) === pathKey(cwd) && s.name.includes(search)).map(({ messages, ...item }) => item)), nextCursor: null };
     }
     const result = await deadline(this.active.conn.listSessions({ cwd, ...(cursor ? { cursor } : {}) }), 30000, '会话列表读取');
-    const data = this.rememberList((result.sessions ?? []).filter(s => s.cwd && pathKey(s.cwd) === pathKey(cwd)).map(s => ({ id: s.sessionId, cwd: s.cwd, name: s.title || '未命名对话', updatedAt: timestamp(s.updatedAt), source: this.provider })));
+    const sessions = (result.sessions ?? []).filter(s => s.cwd && pathKey(s.cwd) === pathKey(cwd)).map(s => {
+      const cached = this.cachedSession(s.cwd, s.sessionId);
+      return { id: s.sessionId, cwd: s.cwd, name: s.title || cached?.name, updatedAt: timestamp(s.updatedAt) || cached?.updatedAt, source: this.provider };
+    });
+    // Some ACP servers omit new or active sessions from their native list.
+    const { threadId, cwd: currentCwd, threadName } = this.state;
+    if (!cursor && threadId && pathKey(currentCwd) === pathKey(cwd) && !sessions.some(s => s.id === threadId)) {
+      const cached = this.cachedSession(currentCwd, threadId);
+      sessions.unshift({ id: threadId, cwd: currentCwd, name: threadName || cached?.name, updatedAt: cached?.updatedAt, source: this.provider });
+    }
+    const data = this.rememberList(sessions);
     return { data: data.filter(s => s.name.toLowerCase().includes(String(search).toLowerCase())), nextCursor: result.nextCursor ?? null };
   }
   async history(id, cursor = null, cwd) {
@@ -238,6 +270,9 @@ export class AcpCompanion extends NativeAgent {
   async readSubmissionHistory({ cwd, threadId }) {
     this.assertReady();
     if (!threadId) return [];
+    if (!this.active.init.agentCapabilities?.loadSession) {
+      throw Object.assign(new Error('CLI 不支持读取原生会话。'), { code: 'NATIVE_HISTORY_UNAVAILABLE' });
+    }
     const messages = [], ep = await this.endpoint(cwd, { history: true, onUpdate: update => replayMessage(messages, update) });
     try {
       if (!ep.init.agentCapabilities?.loadSession) throw new Error('CLI 不支持读取原生会话。');

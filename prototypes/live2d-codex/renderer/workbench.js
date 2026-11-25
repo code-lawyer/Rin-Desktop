@@ -6,12 +6,12 @@ import catalog from '../backend/agent-catalog.cjs';
 import { populateAgentPicker } from './agent-picker.mjs';
 import { installRemoteSettings, installRemoteNavigation } from './remote-ui.mjs';
 import { installSettingsNavigation } from './settings-navigation.mjs';
-import { installAgentSettings } from './custom-agent-settings.mjs';
+import { installAgentSettings } from './agent-settings.mjs';
 import { agentConnectionHelp } from './agent-connection-help.mjs';
 const api = window.companion, $ = id => document.getElementById(id);
 installRemoteSettings(api); installRemoteNavigation(api,{notice:text=>notice(text)});
 const settingsNavigation = installSettingsNavigation(document);
-const agentSettings = installAgentSettings({ api, document });
+const updateAgentSettings = installAgentSettings({ api, document });
 const narrowNavigation = matchMedia('(max-width: 680px)');
 function closeNavigation() {
   const restoreFocus = $('workbench-sidebar').contains(document.activeElement);
@@ -31,7 +31,7 @@ $('toggle-sidebar').onclick = () => {
 };
 $('sidebar-backdrop').onclick = closeNavigation;
 narrowNavigation.addEventListener('change', closeNavigation);
-populateAgentPicker($('agent-select'));
+populateAgentPicker($('agent-select'), { annotate: false });
 let workspace = { projects: [], settings: {} }, current, projectId, selected, threads = [], listCursor, historyCursor, listVersion = 0, historyVersion = 0, noticeTimer, searchTimer, settingsDirty = false, ready = false;
 let settingsRevision = 0;
 function markSettingsDirty(dirty) {
@@ -57,24 +57,24 @@ const act = action => event => { Promise.resolve().then(() => action(event)).cat
 function acceptWorkspace(value) {
   if ((value.version ?? 0) < (workspace.version ?? 0)) return false;
   workspace = value;
-  agentSettings.workspaceChanged(value);
-  populateAgentPicker($('agent-select'), { customAgents: value.customAgents ?? [] });
-  $('agent-config-error').textContent = value.agentConfigError || '';
-  $('agent-config-error').hidden = !value.agentConfigError;
   updateActivity();
   return true;
 }
 const busy = () => isTaskBusy(current);
 const available = () => current?.connection === 'ready' && catalog.isCliAgent(current?.provider);
 function updateActivity() {
-  if (current) agentSettings.stateChanged(current);
+  if (current) updateAgentSettings(current);
   const name = catalog.agentName(current?.provider);
   const connection = current?.connection;
   const sessionError = connection === 'ready' && current?.status === 'error';
-  $('connection').textContent = current?.provider === 'dots' ? '请选择一个 CLI Agent' : sessionError ? `${name} · 会话需要处理` : connection === 'ready' ? `${name} · 已连接` : connection === 'authentication' ? `${name} · 需要登录` : connection === 'error' ? `${name} · 连接需要处理` : `正在连接 ${name}…`;
+  $('connection').textContent = current?.provider === 'dots' ? '请选择一个 CLI Agent' : sessionError ? `${name} · 会话需要处理` : connection === 'ready' ? `${name} · 已连接` : connection === 'authentication' ? `${name} · 需要认证` : connection === 'error' ? `${name} · 连接需要处理` : `正在连接 ${name}…`;
   $('connection').title = connection === 'ready' && !sessionError ? `${name} · 本机工作区\n${current?.cwd || ''}` : current?.error || $('connection').textContent;
   $('connection').dataset.state = sessionError ? 'error' : connection || 'connecting';
   $('agent-select').value = current?.provider ?? 'codex';
+  const modeNote = $('agent-mode-note');
+  const mode = catalog.AGENTS[current?.provider]?.experimental ? current.provider === 'claude' ? '仅 API · 实验' : '实验' : '';
+  if (modeNote.textContent !== mode) modeNote.textContent = mode;
+  modeNote.hidden = !mode;
   $('agent-select').disabled = busy() || current?.connection === 'connecting';
   $('agent-reconnect').disabled = busy() || current?.connection === 'connecting';
   $('agent-help').textContent = agentConnectionHelp(current);

@@ -49,7 +49,7 @@ for (const outcome of [undefined, 'completed', 'interrupted', 'failed']) test(`c
   assert.equal(currentReply(agent.state.messages).readable, outcome === 'completed');
 });
 
-for (const provider of ['claude', 'grok', 'opencode']) test(`${provider}: new/resume/send cannot overlap a pending conversation switch`, async t => {
+for (const provider of ['claude', 'grok', 'antigravity', 'deepseek']) test(`${provider}: new/resume/send cannot overlap a pending conversation switch`, async t => {
   const path = await directory(t), c = new FakeNative({ provider, projectRoot: path, storageDir: path });
   c.rememberList([{ id: 'saved', cwd: path }]);
   const first = c.newConversation(path);
@@ -90,7 +90,7 @@ test('closing while native open is pending disposes the owned transport without 
   assert.ok(c.opened.every(item => item.closed)); assert.equal(changedAfterClose, 0);
 });
 
-for (const provider of ['claude', 'grok', 'opencode']) test(`${provider}: app close waits for the old transport already being disposed during a switch`, async t => {
+for (const provider of ['claude', 'grok', 'antigravity', 'deepseek']) test(`${provider}: app close waits for the old transport already being disposed during a switch`, async t => {
   const path = await directory(t), options = { provider, projectRoot: path, storageDir: path };
   const c = provider === 'claude' ? new ClaudeCompanion(options) : new AcpCompanion(options);
   Object.assign(c.state, { connection: 'ready', status: 'idle', threadId: 'old' });
@@ -156,7 +156,7 @@ const transcript = (status, phase = null) => [
   { id: 'user', role: 'user', text: 'fixture request', turnId: 'turn', complete: true, turnStatus: status },
   { id: 'answer', role: 'assistant', text: 'fixture answer', turnId: 'turn', complete: true, turnStatus: status, phase },
 ];
-for (const provider of ['claude', 'grok', 'opencode']) test(`${provider}: history restore retains success, interruption, failure and commentary semantics`, async t => {
+for (const provider of ['claude', 'grok', 'antigravity', 'deepseek']) test(`${provider}: history restore retains success, interruption, failure and commentary semantics`, async t => {
   const path = await directory(t), options = { provider, projectRoot: path, storageDir: path };
   for (const status of ['completed', 'interrupted', 'failed', 'inProgress']) for (const phase of [null, 'commentary']) {
     const c = provider === 'claude' ? new ClaudeCompanion(options) : new AcpCompanion(options);
@@ -198,7 +198,8 @@ test('more than 100 unsent drafts survive cross-provider saves and a disk reload
   const store = new WorkspaceStore(path); await store.load(); await store.add(path); await store.add(second);
   const original = { provider: 'codex', cwd: path, threadId: 'original' };
   await store.saveDraft(original, 'unsent original');
-  for (let i = 0; i < 105; i++) await store.saveDraft({ provider: ['claude', 'grok', 'opencode'][i % 3], cwd: i % 2 ? path : second, threadId: String(i) }, 'unsent ' + i);
+  const providers = ['claude', 'grok', 'antigravity', 'deepseek'];
+  for (let i = 0; i < 105; i++) await store.saveDraft({ provider: providers[i % providers.length], cwd: i % 2 ? path : second, threadId: String(i) }, 'unsent ' + i);
   const restored = new WorkspaceStore(path); await restored.load();
   assert.equal(restored.draft(original), 'unsent original'); assert.equal(Object.keys(restored.data.drafts).length, 106);
   await restored.saveDraft({ provider: 'claude', cwd: second, threadId: '0' }, '');

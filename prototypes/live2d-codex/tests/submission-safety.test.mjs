@@ -137,7 +137,7 @@ test('pending receipt is recovered as unknown and a failed confirmation retains 
   assert.equal(reload.draft(target), 'saved first');
 });
 
-for (const provider of ['claude', 'grok', 'opencode']) test(`${provider}: local queue acceptance keeps the draft until remote evidence, including later edits`, async t => {
+for (const provider of ['claude', 'grok', 'antigravity', 'deepseek']) test(`${provider}: local queue acceptance keeps the draft until remote evidence, including later edits`, async t => {
   const { root, store, guard } = await fixture(t), gate = deferred(), started = deferred();
   const agent = new NativeAgent({ provider, projectRoot: root, storageDir: root });
   Object.assign(agent.state, { connection: 'ready', status: 'idle', threadId: 'native' });

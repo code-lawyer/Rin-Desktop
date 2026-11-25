@@ -2,16 +2,15 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
-import { mkdtemp, mkdir, rm, readFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, rm, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { ClaudeCompanion, claudeAuthentication } from '../backend/claude-agent.mjs';
+import { ClaudeCompanion, claudeAuthentication, loadClaudeSdk } from '../backend/claude-agent.mjs';
+import catalog from '../backend/agent-catalog.cjs';
 import { AcpCompanion } from '../backend/acp-agent.mjs';
 import { CodexCompanion } from '../backend/codex.mjs';
 import { JsonLineDecoder } from '../backend/json-line-decoder.mjs';
 import { formAnswer } from '../backend/agent-questions.mjs';
-import catalog from '../backend/agent-catalog.cjs';
-import { parseCustomAgents } from '../backend/custom-agents.mjs';
 import { WorkspaceStore } from '../backend/workspace-store.mjs';
 import { SubmissionGuard, submissionBaseline } from '../backend/submission-guard.mjs';
 import { agentConnectionHelp } from '../renderer/agent-connection-help.mjs';
@@ -57,12 +56,26 @@ async function claude(t, account = { apiKeySource: 'ANTHROPIC_API_KEY' }) {
 }
 
 test('Claude SDK requires resolved API authentication and does not offer subscription OAuth', async t => {
-  for (const account of [{}, {tokenSource:'oauth'}, {tokenSource:'oauth',apiKeySource:'none'}, {apiProvider:'firstParty',tokenSource:'oauth',apiKeySource:'oauth'}, {apiKeySource:'unknown'}, {apiKeySource:'unexpected'}, {apiProvider:'future'}]) {
+  for (const account of [{}, {tokenSource:'oauth'}, {tokenSource:'oauth',apiKeySource:'none'}, {apiProvider:'firstParty',tokenSource:'oauth',apiKeySource:'ANTHROPIC_API_KEY'}, {apiProvider:'firstParty',tokenSource:'ANTHROPIC_AUTH_TOKEN',apiKeySource:'ANTHROPIC_API_KEY'}, {subscriptionType:'max',apiKeySource:'ANTHROPIC_API_KEY'}, {apiKeySource:'unknown'}, {apiKeySource:'unexpected'}, {apiProvider:'future'}, {apiProvider:'gateway'}]) {
     assert.throws(() => claudeAuthentication(account), error => error.code === -32000 && /API/.test(error.message));
   }
-  await assert.rejects(claude(t, {tokenSource:'oauth',subscriptionType:'max'}), /不提供订阅/);
-  for (const apiKeySource of ['ANTHROPIC_API_KEY','apiKeyHelper','/login managed key']) assert.match(claudeAuthentication({apiKeySource,apiProvider:'firstParty'}), /API 凭据/);
-  for (const apiProvider of ['bedrock','vertex','foundry','anthropicAws','anthropicGoogleCloud','mantle','gateway']) assert.match(claudeAuthentication({apiProvider}), /云平台/);
+  await assert.rejects(claude(t, {tokenSource:'oauth',subscriptionType:'max'}), /订阅凭据/);
+  for (const apiKeySource of ['ANTHROPIC_API_KEY','apiKeyHelper','/login managed key']) assert.match(claudeAuthentication({apiKeySource,apiProvider:'firstParty',tokenSource:'none'}), /API 凭据/);
+  for (const apiProvider of ['bedrock','vertex','foundry','anthropicAws','anthropicGoogleCloud','mantle']) assert.match(claudeAuthentication({apiProvider}), /云平台/);
+});
+
+test('packaged Claude loads the supported SDK only from its user installation directory', async t => {
+  const directoryName = await directory(t);
+  await assert.rejects(loadClaudeSdk(directoryName), /接入指南.*Claude Agent SDK/);
+  const packageDirectory = join(directoryName, 'node_modules', '@anthropic-ai', 'claude-agent-sdk');
+  await mkdir(packageDirectory, { recursive: true });
+  await writeFile(join(packageDirectory, 'sdk.mjs'), 'export const query = () => "test SDK";');
+  const manifest = join(packageDirectory, 'package.json');
+  const name = '@anthropic-ai/claude-agent-sdk';
+  await writeFile(manifest, JSON.stringify({ name, version: '0.0.0' }));
+  await assert.rejects(loadClaudeSdk(directoryName), new RegExp(catalog.CLAUDE_SDK_VERSION.replaceAll('.', '\\.')));
+  await writeFile(manifest, JSON.stringify({ name, version: catalog.CLAUDE_SDK_VERSION }));
+  assert.equal((await loadClaudeSdk(directoryName)).query(), 'test SDK');
 });
 
 test('Claude native contract: safe defaults, model selection, streamed final text, create and resume', async t=>{
@@ -122,7 +135,7 @@ test('Claude idle callbacks are denied and unexpected EOF fails its pending turn
 
 // A synthetic stdio peer exercises the installed ACP SDK's JSON-RPC framing,
 // validation and callbacks. No child process, account or network is used.
-function acpPeer(cwd, initialization = {}, restore = {}) {
+function acpPeer(cwd, initialization = {}, restore = {}, { newSessionError, listSessions } = {}) {
   const child=Object.assign(new EventEmitter(),{stdin:new PassThrough(),stdout:new PassThrough(),stderr:new PassThrough(),pid:null}), calls=[], requests=new Map();
   let nextId=1000, promptRequest, restoreRequest;
   const send=message=>child.stdout.write(JSON.stringify({jsonrpc:'2.0',...message})+'\n');
@@ -147,9 +160,10 @@ function acpPeer(cwd, initialization = {}, restore = {}) {
     if(message.method==='session/cancel'){if(promptRequest){send({id:promptRequest.id,result:{stopReason:'cancelled'}});promptRequest=null;}return;}
     if(message.id===undefined)return;
     if(['session/load','session/resume'].includes(message.method)){restoreRequest=message;restore.onRequest?.(message);if(!restore.pending)finishRestore();return;}
+    if(message.method==='session/new'&&newSessionError){send({id:message.id,error:newSessionError});return;}
     const result=message.method==='initialize'?{protocolVersion:1,agentCapabilities:{loadSession:true,sessionCapabilities:{list:{}}},authMethods:[{id:'cached_token',name:'Cached'}],agentInfo:{name:'fixture',version:'bridge-1'},...initialization}:
       message.method==='session/new'?session:
-      message.method==='session/list'?{sessions:[{sessionId:'session',cwd:message.params?.cwd ?? cwd,title:'Fixture',updatedAt:'2026-10-21T00:00:00Z'}]}:{};
+      message.method==='session/list'?(listSessions?.(message.params) ?? {sessions:[{sessionId:'session',cwd:message.params?.cwd ?? cwd,title:'Fixture',updatedAt:'2026-10-21T00:00:00Z'}]}):{};
     send({id:message.id,result});
   });
   child.stdin.on('data',chunk=>decoder.push(chunk));
@@ -158,34 +172,33 @@ function acpPeer(cwd, initialization = {}, restore = {}) {
     finish(stopReason='end_turn'){assert.ok(promptRequest);send({id:promptRequest.id,result:{stopReason}});promptRequest=null;},
     drop(){child.stdout.end();child.emit('exit',1);},stop(){child.stdout.end();child.stdin.end();child.stderr.end();} };
 }
-async function acp(t,provider,{initialization,authMethodId,restore}={}){
+async function acp(t,provider,{initialization,restore,...behavior}={}){
   const root=await directory(t),peers=[],agents=[];
-  const launch=catalog.isCustomAgentId(provider)?parseCustomAgents({format:1,agents:[{id:provider,name:'Fixture custom agent',protocol:'acp',command:process.execPath,args:['bridge with spaces.mjs','--stdio'],...(authMethodId?{authMethodId}:{})}]} )[0]:undefined;
-  if(launch)catalog.setCustomAgents([launch]);
   const create=()=>{
-    const agent=new AcpCompanion({provider,projectRoot:root,storageDir:root,launch,spawnAgent:(_binary,args,cwd)=>{const peer=acpPeer(cwd,initialization,restore);peer.args=args;peers.push(peer);return peer.child;}});
-    if(!launch)agent.prepareNative=async()=>{agent.binary='unused';agent.state.version='2.0.0';};
+    const agent=new AcpCompanion({provider,projectRoot:root,storageDir:root,spawnAgent:(_binary,args,cwd)=>{const peer=acpPeer(cwd,initialization,restore,behavior);peer.args=args;peers.push(peer);return peer.child;}});
+    agent.prepareNative=async()=>{agent.binary='unused';agent.state.version='fixture';};
     agents.push(agent);return agent;
   };
   const agent=create();
-  t.after(async()=>{for(const agent of agents)await agent.close();for(const peer of peers)peer.stop();if(launch)catalog.setCustomAgents([]);});
-  if(launch)await agent.connect();
-  else {agent.binary='unused';agent.state.version='2.0.0';await agent.openNative();Object.assign(agent.state,{connection:'ready',status:'idle'});}
+  t.after(async()=>{for(const agent of agents)await agent.close();for(const peer of peers)peer.stop();});
+  await agent.connect();
   return {agent,root,peers,get peer(){return peers.at(-1);},get latestAgent(){return agents.at(-1);},async restart(){await agents.at(-1).close();const next=create();await next.connect();return next;}};
 }
 const permission={sessionId:'session',toolCall:{toolCallId:'tool',title:'Fixture write',kind:'edit',status:'pending',rawInput:{path:'fixture.txt'}},options:[{optionId:'once',name:'Allow once',kind:'allow_once'},{optionId:'no',name:'Reject',kind:'reject_once'},{optionId:'always',name:'Always',kind:'allow_always'}]};
 
-for(const provider of ['grok','opencode','custom-fixture']) {
+for(const provider of ['grok','antigravity','deepseek']) {
   test(`${provider} wire contract: initialize, create, stream, model, list, resume and isolated history`,async t=>{
     const f=await acp(t,provider),{agent,peer}=f;
     assert.deepEqual(peer.calls[0].params.clientCapabilities.fs,{readTextFile:false,writeTextFile:false});assert.equal(peer.calls[0].params.clientCapabilities.terminal,false);
     if(provider==='grok'){assert.ok(peer.args.includes('--no-leader'));assert.ok(peer.calls.some(c=>c.method==='authenticate'));assert.equal(agent.sessionMeta().yoloMode,false);}
-    else if(provider==='custom-fixture'){assert.deepEqual(peer.args,['bridge with spaces.mjs','--stdio']);assert.equal(agent.state.version,'bridge-1');assert.equal(agent.state.connection,'ready');assert.equal(peer.calls.some(c=>c.method==='authenticate'),false);}
-    else assert.deepEqual(peer.args,['acp']);
+    else {
+      assert.deepEqual(peer.args,provider==='deepseek'?['--profile','acp']:['acp']);
+      assert.equal(agent.state.connection,'ready');
+      assert.equal(peer.calls.some(c=>c.method==='authenticate'),false);
+    }
     await agent.chooseModel('fixture');await agent.send('fixture request');await waitFor(()=>peer.calls.some(c=>c.method==='session/prompt'));
     peer.update({sessionUpdate:'agent_message_chunk',content:{type:'text',text:'one '}});
     peer.update({sessionUpdate:'agent_message_chunk',content:{type:'text',text:'ignored'}},'foreign');
-    peer.update({sessionUpdate:'agent_message_chunk',content:{type:'text',text:'child'},_meta:{'opencode/child-session':true}});
     peer.update({sessionUpdate:'agent_message_chunk',content:{type:'text',text:'two'}});peer.finish();await agent.run;
     assert.equal(agent.state.messages.at(-1).text,'one two');assert.equal(agent.state.messages.at(-1).turnStatus,'completed');
     const before=agent.snapshot();peer.update({sessionUpdate:'agent_message_chunk',content:{type:'text',text:'late'}});await new Promise(resolve=>setImmediate(resolve));assert.deepEqual(agent.snapshot(),before);
@@ -210,7 +223,7 @@ for(const provider of ['grok','opencode','custom-fixture']) {
     const id=agent.state.approvals[0].id;await assert.rejects(agent.respond(id,{answers:{count:'9',enabled:'true'}}),/数值/);
     await agent.respond(id,{answers:{count:'2',enabled:'false'}});assert.deepEqual(await pending,{action:'accept',content:{count:2,enabled:false}});
     await agent.interrupt();await agent.disposeNative();
-    if(provider==='custom-fixture')assert.throws(()=>agent.extension(ep,'x.ai/ask_user_question',{questions:[]}),/私有扩展/);
+    if(provider!=='grok')assert.throws(()=>agent.extension(ep,'x.ai/ask_user_question',{questions:[]}),/私有扩展/);
     else {assert.deepEqual(agent.extension(ep,'x.ai/ask_user_question',{questions:[]}),{outcome:'cancelled'});assert.equal(agent.extension(ep,'x.ai/hooks/run',{}).decision,'deny');}
   });
   test(`${provider} titled multi-select forms display labels and enforce wire values and selection limits`,async t=>{
@@ -254,20 +267,67 @@ for(const provider of ['grok','opencode','custom-fixture']) {
   });
 }
 
-test('custom ACP authenticates only a configured advertised method and refuses protocol mismatch',async t=>{
-  const allowed=await acp(t,'custom-auth',{authMethodId:'cached_token'});
+test('Grok uses cached token authentication only and refuses protocol mismatch',async t=>{
+  const allowed=await acp(t,'grok');
   assert.equal(allowed.agent.state.connection,'ready');
-  assert.deepEqual(allowed.peer.calls.find(call=>call.method==='authenticate').params,{methodId:'cached_token'});
-  const absent=await acp(t,'custom-missing-auth',{authMethodId:'not-advertised'});
-  assert.equal(absent.agent.state.connection,'error');assert.match(absent.agent.state.error,/authMethodId/);
+  assert.deepEqual(allowed.peer.calls.find(call=>call.method==='authenticate').params,{methodId:'cached_token',_meta:{headless:true}});
+  const absent=await acp(t,'grok',{initialization:{authMethods:[{id:'other',name:'Other'}]}});
+  assert.equal(absent.agent.state.connection,'authentication');assert.match(absent.agent.state.error,/终端/);
   assert.equal(absent.peer.calls.some(call=>['authenticate','session/new'].includes(call.method)),false);
-  const mismatch=await acp(t,'custom-version',{initialization:{protocolVersion:2}});
+  const mismatch=await acp(t,'grok',{initialization:{protocolVersion:2}});
   assert.equal(mismatch.agent.state.connection,'error');assert.match(mismatch.agent.state.error,/协议版本/);
   assert.equal(mismatch.agent.endpoints.size,0);
 });
 
-test('custom ACP without history capabilities shows local cache, refuses resume and never calls session/load',async t=>{
-  const {agent,peers,root,peer}=await acp(t,'custom-transient',{initialization:{agentCapabilities:{}}});
+test('Antigravity missing cached credentials shows native login help without arranging OAuth in Rin',async t=>{
+  const {agent,peer}=await acp(t,'antigravity',{
+    initialization:{authMethods:[{id:'oauth-personal',name:'Log in with Google'}]},
+    newSessionError:{code:-32000,message:'Authentication required'},
+  });
+  assert.equal(agent.state.connection,'authentication');
+  assert.match(agent.state.loginHelp,/agy.*Google/);
+  assert.deepEqual(peer.calls.map(call=>call.method),['initialize','session/new']);
+  assert.equal(agent.endpoints.size,0);
+});
+
+test('DeepSeek permission requests with only a tool call ID never allow the operation',async t=>{
+  const {agent,peer}=await acp(t,'deepseek');
+  await agent.send('fixture');await waitFor(()=>peer.calls.some(call=>call.method==='session/prompt'));
+  const request={...permission,toolCall:{toolCallId:'opaque-tool'}};
+  assert.deepEqual((await peer.request('session/request_permission',request)).outcome,{outcome:'selected',optionId:'no'});
+  assert.deepEqual((await peer.request('session/request_permission',{...request,options:[permission.options[0]]})).outcome,{outcome:'cancelled'});
+  assert.equal(agent.pending.size,0);
+  assert.match(agent.state.activity,/未提供操作详情/);
+  await agent.interrupt();
+});
+
+test('ACP uses the announced tool details for an ID-only approval and drops them between turns', async t => {
+  const { agent, peer } = await acp(t, 'antigravity');
+  await agent.send('fixture edit');
+  await waitFor(() => peer.calls.some(call => call.method === 'session/prompt'));
+  const toolCallId = 'edit-file';
+  peer.update({ sessionUpdate: 'tool_call', toolCallId, kind: 'edit', title: 'Write fixture', locations: [{ path: 'fixture.txt' }] });
+  peer.update({ sessionUpdate: 'tool_call_update', toolCallId, rawInput: { Path: 'fixture.txt', Content: 'fixture' } });
+  const request = { ...permission, toolCall: { toolCallId } };
+  const answer = peer.request('session/request_permission', request);
+  await waitFor(() => agent.pending.size === 1);
+  const approval = agent.state.approvals[0];
+  assert.equal(approval.kind, 'files');
+  assert.deepEqual(approval.paths, ['fixture.txt']);
+  assert.match(approval.details, /"Content": "fixture"/);
+  await agent.respond(approval.id, { decision: 'accept' });
+  assert.deepEqual((await answer).outcome, { outcome: 'selected', optionId: 'once' });
+  peer.finish();
+  await agent.run;
+  await agent.send('another turn');
+  await waitFor(() => peer.calls.filter(call => call.method === 'session/prompt').length === 2);
+  assert.deepEqual((await peer.request('session/request_permission', request)).outcome, { outcome: 'selected', optionId: 'no' });
+  assert.equal(agent.pending.size, 0);
+  await agent.interrupt();
+});
+
+test('ACP without history capabilities shows local cache, refuses resume and never calls session/load',async t=>{
+  const {agent,peers,root,peer}=await acp(t,'antigravity',{initialization:{agentCapabilities:{}}});
   assert.equal(agent.state.canResume,false);
   await agent.send('fixture');await waitFor(()=>peer.calls.some(call=>call.method==='session/prompt'));
   peer.update({sessionUpdate:'agent_message_chunk',content:{type:'text',text:'local answer'}});peer.finish();await agent.run;
@@ -281,6 +341,24 @@ test('custom ACP without history capabilities shows local cache, refuses resume 
 });
 
 const resumeCapabilities = {sessionCapabilities:{list:{},resume:{}}};
+test('DeepSeek shows the active session and retains cached names for unnamed native sessions', async t => {
+  const {agent,root}=await acp(t,'deepseek',{
+    initialization:{agentCapabilities:resumeCapabilities},
+    listSessions:({cwd})=>({sessions:[{sessionId:'previous',cwd}]}),
+  });
+  await agent.listThreads(root);
+  await agent.resumeConversation('previous',root);
+  agent.state.threadName='Cached Harness name';
+  await agent.persist();
+  await agent.newConversation(root);
+  const sessions=(await agent.listThreads(root)).data;
+  assert.deepEqual(sessions.map(item=>item.id),['session','previous']);
+  assert.equal(sessions[1].name,'Cached Harness name');
+  assert.ok(sessions[1].updatedAt > 0);
+  assert.deepEqual((await agent.listThreads(root,null,'cached harness')).data.map(item=>item.id),['previous']);
+  assert.deepEqual((await agent.listThreads(root,'cursor')).data.map(item=>item.id),['previous']);
+});
+
 const cachedConversation = () => ['completed','interrupted','failed','unknown'].flatMap((turnStatus,n)=>[
   {id:`user-${n}`,turnId:`turn-${n}`,role:'user',text:`保存的请求 ${n}\n第二行`,complete:true,turnStatus},
   {id:`answer-${n}`,turnId:`turn-${n}`,role:'assistant',text:`保存的回复 ${n}`,complete:true,phase:'final_answer',turnStatus},
@@ -321,7 +399,7 @@ test('ACP history and aliases remain separate when two projects assign the same 
   assert.notEqual((await restored.listThreads(other)).data[0]?.name,'First alias');
 });
 
-for(const provider of ['grok','opencode','custom-restore']) for(const [kind,capabilities,method] of [
+for(const provider of ['grok','antigravity','deepseek']) for(const [kind,capabilities,method] of [
   ['load only',{loadSession:true},'session/load'],
   ['resume only',resumeCapabilities,'session/resume'],
   ['load and resume',{loadSession:true,...resumeCapabilities},'session/load'],
@@ -349,7 +427,7 @@ for(const provider of ['grok','opencode','custom-restore']) for(const [kind,capa
 });
 
 test('resume-only empty history stays usable and history viewing does not restore another connection',async t=>{
-  const f=await acp(t,'custom-empty-resume',{initialization:{agentCapabilities:resumeCapabilities}}), agent=await f.restart();
+  const f=await acp(t,'deepseek',{initialization:{agentCapabilities:resumeCapabilities}}), agent=await f.restart();
   assert.equal(agent.state.connection,'ready',agent.state.error);assert.deepEqual(agent.state.messages,[]);
   const count=f.peers.length, history=await agent.history('session');
   assert.equal(history.localOnly,true);assert.deepEqual(history.turns,[]);assert.equal(f.peers.length,count);
@@ -366,7 +444,7 @@ for(const [name,capabilities,error,connection] of [
   ['authentication',resumeCapabilities,{code:-32000,message:'Authentication required'},'authentication'],
   ['load failure with resume available',{loadSession:true,...resumeCapabilities},{code:-32002,message:'Session not found'},'error'],
 ]) test(`ACP restore ${name} preserves stored ID and cache without creating or retrying a session`,async t=>{
-  const f=await acp(t,'custom-restore-failure',{initialization:{agentCapabilities:capabilities},restore:{error}}), messages=cachedConversation();
+  const f=await acp(t,'deepseek',{initialization:{agentCapabilities:capabilities},restore:{error}}), messages=cachedConversation();
   f.agent.state.messages=structuredClone(messages);await f.agent.persist();
   const files=['index.json','session.json'], before=await Promise.all(files.map(name=>readFile(join(f.agent.storageDir,name))));
   const agent=await f.restart();
@@ -379,7 +457,7 @@ for(const [name,capabilities,error,connection] of [
 });
 
 for(const failure of ['disconnect','timeout','close']) test(`pending ACP resume ${failure} cannot erase cache or revive the closed connection`,async t=>{
-  const started=deferred(), f=await acp(t,'custom-pending-resume',{initialization:{agentCapabilities:resumeCapabilities},restore:{pending:true,onRequest:()=>started.resolve()}}), messages=cachedConversation();
+  const started=deferred(), f=await acp(t,'deepseek',{initialization:{agentCapabilities:resumeCapabilities},restore:{pending:true,onRequest:()=>started.resolve()}}), messages=cachedConversation();
   f.agent.state.messages=structuredClone(messages);await f.agent.persist();
   const before=await readFile(join(f.agent.storageDir,'index.json'));
   if(failure==='timeout')t.mock.timers.enable({apis:['setTimeout']});
@@ -400,7 +478,7 @@ for(const failure of ['disconnect','timeout','close']) test(`pending ACP resume 
 });
 
 test('resume cache is never delivery evidence and uncertain submissions keep their draft without resending',async t=>{
-  const f=await acp(t,'custom-resume-receipt',{initialization:{agentCapabilities:resumeCapabilities}});
+  const f=await acp(t,'deepseek',{initialization:{agentCapabilities:resumeCapabilities}});
   const message={id:'cached-user',role:'user',text:'do this once',complete:true,turnStatus:'unknown'};
   f.agent.state.messages=[message];await f.agent.persist();
   const store=new WorkspaceStore(f.root);await store.load();await store.add(f.root);
@@ -411,6 +489,7 @@ test('resume cache is never delivery evidence and uncertain submissions keep the
   const guard=new SubmissionGuard(store), active=agent.active;
   const result=await guard.reconcile(agent,target.provider,'unconfirmed');
   assert.equal(result.status,'unknown');assert.equal(store.draft(target),message.text);assert.equal(agent.active,active);assert.equal(agent.endpoints.size,1);
+  assert.match(result.checkMessage, /对应的 CLI 中核对/);
   assert.deepEqual(agent.state.messages,[message]);
   await assert.rejects(guard.send(agent,target.provider,message.text),/核查/);
   const methods=f.peers.flatMap(peer=>peer.calls.map(call=>call.method));

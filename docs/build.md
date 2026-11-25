@@ -28,12 +28,12 @@ Windows x64，Node.js 24 或更高，npm，Inno Setup 6.7.3。安装器构建使
 | 层级 | 核心文件 | 职责与边界 |
 | --- | --- | --- |
 | Electron 主进程 | `main.cjs` | 单实例锁、特权只读协议 `app://local`（仅允许访问 `renderer/`、`dist/`、`assets/`、`vendor/`）、窗口 CSP 与 IPC 来源校验、壁纸两阶段原子提交（画面解码并暂存设置后再落盘切换，保留声线）、退出前草稿刷盘确认（`draft:flush`）及全部后台子进程托管 |
-| 沙盒渲染窗口 | `preload.cjs`、`renderer/index.html`、`renderer/workbench.html`、`dist/app.js`、`dist/workbench.js` | 开启 `contextIsolation` 与 `sandbox`，通过预加载脚本公开的 `window.companion` 接口与主进程通信。承载桌面壁纸视图（`still-wallpaper.js`、`puppet-wallpaper.mjs` WebGL2 五种可选姿态及思考原画像素重组、`motion-wallpaper.mjs` 真人两态视频）、悬浮对话气泡（`app.js`、`speech-ui.js`）与项目/设置工作台（`workbench.js`、`custom-agent-settings.mjs`） |
+| 沙盒渲染窗口 | `preload.cjs`、`renderer/index.html`、`renderer/workbench.html`、`dist/app.js`、`dist/workbench.js` | 开启 `contextIsolation` 与 `sandbox`，通过预加载脚本公开的 `window.companion` 接口与主进程通信。承载桌面壁纸视图（`still-wallpaper.js`、`puppet-wallpaper.mjs` WebGL2 五种可选姿态及思考原画像素重组、`motion-wallpaper.mjs` 真人两态视频）、悬浮对话气泡（`app.js`、`speech-ui.js`）与项目/设置工作台（`workbench.js`） |
 | 桌面层与点击宿主 | `backend/wallpaper-host.cjs`、`scripts/wallpaper-host.ps1`、`scripts/wallpaper-pose-input.cs` | 将应用自有壁纸窗口挂载至 Windows `Progman`/`WorkerW` 桌面图标层后方；动漫模式空闲时通过低层鼠标观察判断桌面露出人物单击并原样放行系统鼠标事件 |
-| 多 Agent 协议适配 | `backend/codex.mjs`、`backend/acp-agent.mjs`、`backend/claude-agent.mjs`、`backend/native-agent.mjs`、`backend/custom-agents.mjs` | 以 `shell: false` 调用用户本机原生 CLI：Codex 使用 `app-server` stdio JSON-RPC，Grok Build / OpenCode V2 / 自定义接入使用 ACP v1 stdio，Claude 使用官方 Agent SDK（仅限 API / 官方云 API 认证）。凭据与完整历史归属原生 CLI，应用仅缓存最近 200 条显示消息 |
+| 多 Agent 协议适配 | `backend/agent-catalog.cjs`、`backend/codex.mjs`、`backend/acp-agent.mjs`、`backend/claude-agent.mjs`、`backend/native-agent.mjs` | 从固定目录选择后端，以 `shell: false` 运行本机 CLI。Codex 使用 `app-server` stdio JSON-RPC，Antigravity、Grok Build 和 DeepSeek Harness 使用 ACP v1 stdio，Claude 使用官方 Agent SDK 和 API 认证。凭据与完整历史归原生 CLI，Rin 的非 Codex 会话缓存最近 200 条显示消息 |
 | 本地语音与资源 | `backend/resident-speech.mjs`、`backend/speech-worker.cjs`、`backend/qwen-speech.mjs`、`backend/qwen-worker.py`、`backend/voice-resources.mjs` | 独立 `runtime/node.exe` 子进程加载 `sherpa-onnx-node`（GPL-3.0-or-later 组合边界，仅交换 JSON 与 PCM）执行 SenseVoice 听写和 Kokoro 朗读；可选独立 Python 3.12 环境运行 Qwen3-TTS GPU 合成；上游模型按固定 revision 与 SHA-256 校验下载 |
 | RC003 遥控器层 | `backend/remote-controller.mjs`、`backend/remote-input.cjs`、`backend/remote-native.mjs`、`native/rc003-helper.cs` | C# 原生辅助进程（`runtime/rc003-helper.exe`）负责 BLE GATT/ATVV 16 kHz ADPCM 语音流，Koffi 绑定 Win32 Raw Input 区分遥控器按键与普通键盘/输入法 |
-| 持久化与回执保护 | `backend/workspace-store.mjs`、`backend/submission-guard.mjs`、`backend/durable-json.mjs`、`backend/data-recovery.mjs` | 按 `[provider, cwd, threadId]` 隔离草稿，写入使用临时文件 `fsync`、`.bak` 备份与原子重命名（自定义 Agent 配置另带 `.lock` 排他写锁）；发送前记录基线，断线回执不明时保留原稿供核查，绝不自动重发 |
+| 持久化与回执保护 | `backend/workspace-store.mjs`、`backend/submission-guard.mjs`、`backend/durable-json.mjs`、`backend/data-recovery.mjs` | 按 `[provider, cwd, threadId]` 隔离草稿，写入使用临时文件 `fsync`、`.bak` 备份与原子重命名。发送前记录基线，断线回执不明时保留原稿供核查，绝不自动重发 |
 | 工程与发布工具链 | `tools/project/*`、`tools/release/*`、`tools/qa/*`、`tools/probes/*` | 统一启动器、文档链接与版本一致性检查（`check:project`）、工作区公开审计（`check:public`）、Git 暂存区公开审计（`node tools/release/audit-public.mjs --staged`）、Inno Setup 打包与产物字节级校验 |
 
 ## 准备与验证
@@ -47,7 +47,11 @@ npm test
 npm run build
 ```
 
-单元测试和前端构建不需要语音模型。Windows 设备组件可执行 `npm run qa:remote-component` 编译并检查管道，不访问设备。源码初次连接时自动准备组件；打包脚本预编译到 runtime，使用 Windows 自带 .NET Framework 4.8 和 WinMetadata，不依赖 Python 或 Windows SDK。用户自行安装所选 Agent 的 Windows 原生 CLI：Codex、Claude Code、Grok Build 或 OpenCode V2。新版协议依赖锁定在应用目录的 `package-lock.json`；发布脚本收集 SDK 及必要依赖，不打包 CLI 程序或账号。新增 Agent 的使用和手动验收见 [CLI Agent 说明](../prototypes/live2d-codex/CLI-AGENTS.md)；基础构建通过不等于新增后端完成主应用验收，当前范围见[项目状态](project-status.md)。应用的 Node 运行时与默认女性壁纸媒体从锁定的基础安装包获取（历史锁包若含 Cubism Core，也可供源码旧头像模式复用）。正式安装包仅打包 `assets/scene/rin-poses` 动漫原画姿态、`assets/motion/female` 真人视频、`assets/ambience` 环境音及 `assets/character-previews`、`assets/stills` 预览与兼容回退图；已剔除旧 `Cubism Core`、旧雨夜 Live2D 模型（`assets/rainy-window-v2-4k`）、男士资源及仅源码使用的历史原型/预览模块，并在覆盖升级时通过 `[InstallDelete]` 自动清理这些旧残留文件。
+单元测试和前端构建不需要语音模型。Windows 设备组件可执行 `npm run qa:remote-component` 编译并检查管道，不访问设备。源码初次连接时自动准备组件。打包脚本使用 Windows 自带 .NET Framework 4.8 和 WinMetadata 预编译到 runtime，不依赖 Python 或 Windows SDK。
+
+用户自行安装所选 Agent 的 CLI。协议依赖锁定在应用目录的 `package-lock.json`。应用包收集 ACP SDK 及其依赖，Claude Agent SDK 由安装版用户从 npm 单独安装。覆盖升级会清理旧应用目录里的自定义 Agent 模块和旧版随 Claude SDK 打包的专属依赖。安装准备见 [CLI Agent 说明](../prototypes/live2d-codex/CLI-AGENTS.md)。真实账户和主应用验收范围见 [项目状态](project-status.md)。
+
+应用的 Node 运行时与默认女性壁纸媒体从锁定的基础安装包获取（历史锁包若含 Cubism Core，也可供源码旧头像模式复用）。正式安装包仅打包 `assets/scene/rin-poses` 动漫原画姿态、`assets/motion/female` 真人视频、`assets/ambience` 环境音及 `assets/character-previews`、`assets/stills` 预览与兼容回退图。覆盖升级时，`[InstallDelete]` 清理已移除的旧 `Cubism Core`、旧雨夜 Live2D 模型（`assets/rainy-window-v2-4k`）、男士资源及仅源码使用的历史原型和预览模块。
 
 RC003 输入层还使用锁定的 Koffi 3.3.3 和 `@koromix/koffi-win32-x64` 预编译包，通过上述 npm 安装。不要省略 Windows 本平台的 optional dependency。打包脚本显式复制该原生包及许可，并在输出目录加载输入模块；组件检查还在独立副本中用 Electron 的 Node 模式核对加载。连接、按钮设置、麦克风和待验收范围见 [项目状态](project-status.md)。
 

@@ -1,25 +1,40 @@
-const BUILTIN_AGENTS = Object.freeze({
-  codex: { name: 'Codex', binaryEnv: 'VIBE_CODEX_BINARY' },
-  claude: { name: 'Claude', binaryEnv: 'VIBE_CLAUDE_BINARY', experimental: true, help: '安装原生 Claude Code CLI，并在启动应用前配置 ANTHROPIC_API_KEY 或官方支持的云平台 API 认证，再重新连接。API 单独计费；Rin 不提供 Claude 订阅登录或订阅额度，也不会替你创建或切换付费凭据。' },
-  grok: { name: 'Grok Build', binaryEnv: 'VIBE_GROK_BINARY', experimental: true, help: '在自己的终端运行 grok，按原生提示完成登录，然后重新连接。应用复用 Grok 已保存的登录。' },
-  opencode: { name: 'OpenCode', binaryEnv: 'VIBE_OPENCODE_BINARY', experimental: true, help: '使用 OpenCode V2；在终端运行 opencode auth login 登录所需模型提供商，然后重新连接。免费模型可按 OpenCode 自身规则使用。' },
+const CLAUDE_SDK_VERSION = '0.3.240';
+const CLAUDE_API_NOTE = 'Anthropic 要求第三方接入使用 API 认证，API 单独计费。';
+
+const AGENTS = Object.freeze({
+  codex: Object.freeze({
+    name: 'Codex', adapter: 'codex', binaryName: 'codex', binaryEnv: 'VIBE_CODEX_BINARY',
+  }),
+  antigravity: Object.freeze({
+    name: 'Antigravity CLI', adapter: 'acp', binaryName: 'agy', binaryEnv: 'VIBE_ANTIGRAVITY_BINARY', experimental: true,
+    acpArgs: Object.freeze(['acp']),
+    help: '在 Windows 终端运行 agy 完成 Google 登录，也可用 agy acp --login，再重新连接。Rin 通过官方 ACP 接口沿用 CLI 登录，模型与额度由 Google 账号决定。',
+    permissionHint: '工具审批遵循 Antigravity 的原生权限规则。已设为自动允许或拒绝的操作不会弹窗。',
+  }),
+  grok: Object.freeze({
+    name: 'Grok Build', adapter: 'acp', binaryName: 'grok', binaryEnv: 'VIBE_GROK_BINARY', experimental: true,
+    acpArgs: Object.freeze(['--no-auto-update', '--permission-mode', 'default', '--no-subagents', 'agent', '--no-leader', 'stdio']),
+    help: '在自己的终端运行 grok，按原生提示完成登录，然后重新连接。应用复用 Grok 已保存的登录，模型与额度由 xAI 账号决定。',
+  }),
+  claude: Object.freeze({
+    name: 'Claude Agent', adapter: 'claude', binaryName: 'claude', binaryEnv: 'VIBE_CLAUDE_BINARY', experimental: true,
+    help: '请在启动 Rin 前配置 ANTHROPIC_API_KEY 或受支持的云平台 API 认证。',
+  }),
+  deepseek: Object.freeze({
+    name: 'DeepSeek Harness', adapter: 'acp', binaryName: 'dsh', binaryEnv: 'VIBE_DEEPSEEK_BINARY', experimental: true,
+    acpArgs: Object.freeze(['--profile', 'acp']),
+    help: '请安装支持 ACP 的 dsh，在 DeepSeek Harness 中为 acp 配置模型和认证，再重新连接。登录与计费由该配置使用的模型服务管理。',
+    permissionHint: 'Harness 已允许的操作遵循其本地规则。缺少操作详情的审批请求将被拒绝。',
+  }),
 });
-let agents = BUILTIN_AGENTS;
-const isCustomAgentId = id => typeof id === 'string' && /^custom-[a-z0-9][a-z0-9-]{0,47}$/.test(id);
-const isStoredCliAgent = id => Object.hasOwn(BUILTIN_AGENTS, id) || isCustomAgentId(id);
-// Only display metadata crosses into the renderer. Executables, arguments and
-// authentication configuration remain in the main process.
-function setCustomAgents(entries = []) {
-  const custom = {};
-  for (const entry of entries) {
-    if (!isCustomAgentId(entry?.id) || typeof entry.name !== 'string' || !entry.name.trim() || entry.name.length > 80 || Object.hasOwn(custom, entry.id)) throw new Error('自定义 Agent 名称或标识无效。');
-    custom[entry.id] = Object.freeze({ name: entry.name.trim(), custom: true, experimental: true, help: '请先在自己的终端完成该 Agent 的认证，再重新连接。可在“壁纸与设置 → Agent”中修改配置；外部修改后点击“重新读取”。' });
-  }
-  agents = Object.freeze({ ...BUILTIN_AGENTS, ...custom });
-}
+
+const isCliAgent = id => typeof id === 'string' && Object.hasOwn(AGENTS, id);
+
+// Read legacy draft keys without registering or starting their old providers.
+const isStoredCliAgent = id => isCliAgent(id) || id === 'opencode' ||
+  typeof id === 'string' && /^custom-[a-z0-9][a-z0-9-]{0,47}$/.test(id);
+
 module.exports = {
-  get AGENTS() { return agents; },
-  agentName: id => agents[id]?.name ?? (id === 'dots' ? '凛（Dots）' : 'Agent'),
-  isCliAgent: id => Object.hasOwn(agents, id), isCustomAgentId, isStoredCliAgent, setCustomAgents,
-  customAgentChoices: () => Object.entries(agents).filter(([, spec]) => spec.custom).map(([id, spec]) => ({ id, name: spec.name })),
+  AGENTS, CLAUDE_SDK_VERSION, CLAUDE_API_NOTE, isCliAgent, isStoredCliAgent,
+  agentName: id => isCliAgent(id) ? AGENTS[id].name : id === 'dots' ? '凛（Dots）' : 'Agent',
 };

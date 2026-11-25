@@ -5,7 +5,7 @@ import { randomUUID } from 'node:crypto';
 import { isTaskBusy } from './task-state.mjs';
 import { AgentLifecycle } from './agent-lifecycle.mjs';
 import { currentReply } from './reply-state.mjs';
-import { findAgent, versionOf, safeError, deadline } from './agent-process.mjs';
+import { agentCommand, agentEnvironment, versionOf, safeError, deadline } from './agent-process.mjs';
 import catalog from './agent-catalog.cjs';
 import { readJson, writeJson } from './durable-json.mjs';
 import { pathKey } from './path-identity.mjs';
@@ -26,14 +26,15 @@ export function historyTurns(messages) {
 // remain owned by each CLI. This cache contains display data, never credentials.
 export class NativeAgent extends EventEmitter {
   constructor({ provider, projectRoot, storageDir }) {
-    super(); this.provider = provider; this.spec = catalog.AGENTS[provider];
-    if (!this.spec) throw new Error('未知 Agent，请检查接入配置。');
+    super();
+    if (!catalog.isCliAgent(provider)) throw new Error('未知 Agent。');
+    this.provider = provider; this.spec = catalog.AGENTS[provider];
     this.storageDir = join(resolve(storageDir), 'agents', provider); this.projectRoot = resolve(projectRoot);
     this.queue = Promise.resolve(); this.index = {}; this.known = new Map(); this.pending = new Map(); this.closed = false;
     this.lifecycle = new AgentLifecycle();
     this.state = { provider, agentName: this.spec.name, loginHelp: this.spec.help, connection: 'connecting', status: 'connecting', activity: `正在连接 ${this.spec.name}`, error: null, login: null, version: null,
       cwd: this.projectRoot, projectName: basename(this.projectRoot), threadId: null, turnId: null, threadName: '', model: null, models: [], effort: null, messages: [], approvals: [], restored: false,
-      permissionHint: this.spec.custom ? '审批遵循自定义 Agent 的原生配置；自动允许的操作不会弹窗。' : provider === 'opencode' ? '审批遵循 OpenCode 的项目、全局和 Agent 权限规则；配置为自动允许的操作不会弹窗。' : '工具权限请求由原生 Agent 发出，在此确认。',
+      permissionHint: this.spec.permissionHint ?? '工具权限请求由原生 Agent 发出，在此确认。',
       renameLocal: provider !== 'claude', canStartNew: false };
   }
   get busy() { return !!this.run || !!this.lifecycle.active || isTaskBusy(this.state); }
@@ -116,7 +117,13 @@ export class NativeAgent extends EventEmitter {
     } catch (error) { await this.disposeNative().catch(() => {}); this.report(error, { connection: true }); }
     finally { operation.release(); }
   }
-  async prepareNative() { this.binary = findAgent(this.provider); this.state.version = await versionOf(this.binary); }
+  nativeEnvironment() { return agentEnvironment(); }
+  async prepareNative() {
+    const env = this.nativeEnvironment(), command = agentCommand(this.provider, env);
+    this.binary = command.binary;
+    this.binaryArgs = command.args;
+    this.state.version = await versionOf(this.binary, this.binaryArgs, env);
+  }
   assertReady() { if (this.closed || this.state.connection !== 'ready') throw new Error(`${this.spec.name} 尚未连接，请先重新连接。`); }
   idle() { this.assertReady(); if (this.busy) throw new Error('请先完成或停止当前任务。'); }
   push(message) { this.state.messages.push(message); if (this.state.messages.length > 200) this.state.messages.splice(0, this.state.messages.length - 200); }

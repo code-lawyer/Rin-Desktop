@@ -1,7 +1,7 @@
 // Exercise the actual packaged main process with a fresh profile and no CLI.
 import { spawn } from 'node:child_process';
 import { createServer } from 'node:net';
-import { readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import assert from 'node:assert/strict';
 import { setTimeout as delay } from 'node:timers/promises';
@@ -34,7 +34,7 @@ await new Promise((done, fail) => {
 });
 const port = server.address().port;
 await new Promise((done) => server.close(done));
-const env = { ...process.env, VIBE_CODEX_BINARY: join(output, 'unavailable-codex.exe'), VIBE_AGENT_CONFIG: join(output, 'custom-agents.json') };
+const env = { ...process.env, VIBE_CODEX_BINARY: join(output, 'unavailable-codex.exe') };
 delete env.ELECTRON_RUN_AS_NODE;
 let child,
   exited,
@@ -60,7 +60,6 @@ async function launch() {
     [
       `--storage=${join(output, 'data')}`,
       `--project=${output}`,
-      '--provider=codex',
       '--visual=hidden',
       '--shortcut=off',
       `--debug-port=${port}`,
@@ -141,59 +140,34 @@ async function quit() {
   assert.equal(code, 0);
   child = null;
 }
-async function checkCustomAgents() {
-  const fixture = join(output, 'synthetic-acp.mjs'), transcript = join(output, 'synthetic-acp-methods.txt');
-  await writeFile(fixture, `import {createInterface} from 'node:readline';
-import {appendFileSync} from 'node:fs';
-const output=value=>process.stdout.write(JSON.stringify(value)+'\\n');
-createInterface({input:process.stdin}).on('line',line=>{
-  const request=JSON.parse(line); appendFileSync(process.argv[2],request.method+'\\n');
-  if(request.id===undefined)return;
-  let result={};
-  if(request.method==='initialize')result={protocolVersion:1,agentCapabilities:{loadSession:true},agentInfo:{name:'Synthetic QA',version:'1.0'}};
-  else if(request.method==='session/new')result={sessionId:'qa-session'};
-  else if(request.method==='session/prompt'){
-    output({jsonrpc:'2.0',method:'session/update',params:{sessionId:request.params.sessionId,update:{sessionUpdate:'agent_message_chunk',content:{type:'text',text:'Synthetic ACP reply'}}}});
-    result={stopReason:'end_turn'};
-  }else if(request.method!=='session/load'){output({jsonrpc:'2.0',id:request.id,error:{code:-32601,message:'Unsupported synthetic method'}});return;}
-  output({jsonrpc:'2.0',id:request.id,result});
-});
-`);
-  const call = (name, ...args) => workspace.evaluate(`companion.${name}(...${JSON.stringify(args)})`);
-  const value = result => { assert.equal(result.ok, true, result.error); return result.value; };
-  let config = value(await call('customAgents'));
-  assert.deepEqual(config.entries, []);
-  const entry = { id: 'custom-package-qa', name: 'Synthetic package Agent', protocol: 'acp', command: join(directory, 'resources/app/runtime/node.exe'), args: [fixture, transcript] };
-  config = value(await call('saveCustomAgent', entry, config.revision, true));
-  await until(() => workspace.evaluate("!!document.querySelector('#agent-select option[value=custom-package-qa]')"), 'packaged custom picker');
-  assert.equal((await wallpaper.evaluate('companion.customAgents()')).ok, false, 'wallpaper cannot read full launch settings');
-  value(await call('chooseProvider', entry.id));
-  let state = value(await call('snapshot'));
-  assert.equal(state.connection, 'ready'); assert.equal(state.version, '1.0');
-  assert.equal((await readFile(transcript, 'utf8')).includes('session/prompt'), false, 'connecting sends no model task');
-  assert.equal((await call('removeCustomAgent', entry.id, config.revision)).ok, false);
-  config = value(await call('saveCustomAgent', { ...entry, name: 'Edited package Agent' }, config.revision, false));
-  assert.equal(config.needsReconnect, true);
-  value(await call('reconnect'));
-  assert.equal(value(await call('customAgents')).needsReconnect, false);
-  state = value(await call('snapshot'));
-  value(await call('send', 'Synthetic fixed task', { provider: entry.id, cwd: state.cwd, threadId: state.threadId }));
-  await until(async () => {
-    const current = value(await call('snapshot'));
-    return current.status === 'idle' && current.messages.some(message => message.text === 'Synthetic ACP reply');
-  }, 'packaged synthetic ACP response');
-  const cache = join(output, 'data/agents', entry.id, 'session.json'), saved = await readFile(cache, 'utf8');
-  value(await call('chooseProvider', 'codex'));
-  config = value(await call('customAgents'));
-  config = value(await call('removeCustomAgent', entry.id, config.revision));
-  assert.deepEqual(config.entries, []);
-  assert.equal(await readFile(cache, 'utf8'), saved, 'removing configuration retains session data');
-  value(await call('windowAction', 'hide-chat'));
-  checks.push('packaged custom Agent IPC, picker, real synthetic ACP child, edit/reconnect, removal and retained session data');
+const legacyProvider = 'custom-package-qa';
+const selection = join(output, 'data/provider.json');
+const legacyConfig = join(output, 'data/custom-agents.json');
+const cache = join(output, 'data/agents', legacyProvider, 'session.json');
+async function checkFixedAgents() {
+  const ids = ['codex', 'antigravity', 'grok', 'claude', 'deepseek'];
+  assert.deepEqual(portable.backends, ids);
+  await until(() => workspace.evaluate("document.getElementById('agent-select').options.length===5"), 'packaged Agent picker');
+  assert.deepEqual(await workspace.evaluate("[...document.getElementById('agent-select').options].map(option=>option.value)"), ids);
+  assert.equal((await workspace.evaluate('companion.snapshot()')).value.provider, 'codex');
+  for (const target of [legacyProvider, 'opencode', 'dots', 'constructor', ['antigravity']]) {
+    const result = await workspace.evaluate(`companion.chooseProvider(${JSON.stringify(target)})`);
+    assert.equal(result.ok, false);
+    assert.match(result.error, /请选择支持的 Agent/);
+  }
+  assert.equal(await workspace.evaluate("['customAgents','saveCustomAgent','removeCustomAgent','reloadCustomAgents','pickAgentProgram','copyAgentPrompt'].every(name=>!(name in companion))"), true);
+  assert.equal(await readFile(cache, 'utf8'), 'legacy session bytes');
+  assert.equal(await readFile(legacyConfig, 'utf8'), 'legacy config bytes');
+  assert.deepEqual(JSON.parse(await readFile(selection, 'utf8')), { provider: legacyProvider });
+  checks.push('fixed package catalog and preload, retired provider fallback and untouched legacy files');
 }
 try {
+  await mkdir(join(cache, '..'), { recursive: true });
+  await writeFile(selection, JSON.stringify({ provider: legacyProvider }));
+  await writeFile(cache, 'legacy session bytes');
+  await writeFile(legacyConfig, 'legacy config bytes');
   await launch();
-  await checkCustomAgents();
+  await checkFixedAgents();
   assert.equal((await snapshot()).wallpaper.model, 'rin-scene');
   assert.equal(await wallpaper.evaluate('document.hidden'), false);
   checks.push('actual packaged main/preload/renderer default to original anime poses without an installed CLI');

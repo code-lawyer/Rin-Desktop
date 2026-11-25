@@ -12,7 +12,7 @@ test('live Agent probes show help without credentials, SDK loading or fixture wo
   for (const entry of ['claude-probe.mjs', 'acp-probe.mjs']) {
     const output = execFileSync(process.execPath, [join(root, 'tools/probes/cli-agents', entry), '--help'], {
       encoding: 'utf8', windowsHide: true,
-      env: { ...process.env, PROBE_CLAUDE_BINARY: 'nonexistent-fixture.exe', PROBE_GROK_BINARY: 'nonexistent-fixture.exe', PROBE_OPENCODE_BINARY: 'nonexistent-fixture.exe' },
+      env: { ...process.env, PROBE_CLAUDE_BINARY: 'nonexistent-fixture.exe', PROBE_GROK_BINARY: 'nonexistent-fixture.exe', PROBE_ANTIGRAVITY_BINARY: 'nonexistent-fixture.exe', PROBE_DEEPSEEK_BINARY: 'nonexistent-fixture.exe' },
     });
     assert.match(output, /Default: help only/);
   }

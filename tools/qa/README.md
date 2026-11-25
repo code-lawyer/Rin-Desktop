@@ -10,7 +10,7 @@
 | `npm run qa:inventory -- --run` | 只读文件元数据与目录占用，不跟随目录联接；不自动删除 |
 | `npm run qa:known-issues` | 合成数据/协议复现已知业务边界 |
 | `npm run qa:interface` | 隔离 Electron 界面与工作台，无账户或硬件 |
-| `npm run qa:puppet-package -- --run --package="<测试包目录>"` | 实际包的主进程、设置 IPC、自定义 Agent 添加/编辑/重连/删除与数据保留；启动本地合成 ACP 子进程，随后检查壁纸切换、退出及重启恢复。不连接真实账户或硬件，不改系统剪贴板 |
+| `npm run qa:puppet-package -- --run --package="<测试包目录>"` | 检查实际包的固定 Agent 列表、旧接入回退与历史文件保留，以及壁纸切换、退出和重启恢复。使用独立数据，不连接账户或硬件 |
 | `npm run qa:wallpaper-recovery -- --run --package="<测试包目录>"` | 实际包的真人视频解码及首次播放失败，检查原画面/设置保留、候选资源释放、显式重试和新进程恢复；不改写媒体，不连接账户或设备 |
 | `npm run qa:visual -- --run [--extended]` | 隔离页面、布局、长内容、缩放与完整姿态截图；扩展模式增加最小窗口的 125%–200% 页面缩放、控件可达性与 Chromium 无障碍名称检查。页面缩放不代表系统 DPI，无障碍树检查不代替读屏实测 |
 | `npm run qa:shutdown -- --run` | 隔离桌面退出与子进程清理 |
@@ -24,7 +24,7 @@
 | `npm run qa:data-copy -- --run --package="<测试包目录>" --source="<已关闭的应用数据>"` | 完整副本逐文件哈希、数据目录验证、损坏副本恢复与包内工作台启动；源应用必须完全退出。原目录不写入，运行副本禁用 RC003 自动连接 |
 | `npm run qa:release-soak -- --run --package="<测试包目录>" --seconds=1800` | 实际包连续渲染，切姿态/风格、暂停恢复、WebGL 和堆内存检查；隐藏窗口不等于桌面挂载、系统 DPI 或整夜稳定性 |
 | `npm run qa:agent-desktop -- --run --package="<测试包目录>" --provider=codex --turns=20` | 使用现有真实认证完成固定任务、流式中断、历史与重启草稿恢复；provider 可选 grok。会产生模型用量和原生 CLI 测试会话 |
-| `npm run qa:agent-interactions -- --run --package="<测试包目录>" --provider=codex` | 真实 UI 审批、问题卡、仅本测试拥有的 CLI 断线与重连、未确认记录恢复；问题工具能否触发取决于原生 CLI/模式。未确认记录为明确标注的故障注入，不宣称观察到真实丢回执 |
+| `npm run qa:agent-interactions -- --run --source --provider=codex` | 真实 UI 审批、问题卡、CLI 断线重连和注入未确认记录后的恢复。provider 支持 codex、grok 和 antigravity。先构建源码，也可用 `--package="<测试包目录>"` 验收测试包，或加 `--model=<模型 ID>` 指定测试会话模型。会使用真实 CLI 额度，问题工具能否触发取决于原生 CLI 和模式 |
 | `npm run qa:local-speech -- --run --package="<测试包目录>" --models="<已有模型目录>"` | 包内 CPU 语音依赖真实合成和识别固定语句，不录音、不播放、不下载。可加 `--qwen-port=<调试端口>` 使用空闲应用中已就绪的 Qwen，并等待该请求结束；不改变设置或全局停止用户任务 |
 | `npm run qa:prerequisites -- --run --package="<测试包目录>"` | 缺 CLI/模型、仅本机代理故障下的下载取消/失败、WebGL 上下文丢失/重试失败；可加 `--qwen-root="<已有运行环境>"` 隐藏该子进程的 CUDA。属于故障注入，不代替无 GPU 新机器验收 |
 | `npm run data:recover -- --source="<副本>" --out="<新目录>"` | 默认预检与预览，增加 `--run` 才复制恢复；拒绝覆盖，遇到内部目录链接/符号链接时在创建输出前拒绝 |

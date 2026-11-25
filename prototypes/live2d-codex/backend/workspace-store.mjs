@@ -141,6 +141,7 @@ export class WorkspaceStore {
       // The receipt can belong to another provider or to a newly assigned
       // thread. Keep both project identities reachable until it is resolved.
       const pending = Object.values(data.submissions ?? {}).some(record =>
+        isCliAgent(record.target?.provider) &&
         ['pending', 'unknown'].includes(record.status) &&
         [record.target, record.originalTarget].some(target => typeof target?.cwd === 'string' && pathKey(target.cwd) === pathKey(p.cwd)));
       if (pending) throw new Error('此项目还有发送结果未确定，请先核查并处理原稿，再移除此入口。');

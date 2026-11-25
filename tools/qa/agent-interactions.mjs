@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { mkdir, readFile, writeFile, access } from 'node:fs/promises';
+import { randomUUID } from 'node:crypto';
 import { join, resolve, basename } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { packagedSession } from './packaged-session.mjs';
@@ -8,24 +9,26 @@ import { findAgent, versionOf } from '../../prototypes/live2d-codex/backend/agen
 import { createRunDirectory, requireLiveRun, writeRunReport } from './run-output.mjs';
 
 requireLiveRun(
-  'npm run qa:agent-interactions -- --run --package=<test package> --provider=codex|grok',
+  'npm run qa:agent-interactions -- --run --source|--package=<test package> --provider=codex|grok|antigravity [--model=<model id>]',
   'actual CLI approvals/questions, interruption, owned CLI disconnection and unresolved-receipt recovery in a fresh QA project; fixed harmless tasks only',
 );
 const args = process.argv.slice(2),
+  source = args.includes('--source'),
   option = (key) => args.find((arg) => arg.startsWith(`--${key}=`))?.slice(key.length + 3);
 if (
-  !option('package') ||
-  !['codex', 'grok'].includes(option('provider')) ||
-  args.some((arg) => arg !== '--run' && !/^--(package|provider)=./.test(arg))
+  source === Boolean(option('package')) ||
+  !['codex', 'grok', 'antigravity'].includes(option('provider')) ||
+  args.some((arg) => arg !== '--run' && arg !== '--source' && !/^--(package|provider|model)=./.test(arg))
 )
-  throw Error('Use --run, --package and --provider');
+  throw Error('Use --run, --provider and either --source or --package');
 const provider = option('provider'),
   output = await createRunDirectory('agent-interactions'),
   project = join(output, 'project');
 await mkdir(project);
 const binary = findAgent(provider),
   options = {
-    directory: resolve(option('package')),
+    source,
+    directory: source ? undefined : resolve(option('package')),
     output,
     project,
     provider,
@@ -33,12 +36,14 @@ const binary = findAgent(provider),
   };
 const report = {
   provider,
+  source,
   version: await versionOf(binary),
   checks: [],
   accounts: true,
   hardware: false,
   passed: false,
 };
+const marker = 'RIN-' + randomUUID();
 let session;
 const state = () => session.chat.evaluate('(async()=>(await companion.snapshot()).value)()');
 async function idle() {
@@ -106,18 +111,19 @@ console.log(JSON.stringify({ output, provider }));
 try {
   session = await packagedSession(options);
   await idle();
-  if (provider === 'codex') {
-    const model = (await state()).models.find((model) => /luna/i.test(model.model || model.id));
-    if (model)
-      assert.equal(
-        (
-          await session.chat.evaluate(
-            'companion.chooseModel(' + JSON.stringify(model.model || model.id) + ')',
-          )
-        ).ok,
-        true,
-      );
+  const models = (await state()).models;
+  const model = option('model') || (provider === 'codex' ? models.find(item => /luna/i.test(item.model || item.id))?.model : null);
+  if (model) {
+    const choice = await session.chat.evaluate('companion.chooseModel(' + JSON.stringify(model) + ')');
+    assert.equal(choice.ok, true, choice.error);
+    assert.equal((await state()).model, model);
   }
+  report.model = (await state()).model;
+  await submit(`不要调用工具。记住会话标记 ${marker}，并原样回复它。\n`);
+  await idle();
+  const baseline = (await state()).messages.filter(message => message.role === 'assistant').at(-1)?.text;
+  assert.ok(baseline?.includes(marker), 'The native CLI could not return the test marker: ' + (baseline || 'no reply').slice(0, 400));
+  report.checks.push('native login supplies a model response in the Source/Packaged UI');
   for (const decision of ['allow', 'deny', 'stop']) {
     const file = join(output, decision + '.txt');
     const command = `Set-Content -LiteralPath '${file.replaceAll('\\', '/')}' -Value 'APPROVED'`;
@@ -135,10 +141,25 @@ try {
       assert.equal(wrapped?.[1] || raw, command, 'only the exact isolated file write may be approved');
     } else {
       assert.equal(request.kind, 'files');
+      assert.deepEqual(
+        [...new Set((request.paths ?? []).map(path => resolve(project, path)))],
+        [file],
+        'approval must disclose exactly one fixture path across raw input, locations and diffs',
+      );
+      assert.equal(request.command, '', 'file fixture cannot approve shell commands');
       const firstLineObject = request.details.match(/^\{[\s\S]*?\n\}/)?.[0] || request.details;
       const data = JSON.parse(firstLineObject);
-      assert.equal(resolve(data.file_path || data.filePath || data.path), file);
-      assert.ok(!data.command && !data.cmd);
+      const path = data.file_path || data.filePath || data.absolute_path || data.path || data.Path;
+      if (path) assert.equal(resolve(project, path), file);
+      assert.ok(!data.command && !data.cmd && !data.Command);
+      if (provider === 'antigravity' && Object.hasOwn(data, 'Path')) {
+        assert.deepEqual(Object.keys(data).sort(), ['Content', 'Overwrite', 'Path']);
+      }
+      const diff = request.details.slice(firstLineObject.length);
+      const expectedChange = diff.split('\n+++\n');
+      assert.ok(expectedChange.length <= 2, 'one fixture write at most');
+      if (expectedChange.length === 2) assert.equal(expectedChange[1].trim(), 'APPROVED');
+      else assert.equal((data.Content ?? data.content)?.trim(), 'APPROVED');
     }
     await button(decision === 'allow' ? '允许这次' : decision === 'deny' ? '拒绝' : '停止任务');
     await idle();
@@ -150,6 +171,8 @@ try {
   await submit(
     provider === 'grok'
       ? '不要读写文件、联网或调用其他工具。请使用 AskUserQuestion 工具，问我喜欢蓝色还是绿色，提供这两个单选项；等我选择后复述选择。'
+      : provider === 'antigravity'
+      ? '不要读写文件或联网。如果有提问工具，请用它问我喜欢蓝色还是绿色，提供两个单选项。等我选择后复述选择。'
       : '不要读写文件、联网或调用其他工具。请使用 request_user_input 工具，问我喜欢蓝色还是绿色，提供这两个单选项；等我选择后复述选择。',
   );
   try {
@@ -239,6 +262,10 @@ try {
   report.checks.push(
     'injected unresolved journal restores original text and reconciles real CLI history without resending',
   );
+  await submit('不要调用工具。请直接输出本会话开头请你记住的完整 RIN- 会话标记。');
+  await idle();
+  assert.ok((await state()).messages.filter(message => message.role === 'assistant').at(-1)?.text.includes(marker), 'The restarted app continues the original native context');
+  report.checks.push('reply after application restart recalls original session context');
   await close();
   report.passed = true;
 } catch (error) {

@@ -100,7 +100,11 @@ export class SubmissionGuard extends EventEmitter {
     if (this.active.has(provider) || backend.busy) throw new Error('请先等待当前任务结束或停止，再核查发送结果。');
     let rows, message = '尚无法确定是否已送达。请检查会话记录，原稿继续保留；不会自动重发。';
     try { rows = await backend.readSubmissionHistory?.(record.target); }
-    catch { message = '会话记录暂时无法读取，请先重连后再次核查。原稿继续保留。'; }
+    catch (error) {
+      message = error.code === 'NATIVE_HISTORY_UNAVAILABLE'
+        ? '此 Agent 无法在 Rin 中读取原生历史。请在对应的 CLI 中核对，原稿继续保留。'
+        : '会话记录暂时无法读取，请先重连后再次核查。原稿继续保留。';
+    }
     await this.update(provider, id, { status: matchesSubmission(record, rows) ? 'confirmed' : 'unknown', checkedAt: Date.now(), checkMessage: message });
     return this.snapshot(provider);
   }

@@ -3,15 +3,17 @@ import { spawn } from 'node:child_process';
 import { createServer } from 'node:net';
 import { readFile, writeFile } from 'node:fs/promises';
 import { join, resolve, relative, isAbsolute } from 'node:path';
+import { createRequire } from 'node:module';
 import { setTimeout as delay } from 'node:timers/promises';
 import { connectPage } from './cdp.mjs';
 import { closeChild } from '../../prototypes/live2d-codex/backend/agent-process.mjs';
 import { ownedProcessTree, verifyProcessExit, terminateOwnedProcesses } from './owned-processes.mjs';
 
-// A real packaged app, with its own storage, project and loopback debug port.
+// The real application, with its own storage, project and loopback debug port.
 // Never attaches this test wallpaper to the user's desktop or claims hotkeys.
 export async function packagedSession({
   directory,
+  source = false,
   output,
   storage = join(output, 'data'),
   project = output,
@@ -24,8 +26,9 @@ export async function packagedSession({
   const root = resolve(import.meta.dirname, '../..');
   const inside = relative(join(root, 'work/qa'), resolve(output));
   assert.ok(inside && !inside.startsWith('..') && !isAbsolute(inside), 'Use a private QA run');
-  const portable = JSON.parse(await readFile(join(directory, 'resources/app/portable.json'), 'utf8'));
-  if (!allowReleasePackage)
+  const sourceRoot = join(root, 'prototypes/live2d-codex');
+  const portable = source ? null : JSON.parse(await readFile(join(directory, 'resources/app/portable.json'), 'utf8'));
+  if (!source && !allowReleasePackage)
     assert.equal(portable.testBuild?.channel, 'internal-test', 'Use an isolated test package');
   const isolatedStorage = relative(resolve(output), resolve(storage));
   assert.ok(
@@ -41,12 +44,14 @@ export async function packagedSession({
   await new Promise((done) => server.close(done));
   const environment = { ...process.env, VIBE_CODEX_BINARY: join(output, 'unavailable-codex.exe'), ...env };
   delete environment.ELECTRON_RUN_AS_NODE;
+  const executable = source ? createRequire(join(sourceRoot, 'package.json'))('electron') : join(directory, 'VibeVoice.exe');
   const child = spawn(
-    join(directory, 'VibeVoice.exe'),
+    executable,
     [
+      ...(source ? [sourceRoot] : []),
       `--storage=${storage}`,
       `--project=${project}`,
-      `--provider=${provider}`,
+      ...(provider ? [`--provider=${provider}`] : []),
       '--visual=hidden',
       '--shortcut=off',
       `--debug-port=${port}`,
@@ -103,7 +108,7 @@ export async function packagedSession({
             timer = setTimeout(() => reject(Error('App did not exit normally')), 15000);
           }),
         ]);
-      assert.equal(exit?.code, 0, 'packaged main exits normally');
+      assert.equal(exit?.code, 0, 'application exits normally');
       if (inventoryError)
         throw new Error(
           'App exited, but child-process cleanup cannot be verified: ' + inventoryError.message,

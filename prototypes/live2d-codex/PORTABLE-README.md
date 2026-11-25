@@ -1,6 +1,6 @@
 # Rin Desktop · 本地语音工作台
 
-本指南对应当前源码的动漫静态姿态与真人视频壁纸，实际安装版本以包内 `resources/app/portable.json` 为准。Claude、Grok Build、OpenCode及RC003仍为实验能力；验收范围与使用方式见同包 `CLI-AGENTS.md`。
+本指南适用于动漫静态姿态与真人视频壁纸。安装版本见包内 `resources/app/portable.json`。Antigravity、Grok Build、Claude Agent、DeepSeek Harness 和 RC003 为实验功能。
 
 带有 `TEST-BUILD.txt` 的候选包安装为 **Rin Desktop Test**，默认数据在 `%LOCALAPPDATA%\VibeVoice\test-builds\<测试标识>`，与稳定版隔离。安装测试前请从托盘退出日用 Rin；需要沿用数据时先制作完整备份，仅选择副本。不要让两个实例同时打开同一数据目录。预发布测试版未完成全部实机验收，安装器尚未签名。
 
@@ -64,6 +64,7 @@
 动漫原画姿态的完整人物贴图基于 1586 × 992 原图，完整回退图为超分 3840 × 2400，需要支持 WebGL2 的显卡；身体保持原画形状，不拆分手臂或做头部变形。动漫原画采用约 16:10 构图，真人视频采用 16:9，均居中填充屏幕。默认不设置开机自启。
 
 高级启动参数：`--storage=绝对目录` 指定应用状态目录，`--project=绝对目录` 指定首次项目。公开安装版只提供雨夜壁纸，不包含旧 Hiyori 悬浮人物。正常启动不开调试端口。
-## 实验 Agent
 
-Claude、Grok Build 和 OpenCode V2 可在 Agent 下拉框选择。各 CLI 需自行安装；Claude 使用自行配置的 API Key 或官方云平台 API 认证，不提供订阅登录或额度，API 单独计费。逐家真实账户与完整主应用验收仍未完成，详见随包 `CLI-AGENTS.md`。
+## Agent 接入
+
+在 **工作台 → 壁纸与设置 → Agent** 可连接 Codex、Antigravity、Grok Build、Claude Agent 或 DeepSeek Harness。各 CLI 需自行安装。Codex、Antigravity 和 Grok 沿用已有 CLI 登录，Claude Agent 使用由你安装的官方 SDK 和 API 认证，DeepSeek 使用 Harness 的 ACP profile。安装、认证与验收见随包 `CLI-AGENTS.md`。

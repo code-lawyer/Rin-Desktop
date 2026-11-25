@@ -1,11 +1,28 @@
 import { randomUUID } from 'node:crypto';
 import { spawn } from 'node:child_process';
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { NativeAgent, historyTurns, pathKey } from './native-agent.mjs';
 import { agentEnvironment, closeChild, deadline } from './agent-process.mjs';
 import { questionsView, questionAnswers } from './agent-questions.mjs';
 import { restoreHistory } from './reply-state.mjs';
 import { claudeAuthentication } from './claude-auth.mjs';
+import catalog from './agent-catalog.cjs';
 export { claudeAuthentication } from './claude-auth.mjs';
+
+export async function loadClaudeSdk(directory) {
+  if (!directory) return import('@anthropic-ai/claude-agent-sdk');
+  const sdk = join(directory, 'node_modules', '@anthropic-ai', 'claude-agent-sdk');
+  const version = catalog.CLAUDE_SDK_VERSION;
+  try {
+    const manifest = JSON.parse(await readFile(join(sdk, 'package.json'), 'utf8'));
+    if (manifest.name === '@anthropic-ai/claude-agent-sdk' && manifest.version === version) {
+      return await import(pathToFileURL(join(sdk, 'sdk.mjs')).href);
+    }
+  } catch { /* Keep package resolution errors actionable in the UI. */ }
+  throw new Error(`请按「接入指南」在本机安装 Claude Agent SDK ${version}，然后重新连接。`);
+}
 
 function inputChannel() {
   const queue = [], readers = []; let closed = false;
@@ -20,9 +37,12 @@ const textOf = message => typeof message?.content === 'string' ? message.content
 const messagesOf = rows => rows.filter(row => ['user', 'assistant'].includes(row.type) && !row.parent_tool_use_id).map(row => ({ id: row.uuid, role: row.type, text: textOf(row.message), complete: true })).filter(row => row.text);
 
 export class ClaudeCompanion extends NativeAgent {
-  constructor(options) { super({ ...options, provider: 'claude' }); }
+  constructor(options) {
+    super({ ...options, provider: 'claude' });
+    this.sdkDirectory = options.sdkDirectory;
+  }
   async openNative() {
-    this.sdk ??= await import('@anthropic-ai/claude-agent-sdk');
+    this.sdk ??= await loadClaudeSdk(this.sdkDirectory);
     if (this.closed) throw new Error('Agent 已关闭。');
     const input = inputChannel(), transport = { input, closing: false, children: [] }; this.transport = transport;
     const resume = this.state.threadId;

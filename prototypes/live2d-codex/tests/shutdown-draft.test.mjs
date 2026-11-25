@@ -43,7 +43,7 @@ async function fixture({ autoFlush = true, hasRenderer = true, crashed = false }
   const event = { sender, senderFrame: { url: 'app://local/renderer/index.html' } };
   const context = vm.createContext({
     closing: false, quitting: false, draftFlushRequest: null, draftFlushSerial: 0, pendingRelaunch: null, pendingDataSelection: null,
-    changingProvider: false, changingData: false, changingAgentConfig: false, customAgentStore: null,
+    changingProvider: false, changingData: false,
     provider: 'codex', submissions: { active: new Set() },
     trusted: candidate => candidate.sender === sender && candidate.senderFrame?.url === event.senderFrame.url,
     ipcMain: { handle: (name, fn) => handlers.set(name, fn), on: (name, fn) => ipcEvents.set(name, fn) },
@@ -92,30 +92,6 @@ test('quit waits for an already pending save even when the draft is no longer di
   assert.equal(h.events.includes('backend-closed'), false); assert.equal(h.prompt.readOnly, true);
   pending.resolve(); await save; await tick();
   assert.equal(h.saved.get(h.key(h.target)), 'pending write'); assert.equal(h.events.at(-1), 'exit');
-});
-
-test('quit drains an in-progress custom Agent configuration save before exiting', async () => {
-  const h = await fixture(), pending = gate();
-  h.context.customAgentStore = { queue: pending.promise.then(() => h.events.push('agent-config-saved')) };
-  h.context.changingAgentConfig = true;
-  h.quit(); await tick();
-  assert.equal(h.events.includes('exit'), false);
-  assert.equal(h.events.includes('backend-closed'), false);
-  pending.resolve(); await tick();
-  assert.ok(h.events.indexOf('agent-config-saved') < h.events.indexOf('exit'));
-  assert.equal(h.events.at(-1), 'exit');
-});
-
-test('a configuration save failing during quit keeps the editor alive without trapping a later quit', async () => {
-  const h = await fixture(), pending = gate();
-  h.context.customAgentStore = { queue: pending.promise }; h.context.changingAgentConfig = true;
-  h.quit(); await tick(); pending.reject(new Error('disk full')); await tick();
-  assert.equal(h.events.includes('exit'), false); assert.equal(h.events.includes('backend-closed'), false);
-  assert.equal(h.context.quitting, false); assert.equal(h.context.closing, false);
-  assert.ok(h.events.includes('show-workbench'));
-  assert.ok(h.errors.some(message => /Agent 配置未保存，退出已取消/.test(message)));
-  h.context.changingAgentConfig = false;
-  h.quit(); await tick(); assert.equal(h.events.at(-1), 'exit');
 });
 
 test('failed draft persistence aborts quit, preserves editing and can be retried', async () => {

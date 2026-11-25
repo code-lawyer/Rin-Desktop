@@ -8,6 +8,7 @@ import { createRunDirectory, writeRunReport } from './run-output.mjs';
 import { inspectMotionAssets } from '../release/motion-assets.mjs';
 import { inspectPuppetAssets } from '../release/puppet-assets.mjs';
 import { retiredWallpaperAsset, sourceAvatarAsset } from '../release/resource-assets.mjs';
+import catalog from '../../prototypes/live2d-codex/backend/agent-catalog.cjs';
 
 const option = key => process.argv.find(arg => arg.startsWith(`--${key}=`))?.slice(key.length + 3);
 if (!option('package') || process.argv.includes('--help')) {
@@ -27,8 +28,13 @@ assert.deepEqual(puppet.manifest, sourcePuppet.manifest, 'Packaged character dif
 assert.deepEqual(motion.manifest, sourceMotion.manifest, 'Packaged motion media differs from the current approved runtime files');
 assert.equal(manifest.version, (await json(join(root, 'package.json'))).version);
 assert.equal(manifest.version, (await json(join(directory, 'resources/app/package.json'))).version);
-assert.equal(manifest.version, (await json(join(directory, 'resources/app/portable.json'))).version);
-const names = new Set(), forbidden = /\.(onnx|safetensors|wav|pcm)$|(^|\/)(codex|claude|grok|opencode)\.exe$|^resources\/app\/(models|runtime\/qwen|agents)\/|(^|\/)custom-agents\.json(?:\..*)?$|(^|\/)(workspaces|session|auth|provider|appearance)\.json$/i;
+const portable = await json(join(directory, 'resources/app/portable.json'));
+assert.equal(manifest.version, portable.version);
+assert.equal(portable.backend, 'codex');
+assert.deepEqual(portable.backends, Object.keys(catalog.AGENTS));
+assert.deepEqual(portable.experimentalBackends, Object.keys(catalog.AGENTS).filter(id => catalog.AGENTS[id].experimental));
+const names = new Set(), forbidden = /\.(onnx|safetensors|wav|pcm)$|(^|\/)(codex|claude|grok|agy|dsh|opencode)\.exe$|^resources\/app\/(models|runtime\/qwen|agents)\/|(^|\/)custom-agents\.json(?:\..*)?$|(^|\/)(workspaces|session|auth|provider|appearance)\.json$/i;
+const retiredAgentFile = /(?:^|\/)(?:custom-agents|custom-agent-settings|agent-setup-prompt)\.mjs$|(?:^|\/)@anthropic-ai\/claude-agent-sdk(?:[-/]|$)/i;
 // Source-owned asset metadata and READMEs intentionally updated since earlier
 // baselines: verify them against current source, and compare all other assets
 // to the baseline package byte-for-byte.
@@ -38,7 +44,7 @@ let bytes = 0, sourceMatches = 0;
 for (const entry of manifest.files) {
   const file = resolve(directory, entry.file), inside = relative(directory, file);
   assert.ok(inside && !inside.startsWith('..') && !isAbsolute(inside), 'Unsafe package path');
-  assert.ok(!names.has(entry.file) && !forbidden.test(entry.file), 'Unexpected or duplicate package file: ' + entry.file);
+  assert.ok(!names.has(entry.file) && !forbidden.test(entry.file) && !retiredAgentFile.test(entry.file), 'Unexpected or duplicate package file: ' + entry.file);
   names.add(entry.file);
   assert.ok(!sourceAvatarAsset(entry.file), 'Source-only Live2D file in package: ' + entry.file);
   assert.equal((await stat(file)).size, entry.bytes, entry.file);
@@ -88,6 +94,6 @@ if (option('baseline')) {
   }
   assert.ok(preserved > 10);
 }
-const report = {version:manifest.version,files:names.size,bytes,sourceMatches,motionMediaFiles:motion.names.length,animeVideoExcluded:true,sourceAvatarExcluded:true,puppetFiles:puppet.names.length,preservedArtworkAndCpuFiles:preserved,noModelsCredentialsOrCli:true,accounts:false,hardware:false,passed:true};
+const report = {version:manifest.version,files:names.size,bytes,sourceMatches,backends:portable.backends,claudeSdkSuppliedByUser:true,motionMediaFiles:motion.names.length,animeVideoExcluded:true,sourceAvatarExcluded:true,puppetFiles:puppet.names.length,preservedArtworkAndCpuFiles:preserved,noModelsCredentialsOrCli:true,accounts:false,hardware:false,passed:true};
 await writeRunReport(output,report);
 console.log(JSON.stringify({output,...report}));
