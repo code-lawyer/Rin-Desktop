@@ -53,6 +53,7 @@ for (const entry of manifest.files) {
     sourceMatches++;
   }
 }
+for (const asset of revisedAssetMetadata) assert.ok(names.has('resources/app/' + asset), 'Missing asset metadata: ' + asset);
 for (const script of wallpaperScripts) assert.ok(names.has('resources/app/' + script), 'Missing wallpaper helper: ' + script);
 assert.ok(names.size > 100 && sourceMatches > 20);
 assert.equal(bytes, manifest.bytes);
