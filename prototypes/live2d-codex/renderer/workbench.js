@@ -229,27 +229,40 @@ function wallpaperStyle({ character, wallpaperMotion }) {
 }
 function updateCharacterStatus() {
   const status = workspace.wallpaper;
+  const desktop = workspace.desktopWallpaper;
   const style = wallpaperStyle(status?.phase === 'loading' ? status : workspace.settings);
   const radios = document.querySelectorAll('[name="wallpaper-style"]');
   for (const radio of radios) radio.checked = radio.value === style;
   const label = document.querySelector('[name="wallpaper-style"]:checked + .character-card strong').textContent;
-  $('character-status').dataset.phase = status?.phase || '';
-  setStatusText('character-status', status?.phase === 'error' ? status.error : status?.phase === 'loading' ? '正在载入壁纸…' : '当前风格：' + label);
-  $('retry-character').hidden = status?.phase !== 'error';
+  const phase = desktop && desktop.phase !== 'ready' ? desktop.phase : status?.phase;
+  let message = '当前风格：' + label;
+  if (desktop?.phase === 'error') message = '桌面壁纸挂载失败，对话和工作台仍可使用。' + (desktop.error ? ' ' + desktop.error : '');
+  else if (desktop?.phase === 'loading') message = '正在挂载桌面壁纸…';
+  else if (status?.phase === 'error') message = status.error;
+  else if (status?.phase === 'loading') message = '正在载入壁纸…';
+  $('character-status').dataset.phase = phase || '';
+  setStatusText('character-status', message);
+  $('retry-character').hidden = phase !== 'error';
+  $('retry-character').textContent = desktop?.phase === 'error' ? '重试挂载' : '重试加载';
 }
 async function saveWallpaperStyle(style) {
   const character = style === 'anime-male' ? characters.ANIME_MALE_CHARACTER : characters.DEFAULT_CHARACTER;
   try { acceptWorkspace(await run(api.saveSettings({ character, wallpaperMotion: style === 'realistic' }))); }
   finally { updateCharacterStatus(); fillStills(); }
 }
-function fillSettings({ forceKeys = false } = {}) {
-  fillStills();
+function fillAutomaticSettings() {
   const s = workspace.settings;
   $('ui-theme').value = s.theme || 'system';
   $('auto-speak').checked = s.autoSpeak; $('speed').value = String(s.speed); $('remote-enabled').checked = s.remoteEnabled;
   fillVoices();
-  fillModels();
   $('tts-engine').value = s.ttsEngine || 'qwen';
+  selectSavedMicrophone();
+}
+function fillSettings({ forceKeys = false } = {}) {
+  fillStills();
+  fillAutomaticSettings();
+  fillModels();
+  const s = workspace.settings;
   // Replacing a focused key learner does not reliably emit blur, and unsaved
   // hotkey edits stay local until saved or explicitly discarded.
   const editingKey = document.activeElement?.matches('#shortcuts input,#remote-keys input');
@@ -314,17 +327,31 @@ function updateResourceStatus() {
   else $('resource-meter').removeAttribute('value');
   $('cancel-resource').hidden = !resource.cancelable;
 }
-async function saveSpeechChoice(patch) {
-  acceptWorkspace(await run(api.saveSettings(patch)));
-  updateSpeechStatus();
-  showSaveStatus('已自动保存');
+async function saveAutomaticSetting(patch) {
+  showSaveStatus('');
+  try {
+    acceptWorkspace(await run(api.saveSettings(patch)));
+    showSaveStatus('已自动保存');
+  } catch (error) {
+    showSaveStatus('未保存，已恢复');
+    throw error;
+  } finally {
+    fillAutomaticSettings();
+    updateSpeechStatus();
+  }
+}
+function selectSavedMicrophone() {
+  const field = $('microphone'), selected = workspace.settings.microphone || '';
+  if (selected && ![...field.options].some(option => option.value === selected)) {
+    field.append(Object.assign(node('option','已选设备（当前不可用）'), { value: selected }));
+  }
+  field.value = selected;
 }
 async function refreshDevices() {
-  const devices = await navigator.mediaDevices.enumerateDevices(); const selectedDevice = workspace.settings.microphone;
+  const devices = await navigator.mediaDevices.enumerateDevices();
   $('microphone').replaceChildren(Object.assign(node('option','系统默认麦克风'),{value:''}));
   for (const d of devices.filter(d => d.kind === 'audioinput' && d.deviceId && d.deviceId !== 'default')) { const o = node('option',d.label || '麦克风（听写后显示名称）'); o.value = d.deviceId; $('microphone').append(o); }
-  if (selectedDevice && ![...$('microphone').options].some(o => o.value === selectedDevice)) { const o = node('option','已选设备（当前不可用）'); o.value = selectedDevice; $('microphone').append(o); }
-  $('microphone').value = selectedDevice || '';
+  selectSavedMicrophone();
 }
 async function saveSettings() {
   const values = id => Object.fromEntries([...$(id).querySelectorAll('input')].map(f => [f.dataset.action,f.value]));
@@ -359,7 +386,10 @@ function showSettings() { closeNavigation(); $('settings').hidden = false; $('co
 $('settings-tab').onclick = showSettings;
 $('manage-agents').onclick = () => { showSettings(); document.querySelector('[data-setting-target="agent-settings"]').click(); };
 for (const radio of document.querySelectorAll('[name="wallpaper-style"]')) radio.onchange = act(() => saveWallpaperStyle(radio.value));
-$('retry-character').onclick = act(() => saveWallpaperStyle(wallpaperStyle(workspace.wallpaper)));
+$('retry-character').onclick = act(async () => {
+  if (workspace.desktopWallpaper?.phase === 'error') acceptWorkspace(await run(api.wallpaperControl('retry-desktop')));
+  else await saveWallpaperStyle(wallpaperStyle(workspace.wallpaper));
+});
 let stillSaving = 0;
 let previewStyleKey;
 function fillStills() {
@@ -417,7 +447,7 @@ async function saveStillSetting(patch) {
   finally { stillSaving--; fillStills(); }
 }
 $('still-pose').onchange=act(()=>saveStillSetting({stillPose:$('still-pose').value}));
-$('ui-theme').onchange=act(()=>saveSpeechChoice({theme:$('ui-theme').value}));
+$('ui-theme').onchange=act(()=>saveAutomaticSetting({theme:$('ui-theme').value}));
 $('ambience-enabled').onchange=act(()=>saveStillSetting({ambienceEnabled:$('ambience-enabled').checked}));
 for(const [field,key] of [['rain-volume','rainVolume'],['key-volume','keyVolume']]) {
   $(field).oninput=()=>{ $(field+'-label').textContent=$(field).value+'%'; };
@@ -426,19 +456,19 @@ for(const [field,key] of [['rain-volume','rainVolume'],['key-volume','keyVolume'
 $('retry-ambience').onclick=act(async()=>acceptWorkspace(await run(api.wallpaperControl('retry-audio'))));
 $('pause-stills').onclick=act(async()=>acceptWorkspace(await run(api.wallpaperControl('pause',!workspace.wallpaperPaused))));
 matchMedia('(prefers-reduced-motion: reduce)').addEventListener('change',fillStills);
-$('tts-resident').onchange = act(async () => { const enabled = $('tts-resident').checked; try { await saveSpeechChoice({ttsResident:enabled}); } finally { updateSpeechStatus(); } });
+$('tts-resident').onchange = act(() => saveAutomaticSetting({ttsResident:$('tts-resident').checked}));
 $('cancel-resource').onclick = act(async () => { await run(api.cancelDownload()); });
-$('tts-engine').onchange = act(() => saveSpeechChoice({ttsEngine:$('tts-engine').value}));
-$('qwen-voice').onchange = act(() => saveSpeechChoice({qwenVoice:$('qwen-voice').value}));
-$('voice').onchange = act(() => saveSpeechChoice({voice:Number($('voice').value)}));
-$('speed').onchange = act(() => saveSpeechChoice({speed:Number($('speed').value)}));
-$('microphone').onchange = act(() => saveSpeechChoice({microphone:$('microphone').value}));
-$('remote-enabled').onchange = act(() => saveSpeechChoice({remoteEnabled:$('remote-enabled').checked}));
-$('auto-speak').onchange = act(() => saveSpeechChoice({autoSpeak:$('auto-speak').checked}));
-$('prepare-speech').onchange = act(() => saveSpeechChoice({prepareSpeech:$('prepare-speech').checked}));
-$('completion-sound').onchange = act(() => saveSpeechChoice({completionSound:$('completion-sound').checked}));
+$('tts-engine').onchange = act(() => saveAutomaticSetting({ttsEngine:$('tts-engine').value}));
+$('qwen-voice').onchange = act(() => saveAutomaticSetting({qwenVoice:$('qwen-voice').value}));
+$('voice').onchange = act(() => saveAutomaticSetting({voice:Number($('voice').value)}));
+$('speed').onchange = act(() => saveAutomaticSetting({speed:Number($('speed').value)}));
+$('microphone').onchange = act(() => saveAutomaticSetting({microphone:$('microphone').value}));
+$('remote-enabled').onchange = act(() => saveAutomaticSetting({remoteEnabled:$('remote-enabled').checked}));
+$('auto-speak').onchange = act(() => saveAutomaticSetting({autoSpeak:$('auto-speak').checked}));
+$('prepare-speech').onchange = act(() => saveAutomaticSetting({prepareSpeech:$('prepare-speech').checked}));
+$('completion-sound').onchange = act(() => saveAutomaticSetting({completionSound:$('completion-sound').checked}));
 $('preview-completion-sound').onclick = act(() => run(api.previewCompletionSound()));
-$('retry-tts').onclick = act(() => saveSpeechChoice({ttsResident:true}));
+$('retry-tts').onclick = act(() => saveAutomaticSetting({ttsResident:true}));
 $('choose-qwen').onclick = act(async () => { acceptWorkspace(await run(api.chooseQwen())); updateSpeechStatus(); });
 $('use-existing-data').onclick = act(() => run(api.useData()));
 $('save-settings').onclick = act(saveSettings);

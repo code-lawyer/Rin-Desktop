@@ -87,6 +87,98 @@ test('lack of history is unknown, requires explicit review, and release never di
   await guard.release(agent, 'codex', id); assert.equal(sends, 1); assert.equal(store.draft(target), 'keep this');
 });
 
+test('review releases a long receipt and keeps both drafts separately editable after restart and a later send', async t => {
+  const { root, store, agent, guard, target } = await fixture(t);
+  const original = '甲'.repeat(40000), newer = '乙'.repeat(30000);
+  let sends = 0, accepted = false;
+  agent.rpc.request = async method => {
+    if (method === 'thread/read') return { thread: { cwd: root, turns: [] } };
+    assert.equal(method, 'turn/start'); sends++;
+    if (!accepted) throw new Error('receipt lost');
+    return { turn: { id: 'next-turn' } };
+  };
+  await assert.rejects(guard.send(agent, 'codex', original), /receipt lost/);
+  await store.saveDraft(target, newer);
+  agent.state.status = 'idle';
+  const { id } = guard.snapshot('codex');
+  await guard.reconcile(agent, 'codex', id);
+  const released = await guard.release(agent, 'codex', id);
+  assert.equal(released.status, 'released');
+  assert.equal(released.draft.text, newer);
+  assert.deepEqual(released.draft.recoveries, [{ id, length: original.length }]);
+  assert.equal(sends, 1);
+
+  accepted = true;
+  await guard.send(agent, 'codex', 'different request', target);
+  assert.equal(sends, 2);
+  const restored = new WorkspaceStore(root); await restored.load();
+  const input = await restored.swapRecoveredDraft(target, id);
+  assert.equal(input.text, original);
+  assert.deepEqual(input.recoveries, [{ id, length: newer.length }]);
+  await restored.saveDraft(target, 'edited original');
+  assert.equal((await restored.swapRecoveredDraft(target, id)).text, newer);
+  assert.equal((await restored.swapRecoveredDraft(target, id)).text, 'edited original');
+  await restored.saveDraft(target, '');
+  assert.equal((await restored.swapRecoveredDraft(target, id)).text, newer);
+  assert.equal(restored.draftSnapshot(target).recoveries, undefined);
+});
+
+test('draft recovery flushes the editor before swapping and cannot repaint another conversation', async () => {
+  const first = { provider: 'codex', cwd: 'C:/Example', threadId: 'first' };
+  const second = { ...first, threadId: 'second' };
+  const texts = new Map([['first', 'draft'], ['second', 'other draft']]), snapshots = [];
+  const swap = deferred(), swapping = deferred();
+  let editor;
+  const drafts = createDraftSession({
+    request: async ({ threadId }, text) => {
+      if (text === undefined) return { ok: true, value: { text: texts.get(threadId), recoveries: [{ id: threadId, length: 3 }] } };
+      texts.set(threadId, text);
+      return { ok: true };
+    },
+    getText: () => editor, setText: text => { editor = text; },
+    onRecovery: copies => snapshots.push(copies),
+  });
+  await drafts.restore(first);
+  editor = 'latest edit'; drafts.edited();
+  const result = drafts.recover(first, async () => {
+    assert.equal(texts.get('first'), 'latest edit');
+    swapping.resolve();
+    return swap.promise;
+  });
+  await swapping.promise;
+  await drafts.restore(second);
+  swap.resolve({ ok: true, value: { text: 'old draft', recoveries: [{ id: 'first', length: 11 }] } });
+  assert.equal((await result).ok, true);
+  assert.equal(editor, 'other draft');
+  assert.deepEqual(snapshots.at(-1), [{ id: 'second', length: 3 }]);
+});
+
+test('changing conversation while recovery flushes the editor cancels the pending swap', async () => {
+  const first = { provider: 'codex', cwd: 'C:/Example', threadId: 'first' };
+  const second = { ...first, threadId: 'second' };
+  const writing = deferred(), written = deferred();
+  let editor;
+  const drafts = createDraftSession({
+    request: async ({ threadId }, text) => {
+      if (text === undefined) return { ok: true, value: { text: threadId } };
+      writing.resolve();
+      await written.promise;
+      return { ok: true };
+    },
+    getText: () => editor, setText: text => { editor = text; },
+  });
+  await drafts.restore(first);
+  editor = 'edited first'; drafts.edited();
+  let swaps = 0;
+  const recovery = drafts.recover(first, async () => { swaps++; return { ok: true, value: { text: 'saved copy' } }; });
+  await writing.promise;
+  await drafts.restore(second);
+  written.resolve();
+  assert.equal((await recovery).ok, false);
+  assert.equal(swaps, 0);
+  assert.equal(editor, second.threadId);
+});
+
 test('an accepted notification before a lost RPC reply cannot regress a confirmed receipt', async t => {
   const { root, store, agent, guard, target } = await fixture(t);
   agent.rpc.request = async method => {

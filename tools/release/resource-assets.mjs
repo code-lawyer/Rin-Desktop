@@ -34,9 +34,9 @@ const sourceAvatarFiles = new Set([
   'licenses/live2d-proprietary-agreement.html',
   'licenses/pixi-LICENSE',
   'licenses/pixi-live2d-LICENSE',
-]);
+].map(name => name.toLowerCase()));
 export function sourceAvatarAsset(path) {
-  const name = path.replaceAll('\\', '/');
+  const name = path.replaceAll('\\', '/').toLowerCase();
   return (
     name === 'resources/app/vendor' ||
     name.startsWith('resources/app/vendor/') ||

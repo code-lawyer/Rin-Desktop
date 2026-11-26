@@ -1,13 +1,15 @@
 import { cp, mkdir, writeFile, readFile } from 'node:fs/promises';
-import { resolve, join, relative } from 'node:path';
+import { resolve, join, dirname } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import { writeManifest } from '../../../tools/release/manifest.mjs';
 import { releaseVersion, requireFreshDirectory, reserveFreshDirectory } from '../../../tools/release/release-inputs.mjs';
 import { inspectMotionAssets, copyMotionAssets } from '../../../tools/release/motion-assets.mjs';
 import { inspectPuppetAssets, copyPuppetAssets } from '../../../tools/release/puppet-assets.mjs';
-import { retiredWallpaperAsset, sourceAvatarAsset } from '../../../tools/release/resource-assets.mjs';
+import { sourceAvatarAsset } from '../../../tools/release/resource-assets.mjs';
+import { checkedSourcePath, trackedPackageInputs } from '../../../tools/release/package-inputs.mjs';
 import { flipElectronFuses } from '../../../tools/release/electron-fuses.mjs';
+import { packageRenderer } from './build.mjs';
 import { copyAgentDependencies } from './copy-agent-dependencies.mjs';
 import catalog from '../backend/agent-catalog.cjs';
 import characters from '../backend/character-profiles.cjs';
@@ -25,28 +27,28 @@ const motionDirectory = join(root, 'assets/motion/female');
 await inspectMotionAssets(motionDirectory);
 const poseDirectories = characters.POSE_DIRECTORIES.map(directory => `assets/scene/${directory}`);
 for (const directory of poseDirectories) await inspectPuppetAssets(join(root, directory));
+const sources = trackedPackageInputs(workspace);
+const renderer = await packageRenderer(sources);
 await reserveFreshDirectory(output);
 const appDir = join(output,'resources/app'); await mkdir(appDir,{recursive:true});
 await cp(join(root,'node_modules/electron/dist'),output,{recursive:true,filter:src=>!src.endsWith('electron.exe')});
 await cp(join(root,'node_modules/electron/dist/electron.exe'),join(output,'VibeVoice.exe'));
 await flipElectronFuses(join(output,'VibeVoice.exe'));
-for (const file of ['main.cjs','preload.cjs','voice-resources.json']) await cp(join(root,file),join(appDir,file));
-for (const dir of ['backend','renderer','dist']) await cp(join(root,dir),join(appDir,dir),{
-  recursive:true,
-  filter:src=>!src.includes('__pycache__') && !src.endsWith('dots.mjs') &&
-    !sourceAvatarAsset(join('resources/app', relative(root, src))) && !/[/\\]anime-(catalog|player)\.mjs$/.test(src),
-});
+for (const file of sources) {
+  const target = join(file.startsWith('licenses/') ? output : appDir, file);
+  await mkdir(dirname(target), { recursive: true });
+  await cp(await checkedSourcePath(root, file), target);
+}
+for (const file of renderer) {
+  const target = join(appDir, 'dist', file.name);
+  await mkdir(dirname(target), { recursive: true });
+  await writeFile(target, file.bytes, { flag: 'wx' });
+}
 await mkdir(join(appDir,'runtime'),{recursive:true});
 await cp(await buildRemoteHelper(join(root,'native/rc003-helper.cs'),join(workspace,'work/build/remote')),join(appDir,'runtime/rc003-helper.exe'));
 await cp(join(resources,'runtime/node.exe'),join(appDir,'runtime/node.exe'));
-for (const name of ['ambience']) await cp(join(root,'assets',name),join(appDir,'assets',name),{
-  recursive:true, filter:source=>!retiredWallpaperAsset(relative(join(root,'assets'),source)),
-});
 await copyMotionAssets(motionDirectory, join(appDir, 'assets/motion/female'));
 for (const directory of poseDirectories) await copyPuppetAssets(join(root, directory), join(appDir, directory));
-await mkdir(join(appDir,'scripts'),{recursive:true});
-for (const file of ['wallpaper-host.ps1', 'wallpaper-pose-input.cs'])
-  await cp(join(root, 'scripts', file), join(appDir, 'scripts', file));
 for (const name of ['sherpa-onnx-node','sherpa-onnx-win-x64']) await cp(join(root,'node_modules',name),join(appDir,'node_modules',name),{recursive:true});
 await copyAgentDependencies(root, appDir);
 await writeFile(join(appDir,'package.json'),JSON.stringify({name:'vibe-voice',version,type:'module',main:'main.cjs',private:true},null,2));
@@ -59,10 +61,6 @@ const cliGuide = (await readFile(join(root,'CLI-AGENTS.md'),'utf8'))
 await writeFile(join(output,'CLI-AGENTS.md'), cliGuide);
 await cp(join(root,'THIRD-PARTY-NOTICES.md'),join(output,'THIRD-PARTY-NOTICES.md'));
 await cp(join(workspace,'LICENSE'),join(output,'LICENSE-VibeVoice.txt'));
-await cp(join(root,'licenses'),join(output,'licenses'),{
-  recursive:true,
-  filter:src=>!sourceAvatarAsset(relative(root, src)),
-});
 const licenseIndex = JSON.parse(await readFile(join(root, 'licenses/SOURCES.json'), 'utf8'));
 await writeFile(join(output, 'licenses/SOURCES.json'), JSON.stringify(
   licenseIndex.filter(entry => !sourceAvatarAsset(`licenses/${entry.file}`)), null, 2,

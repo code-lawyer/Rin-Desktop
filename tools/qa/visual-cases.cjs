@@ -174,6 +174,12 @@ module.exports=async function visualCases({open,evaluate,delay,output,extended=f
   await evaluate(workbench,`document.querySelector('[data-setting-target="wallpaper-settings"]').click();document.querySelector('[name="wallpaper-style"]').focus();interfaceFixture.emit('remoteAction','down')`);
   await capture(workbench,'character-focus',1120,760);
   await verify(workbench,'an unchanged wallpaper page has no save button',"document.getElementById('save-settings').hidden");
+  await emit(workbench,'workspace',{desktopWallpaper:{phase:'error',error:'测试：Windows 桌面层未就绪。'}});
+  await verify(workbench,'desktop attachment errors keep settings usable and offer their own retry',
+    "document.getElementById('character-status').textContent.includes('Windows 桌面层未就绪') && !document.getElementById('retry-character').hidden && document.getElementById('retry-character').textContent==='重试挂载'");
+  await evaluate(workbench,"document.getElementById('retry-character').click()");
+  await wait(workbench,"interfaceFixture.stats().desktopRetries===1 && document.getElementById('retry-character').hidden");
+  await verify(workbench,'desktop retry leaves the selected wallpaper style available',"document.querySelector('[name=wallpaper-style]:checked').value==='anime'");
   await evaluate(workbench,`(() => {document.querySelector('[data-setting-target="playback-settings"]').click();const speed=document.getElementById('speed');speed.value='1.1';speed.dispatchEvent(new Event('change',{bubbles:true}));})()`);
   await delay(60);
   await verify(workbench,'voice speed saves immediately without exposing manual save',"document.getElementById('save-settings').hidden && document.getElementById('speed').value==='1.1'");
@@ -225,8 +231,14 @@ module.exports=async function visualCases({open,evaluate,delay,output,extended=f
       return {text:el.textContent.trim(),fontSize:style.fontSize,fontWeight:style.fontWeight,color:style.color,background,contrast:(Math.max(foreground,back)+.05)/(Math.min(foreground,back)+.05)};
     });
   })()`);
-  await evaluate(workbench,`(() => {const theme=document.getElementById('ui-theme');theme.value='light';theme.dispatchEvent(new Event('change',{bubbles:true}));})()`);
-  await delay(80);
+  await emit(workbench,'settings-error','测试：设置写入失败。');
+  await evaluate(workbench,`(() => {const theme=document.getElementById('ui-theme');theme.focus();theme.value='light';theme.dispatchEvent(new Event('change',{bubbles:true}));})()`);
+  await wait(workbench,"document.getElementById('notice-text').textContent.includes('设置写入失败')");
+  await verify(workbench,'a rejected theme save restores the saved selection and retains focus',`document.getElementById('ui-theme').value==='system' && document.documentElement.dataset.theme==='system' && document.activeElement.id==='ui-theme' && document.getElementById('notice-text').textContent.includes('设置写入失败') && document.getElementById('settings-save-status').textContent.includes('未保存')`);
+  await emit(workbench,'settings-error','');
+  await evaluate(workbench,`(() => {document.getElementById('notice-close').click();const theme=document.getElementById('ui-theme');theme.value='light';theme.dispatchEvent(new Event('change',{bubbles:true}));})()`);
+  await wait(workbench,"document.documentElement.dataset.theme==='light'");
+  await verify(workbench,'the same theme can be selected again after a failed save',`document.getElementById('ui-theme').value==='light' && document.documentElement.dataset.theme==='light' && document.getElementById('settings-save-status').textContent==='已自动保存'`);
   await capture(workbench,'wallpaper-settings-light',1120,760);
   const wallpaperStyles=await measureWallpaperContrast();
   for(const entry of wallpaperStyles)if(entry.contrast<4.5)failures.push({name:'wallpaper text contrast (light)',...entry});

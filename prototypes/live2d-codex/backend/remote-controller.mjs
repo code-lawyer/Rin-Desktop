@@ -23,9 +23,10 @@ export class RemoteController extends EventEmitter {
     if(this.closed || this.suspended || this.disconnecting || this.busy || this.session) throw new Error('请先完成当前遥控器操作。');
     if(this.state.phase==='connected')throw new Error('如需更换遥控器，请先断开当前连接再搜索。');
     this.busy=true; this.update({scanning:true,notice:''});
-    try { const native=await this.transport(); const devices=await native.request('scan'); this.update({devices}); return this.snapshot(); }
+    try { const native=await this.transport(); const devices=await native.request('scan'); this.update({devices}); }
     catch(error) {this.update({notice:error.message});throw error;}
     finally {this.busy=false;this.update({scanning:false});}
+    return this.snapshot();
   }
   async configure(patch) {
     if(this.session || this.busy) throw new Error('请先完成当前遥控器操作，再修改按钮。');

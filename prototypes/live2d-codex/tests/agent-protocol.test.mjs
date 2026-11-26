@@ -301,6 +301,48 @@ test('DeepSeek permission requests with only a tool call ID never allow the oper
   await agent.interrupt();
 });
 
+test('ACP refuses permissions with a title but no recognizable operation or concrete scope', async t => {
+  const { agent, peer, root } = await acp(t, 'antigravity');
+  await agent.send('fixture');
+  await waitFor(() => peer.calls.some(call => call.method === 'session/prompt'));
+  for (const toolCall of [
+    { kind: 'edit', rawInput: { content: 'unscoped text' } },
+    { kind: 'execute', rawInput: { command: 'echo fixture' } },
+    { kind: 'execute', rawInput: { command: 'echo fixture', workdir: 'relative' } },
+    { kind: 'execute', rawInput: { command: 'echo fixture', cmd: 'echo other', workdir: root } },
+    { kind: 'execute', rawInput: { command: 'echo fixture', cwd: root, workdir: join(root, 'other') } },
+    { kind: 'execute', rawInput: { workdir: root }, locations: [{ path: 'fixture.txt' }] },
+    { kind: 'move', rawInput: { path: 'fixture.txt' } },
+    { kind: 'other', rawInput: { path: 'fixture.txt' } },
+    ...(process.platform === 'win32' ? [{ kind: 'execute', rawInput: { command: 'echo fixture', cwd: '\\rooted' } },
+      { kind: 'delete', rawInput: { path: 'D:drive-relative.txt' } }] : []),
+  ]) {
+    let answered = false;
+    const answer = peer.request('session/request_permission', { ...permission, toolCall: { toolCallId: 'unscoped', title: 'Fixture', ...toolCall } }).then(result => { answered = true; return result; });
+    // Record an unexpected card without leaving the negative test waiting for an answer.
+    await waitFor(() => agent.pending.size || answered);
+    assert.equal(agent.pending.size, 0);
+    assert.deepEqual((await answer).outcome, { outcome: 'selected', optionId: 'no' });
+  }
+
+  const answer = peer.request('session/request_permission', { ...permission, toolCall: { toolCallId: 'command', title: 'Fixture command', kind: 'execute', rawInput: { cmd: 'echo fixture', workdir: root } } });
+  await waitFor(() => agent.pending.size === 1);
+  assert.equal(agent.state.approvals[0].command, 'echo fixture');
+  assert.equal(agent.state.approvals[0].cwd, root);
+  await agent.respond(agent.state.approvals[0].id, { decision: 'accept' });
+  assert.deepEqual((await answer).outcome, { outcome: 'selected', optionId: 'once' });
+  for (const [kind, operation] of [['read', '读取文件'], ['search', '搜索文件']]) {
+    const answer = peer.request('session/request_permission', { ...permission, toolCall: { toolCallId: kind, kind, rawInput: { file_path: 'fixture.txt' } } });
+    await waitFor(() => agent.pending.size === 1);
+    const approval = agent.state.approvals[0];
+    assert.equal(approval.command, operation);
+    assert.equal(approval.cwd, root);
+    assert.deepEqual(approval.paths, ['fixture.txt']);
+    await agent.respond(approval.id, { decision: 'decline' });
+    assert.deepEqual((await answer).outcome, { outcome: 'selected', optionId: 'no' });
+  }
+});
+
 test('ACP uses the announced tool details for an ID-only approval and drops them between turns', async t => {
   const { agent, peer } = await acp(t, 'antigravity');
   await agent.send('fixture edit');
@@ -341,6 +383,46 @@ test('ACP without history capabilities shows local cache, refuses resume and nev
 });
 
 const resumeCapabilities = {sessionCapabilities:{list:{},resume:{}}};
+test('a disconnected ACP CLI cannot receive or cache a turn that is waiting for its local receipt', async t => {
+  const { agent, peer } = await acp(t, 'deepseek', { initialization: { agentCapabilities: resumeCapabilities } });
+  const entered = deferred(), journal = deferred(), receipts = [];
+  agent.on('submission', receipt => receipts.push(receipt));
+  await agent.send('queued locally', { id: 'disconnect-before-dispatch', beforeDispatch() { entered.resolve(); return journal.promise; } });
+  await entered.promise;
+  const settling = agent.run;
+  peer.drop();
+  await waitFor(() => agent.state.connection === 'error');
+  journal.resolve();
+  await settling;
+  assert.equal(receipts.at(-1).status, 'not-sent');
+  assert.equal(peer.calls.some(call => call.method === 'session/prompt'), false);
+  assert.deepEqual(agent.state.messages, []);
+});
+test('DeepSeek cache excludes a request stopped before dispatch but retains a dispatched interrupted turn', async t => {
+  const fixture = await acp(t, 'deepseek', { initialization: { agentCapabilities: resumeCapabilities } });
+  const { agent, peer, root } = fixture;
+  const entered = deferred(), journal = deferred(), receipts = [];
+  agent.on('submission', receipt => receipts.push(receipt));
+  await agent.send('not actually sent', { id: 'before-dispatch', beforeDispatch() { entered.resolve(); return journal.promise; } });
+  await entered.promise;
+  const stopping = agent.interrupt();
+  journal.resolve();
+  await stopping;
+  assert.equal(receipts.at(-1).status, 'not-sent');
+  assert.equal(peer.calls.some(call => call.method === 'session/prompt'), false);
+  assert.equal(agent.state.threadName, '');
+  assert.deepEqual((await agent.history('session', null, root)).turns, []);
+  assert.equal(peer.calls.some(call => call.method === 'session/cancel'), false);
+
+  await agent.send('actually sent');
+  await waitFor(() => peer.calls.some(call => call.method === 'session/prompt'));
+  await agent.interrupt();
+  const reopened = await fixture.restart();
+  const history = await reopened.history('session', null, root);
+  assert.equal(history.localOnly, true);
+  assert.deepEqual(history.turns.map(turn => [turn.status, turn.items[0].content[0].text]), [['interrupted', 'actually sent']]);
+});
+
 test('DeepSeek shows the active session and retains cached names for unnamed native sessions', async t => {
   const {agent,root}=await acp(t,'deepseek',{
     initialization:{agentCapabilities:resumeCapabilities},

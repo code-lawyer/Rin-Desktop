@@ -145,25 +145,34 @@ export class NativeAgent extends EventEmitter {
     if (this.state.status === 'error') throw new Error('请先重连或开始新对话。');
     if (typeof text !== 'string' || !text.trim() || text.length > 64000) throw new Error('请输入 1 至 64000 个字符的任务。');
     const turnId = randomUUID(); this.stopRequested = false;
+    const message = { id: randomUUID(), role: 'user', text: text.trim(), turnId, complete: true };
     const receipt = { ...submission, received: false, dispatched: false }; this.submission = receipt;
     Object.assign(this.state, { turnId, status: 'starting', error: null, activity: '正在发送' });
-    this.push({ id: randomUUID(), role: 'user', text: text.trim(), turnId, complete: true });
-    this.state.threadName ||= text.trim().slice(0, 48); this.changed();
+    this.changed();
     // Install the operation before any callbacks can arrive, and return to the
     // renderer immediately so approval and stop stay usable throughout a turn.
     const run = Promise.resolve().then(async () => {
       let status = 'completed';
       try {
         if (!this.stopRequested) {
+          this.assertReady();
           this.state.status = 'working'; this.state.activity = `${this.spec.name} 正在处理`; this.changed();
-          if (submission.beforeDispatch) await submission.beforeDispatch({ cwd: this.state.cwd, threadId: this.state.threadId, userMessageId: this.provider === 'claude' ? this.state.messages.findLast(m => m.role === 'user')?.id : undefined });
+          if (submission.beforeDispatch) await submission.beforeDispatch({ cwd: this.state.cwd, threadId: this.state.threadId, userMessageId: this.provider === 'claude' ? message.id : undefined });
           if (this.stopRequested || this.closed) { status = 'interrupted'; return; }
+          this.assertReady();
+          this.push(message);
+          this.state.threadName ||= message.text.slice(0, 48);
           receipt.dispatched = true;
-          const result = await this.promptNative(text.trim());
+          const prompting = this.promptNative(message.text);
+          this.changed();
+          const result = await prompting;
           this.receivedSubmission();
           if (result?.cancelled || this.stopRequested) status = 'interrupted';
         } else status = 'interrupted';
-      } catch (error) { status = this.stopRequested ? 'interrupted' : 'failed'; if (!this.stopRequested) this.report(error); }
+      } catch (error) {
+        status = this.stopRequested ? 'interrupted' : 'failed';
+        if (!this.stopRequested && this.state.connection === 'ready') this.report(error);
+      }
       finally {
         if (!receipt.received) this.emit('submission', { id: receipt.id, status: receipt.dispatched ? 'unknown' : 'not-sent', target: { cwd: this.state.cwd, threadId: this.state.threadId } });
         if (this.submission === receipt) this.submission = null;
@@ -190,7 +199,7 @@ export class NativeAgent extends EventEmitter {
     if (this.stopping) return this.stopping;
     this.stopRequested = true; this.state.status = 'stopping'; this.state.activity = '正在停止'; this.cancelApprovals(); this.changed();
     this.stopping = (async () => {
-      try { await deadline(Promise.all([this.cancelNative(), this.run]), 20000, '停止'); }
+      try { await deadline(Promise.all([this.submission?.dispatched ? this.cancelNative() : undefined, this.run]), 20000, '停止'); }
       catch (error) { await this.disposeNative().catch(() => {}); this.report(new Error(`停止未正常收尾，已关闭此 CLI 连接。请重连恢复会话。${safeError(error)}`), { connection: true }); }
       finally { this.stopping = null; }
     })();

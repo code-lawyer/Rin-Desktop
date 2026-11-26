@@ -1,5 +1,6 @@
 import { Readable, Writable } from 'node:stream';
 import { randomUUID } from 'node:crypto';
+import { isAbsolute } from 'node:path';
 import { NativeAgent, historyTurns, pathKey } from './native-agent.mjs';
 import { acpAgentEnvironment, spawnAgent, closeChild, deadline } from './agent-process.mjs';
 import { questionsView, questionAnswers, formView, formAnswer } from './agent-questions.mjs';
@@ -9,12 +10,51 @@ import packageInfo from '../package.json' with { type: 'json' };
 const flatten = options => (options ?? []).flatMap(o => o.options ? flatten(o.options) : [o]);
 const timestamp = value => typeof value === 'number' ? (value > 1e12 ? value / 1000 : value) : Date.parse(value) / 1000 || 0;
 const nonEmptyText = value => typeof value === 'string' && value.trim();
+const fileOperations = { read: '读取文件', edit: '修改文件', delete: '删除文件', move: '移动文件', search: '搜索文件' };
+const validPath = value => nonEmptyText(value) && !/[\x00-\x1F]/.test(value);
+const qualifiedPath = value => validPath(value) && (process.platform === 'win32'
+  ? /^(?:[a-z]:[\\/]|[\\/]{2}[^\\/?\.][^\\/]*[\\/][^\\/]+)/i.test(value)
+  : isAbsolute(value));
+const relativePath = value => validPath(value) && !isAbsolute(value) &&
+  (process.platform !== 'win32' || !/^[a-z]:/i.test(value));
 function mergeToolDetails(previous, update) {
   const tool = { ...previous };
   for (const field of ['title', 'kind', 'rawInput', 'locations', 'content']) {
     if (update?.[field] != null) tool[field] = update[field];
   }
   return tool;
+}
+function approvalScope(tool, sessionCwd) {
+  const input = tool.rawInput;
+  const directories = [...new Set([input?.cwd, input?.workdir, input?.working_directory, input?.Cwd].filter(nonEmptyText))];
+  if (directories.length > 1) return null;
+  const [cwd] = directories;
+  if (tool.kind === 'execute') {
+    const commands = [...new Set([input?.command, input?.cmd, input?.Command].filter(nonEmptyText))];
+    return commands.length === 1 && qualifiedPath(cwd) ? { kind: 'command', command: commands[0], cwd } : null;
+  }
+  if (tool.kind === 'fetch') {
+    try {
+      const url = new URL(input?.url ?? input?.URL);
+      if (['http:', 'https:'].includes(url.protocol) && !url.username && !url.password)
+        return { kind: 'command', command: `访问 ${url.href}`, cwd: '' };
+    } catch { /* The request did not provide a usable URL. */ }
+    return null;
+  }
+  if (!Object.hasOwn(fileOperations, tool.kind)) return null;
+  const locations = Array.isArray(tool.locations) ? tool.locations : [];
+  const content = Array.isArray(tool.content) ? tool.content : [];
+  const paths = [...new Set([
+      ...locations.map(location => location?.path),
+      ...content.filter(item => item?.type === 'diff').map(item => item.path),
+      input?.path, input?.filePath, input?.file_path, input?.absolute_path, input?.Path,
+      ...(tool.kind === 'move' ? [input?.source, input?.destination, input?.old_path, input?.new_path] : []),
+  ].filter(nonEmptyText))];
+  const directory = cwd || sessionCwd;
+  if (!paths.length || tool.kind === 'move' && paths.length < 2 ||
+      paths.some(path => !qualifiedPath(path) && !(relativePath(path) && qualifiedPath(directory)))) return null;
+  return { kind: ['edit', 'delete', 'move'].includes(tool.kind) ? 'files' : 'command',
+    command: fileOperations[tool.kind], cwd: qualifiedPath(directory) ? directory : '', paths };
 }
 function markToolPreamble(message) {
   if (message?.role === 'assistant') Object.assign(message, { complete: true, phase: 'commentary' });
@@ -152,27 +192,17 @@ export class AcpCompanion extends NativeAgent {
     const tool = mergeToolDetails(ep.tools.get(p.toolCall?.toolCallId), p.toolCall);
     const allow = p.options?.find(o => o.kind === 'allow_once');
     const deny = p.options?.find(o => o.kind === 'reject_once');
-    const input = tool.rawInput;
-    const command = [input?.command, input?.cmd, input?.Command].find(nonEmptyText) || '';
-    const cwd = [input?.cwd, input?.workdir, input?.working_directory, input?.Cwd].find(nonEmptyText) || '';
+    const scope = approvalScope(tool, this.state.cwd);
     const content = Array.isArray(tool.content) ? tool.content : [];
-    const locations = Array.isArray(tool.locations) ? tool.locations : [];
-    const paths = [...new Set([
-      ...locations.map(location => location?.path),
-      ...content.filter(item => item?.type === 'diff').map(item => item.path),
-      input?.path, input?.filePath, input?.file_path, input?.absolute_path, input?.Path,
-    ].filter(nonEmptyText))];
-    const inputProvided = typeof input === 'string' ? input.trim() : input && Object.keys(input).length;
-    if (!command && !paths.length && !(nonEmptyText(tool.title) && inputProvided)) {
+    if (!scope) {
       this.state.activity = 'Agent 未提供操作详情，已拒绝工具请求';
       this.changed(false);
       return { outcome: deny ? { outcome: 'selected', optionId: deny.optionId } : { outcome: 'cancelled' } };
     }
-    const details = [JSON.stringify(input ?? {}, null, 2), ...content.map(item =>
+    const details = [JSON.stringify(tool.rawInput ?? {}, null, 2), ...content.map(item =>
       item?.type === 'diff' ? `${item.path}\n---\n${item.oldText || ''}\n+++\n${item.newText || ''}` : item?.content?.text || ''
     )].join('\n').slice(0, 256000);
-    const kind = ['edit', 'delete', 'move'].includes(tool.kind) ? 'files' : 'command';
-    return this.ask({ kind, reason: tool.title || 'Agent 请求执行工具', command, cwd, paths, details, allowDisabled: !allow }, answer => {
+    return this.ask({ ...scope, reason: tool.title || 'Agent 请求执行工具', details, allowDisabled: !allow }, answer => {
       if (!['accept', 'decline'].includes(answer?.decision)) throw new Error('请选择允许或拒绝。');
       const selected = answer.decision === 'accept' ? allow : deny;
       if (answer.decision === 'accept' && !selected) throw new Error('该请求没有提供单次允许选项，请在原生 CLI 中处理。');

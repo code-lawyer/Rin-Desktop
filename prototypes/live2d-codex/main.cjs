@@ -24,6 +24,7 @@ const projectRoot = packaged ? app.getPath('documents') : resolve(root, '../..')
 const sourceStorage = join(projectRoot, 'work/runtime/avatar');
 const argument = key => process.argv.find(arg => arg.startsWith(`--${key}=`))?.slice(key.length + 3);
 const wallpaperMode = packaged || (argument('mode') ?? 'wallpaper') === 'wallpaper';
+const nativeWallpaper = wallpaperMode && argument('visual') !== 'hidden';
 const localDataRoot = process.env.LOCALAPPDATA || app.getPath('userData');
 let portable, startupStorageError, defaultStorage, storageDir, writeProviderSelection;
 try {
@@ -62,14 +63,15 @@ const remoteInput = new RemoteInput({onError:error=>remote?.disconnect().then(()
 const isLocal = url => { try { const u = new URL(url); return u.protocol === 'app:' && u.hostname === 'local' && ['/renderer/index.html', '/renderer/workbench.html'].includes(u.pathname); } catch { return false; } };
 const trusted = event => [avatar, chat, workbench].some(win => win && !win.isDestroyed() && win.webContents === event.sender) && isLocal(event.senderFrame?.url ?? '');
 const appearance = () => ({ scale: characterScale, mode: wallpaperMode ? 'wallpaper' : 'avatar' });
-const presentation = () => ({ mode: wallpaperMode ? 'wallpaper' : 'avatar', wallpaperKind: wallpaperStatus.wallpaperKind || 'artwork', character: wallpaperStatus.character ?? characterProfile(store?.data.settings.character).id, characterRequest: wallpaperStatus.requestId, chatVisible: !!chat?.isVisible(), paused: manualPause || suspended || screenLocked || !!wallpaperHost?.status.occluded, manualPause, stills: { ...stillSettings(store?.data.settings), wallpaperMotion: wallpaperStatus.wallpaperMotion ?? store?.data.settings.wallpaperMotion === true }, capturing: !!captureTarget, speaking, replyNarration: replyNarration.cue, ambientRevision, ambientRetry, desktopAttached: !!wallpaperHost?.status.ok, desktopLayer: wallpaperHost?.status.parentClass ?? null, desktopBounds: wallpaperHost?.status.bounds ?? null,
+const presentation = () => ({ mode: wallpaperMode ? 'wallpaper' : 'avatar', wallpaperKind: wallpaperStatus.wallpaperKind || 'artwork', character: wallpaperStatus.character ?? characterProfile(store?.data.settings.character).id, characterRequest: wallpaperStatus.requestId, chatVisible: !!chat?.isVisible(), paused: manualPause || suspended || screenLocked ||
+  (nativeWallpaper && !wallpaperHost?.status.ok) || !!wallpaperHost?.status.occluded, manualPause, stills: { ...stillSettings(store?.data.settings), wallpaperMotion: wallpaperStatus.wallpaperMotion ?? store?.data.settings.wallpaperMotion === true }, capturing: !!captureTarget, speaking, replyNarration: replyNarration.cue, ambientRevision, ambientRetry, desktopAttached: !!wallpaperHost?.status.ok, desktopLayer: wallpaperHost?.status.parentClass ?? null, desktopBounds: wallpaperHost?.status.bounds ?? null,
   fixedPosePreview, posePreferenceRevision });
 function wallpaperRenderer() {
   if (!avatar || avatar.isDestroyed()) return null;
   const contents = avatar.webContents;
   return contents.isDestroyed() || contents.isCrashed() ? null : contents;
 }
-function poseSelectionEnabled(value) {
+function poseSelectionEnabled(value = presentation()) {
   return wallpaperMode && !closing && !quitting && wallpaperStatus.phase === 'ready' &&
     ['auto', 'manual'].includes(wallpaperStatus.activity) && canPreviewPose(backend?.state, value);
 }
@@ -144,7 +146,9 @@ function hideChat() { if (readingMode) { readingMode = false; chat.setFullScreen
 function toggleChat() { chat?.isVisible() ? hideChat() : showChat(); }
 function recallChat() { chat?.isVisible() && chat.isFocused() ? hideChat() : showChat(); }
 function showWorkbench(page) { hideChat(); workbench?.show(); workbench?.focus(); workbench?.webContents.send('workbench:refresh', typeof page === 'string' ? page : null); }
-function workspaceSnapshot() { return { ...store.snapshot(), version: workspaceVersion, speech: speech.status(), remote: remote?.snapshot(), wallpaper: wallpaperStatus, ambience: ambienceStatus, wallpaperPaused: manualPause, resources: voiceResources?.snapshot(), shortcutErrors, legacyDotsAvailable }; }
+function workspaceSnapshot() { return { ...store.snapshot(), version: workspaceVersion, speech: speech.status(), remote: remote?.snapshot(), wallpaper: wallpaperStatus,
+  desktopWallpaper: nativeWallpaper ? { phase: wallpaperHost?.status.phase ?? 'loading', error: wallpaperHost?.status.error } : null,
+  ambience: ambienceStatus, wallpaperPaused: manualPause, resources: voiceResources?.snapshot(), shortcutErrors, legacyDotsAvailable }; }
 function notifyWorkspace() { workspaceVersion++; notifyPresentation(); for (const win of [chat, workbench]) if (win && !win.isDestroyed()) win.webContents.send('workbench:state', workspaceSnapshot()); }
 function stopSpeech() { playbackRevision++; speaking = false; replyNarration.clear(); notifyPresentation(); chat?.webContents.send('speech:stop'); return speech?.stop().catch(error => console.error('[speech:stop]', error.message)); }
 async function confirmWallpaper(info) {
@@ -232,6 +236,28 @@ function recoverWallpaperRenderer() {
     wallpaperKind: wallpaperStatus.wallpaperKind || 'artwork', wallpaperMotion: wallpaperStatus.wallpaperMotion, animePlayback: wallpaperStatus.animePlayback, requestId: wallpaperStatus.requestId + 1 };
   lastPresentation = '';
   avatar.webContents.reload();
+}
+function startWallpaperHost() {
+  avatar.setIgnoreMouseEvents(true);
+  // The native helper shows this HWND only after it is attached and sized.
+  wallpaperHost = new WallpaperHost(avatar, { canStart: () => !closing && !quitting && !avatar.isDestroyed() });
+  let lastPhase, lastError;
+  wallpaperHost.on('status', value => {
+    if (closing) return;
+    if (!value.ok && !avatar.isDestroyed() && avatar.isVisible()) avatar.hide();
+    if (value.phase === lastPhase && value.error === lastError) {
+      notifyPresentation();
+      return;
+    }
+    lastPhase = value.phase;
+    lastError = value.error;
+    notifyWorkspace();
+    if (value.ok) console.info('[companion:desktop]', JSON.stringify(presentation()));
+    else if (value.error) console.error('[companion:desktop]', value.error);
+  });
+  wallpaperHost.on('pose-click', click => selectWallpaperPose({ click }));
+  screen.on('display-metrics-changed', () => { wallpaperHost.ensure(); positionChat(); });
+  wallpaperHost.start();
 }
 function switchAllowed() { if (captureTarget) throw new Error('请先完成或取消听写，再切换对话。'); if (!isCliAgent(provider)) throw new Error('请先选择 CLI Agent。'); stopSpeech(); }
 function sendInputAction(action) {
@@ -597,7 +623,10 @@ else {
     handler('companion:submission', (_event, action, id) => {
       if (!isCliAgent(provider)) throw new Error('请先选择 CLI Agent。');
       if (action === 'check') return submissions.reconcile(backend, provider, id);
-      if (action === 'release') return submissions.release(backend, provider, id);
+      if (action === 'release') {
+        if (captureTarget) throw new Error('请先完成听写，再恢复草稿。');
+        return submissions.release(backend, provider, id);
+      }
       throw new Error('发送核查操作无效。');
     });
     handler('companion:interrupt', () => backend.interrupt());
@@ -648,7 +677,17 @@ else {
       requireProvider(expected); return backend.renameConversation(id, name, store.project(projectId).cwd);
     });
     handler('workbench:effort', (_event, effort) => backend.chooseEffort(effort));
-    handler('workbench:draft', (_event, target, text) => text === undefined ? store.draftSnapshot(target) : store.saveDraft(target, text));
+    handler('workbench:draft', async (_event, target, text) => {
+      if (text !== undefined) return store.saveDraft(target, text);
+      // A reopened editor must see any recovery or save already in progress.
+      await store.queue;
+      return store.draftSnapshot(target);
+    });
+    handler('workbench:swap-recovered-draft', (event, target, id) => {
+      if (event.sender !== chat.webContents) throw new Error('请从对话窗口切换草稿。');
+      if (captureTarget || backend.busy || submissions.active.has(provider)) throw new Error('请先完成任务或听写，再切换草稿。');
+      return store.swapRecoveredDraft(target, id);
+    });
     ipcMain.on('draft:flushed', (event, id, result) => {
       const pending = draftFlushRequest;
       if (!trusted(event) || event.sender !== chat?.webContents || pending?.sender !== event.sender || pending.id !== id) return;
@@ -745,6 +784,7 @@ else {
     });
     handler('wallpaper:control', (event, action, value) => {
       if(action==='retry-audio') { ambientRetry++; recoverWallpaperRenderer(); notifyWorkspace(); }
+      else if(action==='retry-desktop' && event.sender===workbench.webContents && wallpaperHost) wallpaperHost.retry();
       else if(action==='pause' && typeof value==='boolean') { manualPause=value; const item=trayMenu?.getMenuItemById('pause-wallpaper'); if(item)item.checked=value; notifyWorkspace(); }
       else if(action==='gesture') throw new Error('单次骨骼动作已停用，请选择完整陪伴姿态。');
       else throw new Error('壁纸操作无效。');
@@ -860,15 +900,7 @@ else {
     });
     await Promise.all([avatar.loadURL(`app://local/renderer/index.html?view=${wallpaperMode ? 'wallpaper' : 'avatar'}`), chat.loadURL('app://local/renderer/index.html?view=chat'), workbench.loadURL('app://local/renderer/workbench.html')]);
     console.info('[companion:startup]', 'loaded');
-    if (wallpaperMode && argument('visual') !== 'hidden') {
-      avatar.setIgnoreMouseEvents(true); avatar.setOpacity(0); avatar.showInactive();
-      wallpaperHost = new WallpaperHost(avatar);
-      wallpaperHost.on('status', value => { notifyPresentation(); if (!value.ok) console.error(value.error); });
-      wallpaperHost.on('pose-click', click => selectWallpaperPose({ click }));
-      await wallpaperHost.start(); avatar.setOpacity(1); wallpaperHost.command('ensure');
-      console.info('[companion:desktop]', JSON.stringify(presentation()));
-      screen.on('display-metrics-changed', () => { wallpaperHost.command('ensure'); positionChat(); });
-    } else if (argument('visual') !== 'hidden') avatar.showInactive(); // Isolated UI verification can omit the legacy character window.
+    if (!wallpaperMode && argument('visual') !== 'hidden') avatar.showInactive(); // Isolated UI verification can omit the legacy character window.
     tray = new Tray(icon()); tray.setToolTip(`${portable?.testBuild ? 'Rin Desktop 测试版' : 'Vibe Voice'} · ${agentName(provider)} 桌面伙伴`);
     trayMenu = Menu.buildFromTemplate([{ label: '打开对话  Ctrl+Alt+空格', click: showChat },
       { label: '壁纸人物', click: () => showWorkbench('wallpaper') },
@@ -882,6 +914,7 @@ else {
     tray.setContextMenu(trayMenu);
     tray.on('click', toggleChat);
     registerShortcuts(); speech.configure(store.data.settings); notifyWorkspace();
+    if (nativeWallpaper) startWallpaperHost();
     remote.start();
     await backend.connect();
     if (argument('show') === 'wallpaper') showWorkbench('wallpaper');
@@ -921,7 +954,7 @@ else {
         if (pendingDataSelection) { await pendingDataSelection(); pendingDataSelection = null; }
         if (pendingRelaunch) { app.relaunch(pendingRelaunch); pendingRelaunch = null; }
       } catch (error) {
-        quitting = false; pendingDataSelection = null; pendingRelaunch = null; registerShortcuts();
+        quitting = false; pendingDataSelection = null; pendingRelaunch = null; registerShortcuts(); wallpaperHost?.retry();
         try { if (chat && !chat.isDestroyed()) { chat.webContents.send('draft:flush-cancelled', error.message); showChat(); } } catch { /* A renderer can disappear while the flush is pending. */ }
         dialog.showErrorBox('保存未完成，退出已取消', error.message);
         return;

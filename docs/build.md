@@ -53,7 +53,7 @@ npm run build
 
 用户自行安装所选 Agent 的 CLI。协议依赖锁定在应用目录的 `package-lock.json`。应用包收集 ACP SDK 及其依赖，Claude Agent SDK 由安装版用户从 npm 单独安装。覆盖升级会清理旧应用目录里的自定义 Agent 模块和旧版随 Claude SDK 打包的专属依赖。安装准备见 [CLI Agent 说明](../prototypes/live2d-codex/CLI-AGENTS.md)。真实账户和主应用验收范围见 [项目状态](project-status.md)。
 
-应用的 Node 运行时与真人壁纸媒体从锁定的基础安装包获取（历史锁包若含 Cubism Core，也可供源码旧头像模式复用）。安装包从 `assets/scene/rin-poses` 和 `assets/scene/rin-male-poses` 的资源清单打包两套动漫原画，另含 `assets/motion/female` 真人视频、`assets/ambience` 环境音和 `assets/character-previews`、`assets/stills` 预览与兼容回退图。覆盖升级时，`[InstallDelete]` 清理已移除的旧 `Cubism Core`、旧雨夜 Live2D 模型、旧男士壁纸及仅源码使用的历史原型和预览模块。
+应用的 Node 运行时与真人壁纸媒体从锁定的基础安装包获取（历史锁包若含 Cubism Core，也可供源码旧头像模式复用）。安装包从 `assets/scene/rin-poses` 和 `assets/scene/rin-male-poses` 的资源清单打包两套动漫原画、预览和静态回退图，另含 `assets/motion/female` 真人视频与 `assets/ambience` 环境音。覆盖升级时，`[InstallDelete]` 清理旧 `Cubism Core`、旧壁纸模型以及历史预览和静态底图目录。
 
 RC003 输入层还使用锁定的 Koffi 3.3.3 和 `@koromix/koffi-win32-x64` 预编译包，通过上述 npm 安装。不要省略 Windows 本平台的 optional dependency。打包脚本显式复制该原生包及许可，并在输出目录加载输入模块；组件检查还在独立副本中用 Electron 的 Node 模式核对加载。连接、按钮设置、麦克风和待验收范围见 [项目状态](project-status.md)。
 
@@ -83,7 +83,7 @@ npm run resources
 npm run resources -- --installer="release/test-builds/v0.6.3-rc.13/Rin-Desktop-0.6.3-rc.13-Setup.exe"
 ```
 
-资源清单指向可下载的 GitHub 安装器。发布候选版时用已构建的安装器生成资源清单，标签包含最终清单。清理旧 Release 前验证新标签的资源恢复入口。从较早的 Git 标签源码归档构建时，若资源链接已失效，可使用当前 `main` 的资源清单和本说明。
+资源清单指向可下载的 GitHub 安装器。发布标签指向包内 `source-state.json` 记录的构建提交。核对新附件的公开下载、大小和 SHA-256 后，在 `main` 的后续提交中更新资源清单。构建提交仍引用当时使用的基础安装包。若较早标签的资源链接已失效，可使用当前 `main` 的资源清单。清理旧 Release 前先用新清单验证资源恢复。
 
 准备好后，在仓库根目录运行：
 
@@ -104,12 +104,12 @@ npm start
 $resourceVersion = (Get-Content tools/release/resource-manifest.json -Raw | ConvertFrom-Json).version
 $env:VIBE_RESOURCE_APP = (Resolve-Path "work/release-resources/$resourceVersion/resources/app").Path
 $env:INNO_ISCC = 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe'
-npm run package
+npm run package -- --preflight
 ```
 
-打包要求根目录与应用版本一致，输出目录必须全新。`npm run package -- --preflight` 在 `work/qa/release-preflight/` 生成使用正式 AppId 的未签名预检包，文件名带 `Preflight`，适合本机隔离解包和兼容性检查。预检保留现有资源锁。预发布版本使用 `npm run package` 时仍更新资源锁。
+打包需要 Git 工作区，根目录与应用版本须一致，输出目录必须全新。应用代码从 Git 跟踪的运行文件收集，前端只收集本次构建的入口和分块。完整打包目录在编译安装器前核对文件类型、隐私路径、文本内容与随包指南链接。`npm run package -- --preflight` 在 `work/qa/release-preflight/` 生成使用正式 AppId 的未签名预检包，文件名带 `Preflight`，可在源码有本地修改时用于本机隔离解包和兼容性检查。
 
-正式版本号使用 `X.Y.Z`。构建前配置两个环境变量。`RIN_RELEASE_SIGN_SCRIPT` 指向本机签名 PowerShell 脚本，脚本接受一个可执行文件路径，负责用发布者的代码签名身份签名并加时间戳，失败时应返回非零。`RIN_RELEASE_SUBJECT` 设为发布者证书的 Subject。签名脚本和签名服务配置放在本机受控位置。可接入 [Microsoft Artifact Signing](https://learn.microsoft.com/en-us/azure/artifact-signing/how-to-signing-integrations) 或其他 Windows 公开信任的代码签名服务。
+正式版本号使用 `X.Y.Z`，从干净的已提交源码执行 `npm run package`。`RIN_RELEASE_SIGN_SCRIPT` 指向本机签名 PowerShell 脚本，脚本接受一个可执行文件路径，负责用发布者的代码签名身份签名并加时间戳，失败时应返回非零。`RIN_RELEASE_SUBJECT` 设为发布者证书的 Subject。签名脚本和签名服务配置放在本机受控位置。可接入 [Microsoft Artifact Signing](https://learn.microsoft.com/en-us/azure/artifact-signing/how-to-signing-integrations) 或其他 Windows 公开信任的代码签名服务。
 
 正式构建先签 `VibeVoice.exe` 和 `rc003-helper.exe` 再重建文件清单，随后由 Inno Setup 签安装器和卸载器。包外 `SHA256SUMS.txt` 绑定待验收安装器。完成 [正式候选包验收](../tools/release/TEST-ACCEPTANCE.md#正式候选包)后，把同一份安装器和对应源码归档发到该版本 Release。附件公开后可运行 `node tools/release/lock-resources.mjs` 将资源锁指向已发布安装器。
 
@@ -117,9 +117,9 @@ npm run package
 
 正式/测试/便携打包入口在写入新包之前校验这些文件，缺失或哈希不符会停止；只收集六个媒体和规范化运行清单，不把生成账户响应、母片或制作目录整体打包。复制后的字节再次校验，最后才写运行清单。安装包核查还将这六个媒体与当前源码资源逐项比较。完整性校验不代表接缝、4K效果或许可验收。源代码、媒体完整性与实际安装验收分别记录。早期 0.5.0 / 0.6.0 旧包不包含当前四段视频及后续数据安全修复，不能用版本号代替包内容核对。
 
-内部验收使用 `npm run package:test -- --id=<新的测试标识>`，需要相同资源、Inno Setup 和 Windows tar。该命令生成独立 ZIP 与测试安装器、文件/源码指纹、离线检查、数据恢复和验收表，输出 `release/test-builds/<标识>`；不修改正式资源清单、基础版本或已有产物。测试安装器使用独立 AppId/目录/快捷方式，测试数据默认隔离。构建不启动真实 Agent 或硬件，人工验收按[测试清单](../tools/release/TEST-ACCEPTANCE.md)进行。
+内部验收使用 `npm run package:test -- --id=<新的测试标识>`，需要相同资源、Inno Setup 和 Windows tar。该命令生成独立 ZIP、测试安装器、源码指纹、离线检查、数据恢复和验收表，默认输出到 `release/test-builds/<标识>`，也可指定 `--output=work/qa/<新目录>`。内部验收允许本地修改，构建结果标记为 `publishable: false`。测试安装器使用独立 AppId、目录和快捷方式，测试数据默认隔离。构建不启动真实 Agent 或硬件，人工验收按[测试清单](../tools/release/TEST-ACCEPTANCE.md)进行。
 
-供用户下载安装的候选也使用此隔离入口：先同步根目录、应用及两个 lockfile 的候选版本号，提交并推送已审计源码，再以唯一测试标识构建。GitHub Release 标记为预发布，标签指向构建记录中的源码提交，安装器须通过安装验证。公开下载文件可命名为 `Rin-Desktop-<候选版本>-Setup.exe`，但必须与原测试安装器逐字节一致；保留包内测试标识、隔离目录和验收说明。下载指南直接链接候选发布页；只有预发布版本时，不使用 `releases/latest` 入口。资源清单可以锁定已核验的候选安装器，并须实际验证资源恢复。
+供用户下载安装的候选先同步根目录、应用及两个 lockfile 的预发布版本号，提交并推送已审计源码，再执行 `npm run package:test -- --id=<新的测试标识> --public`。构建要求干净的 Git 工作区及可完整检查的索引，会拒绝 `assume-unchanged`、`skip-worktree` 条目，并在编译前核对提交与源码指纹。发布前确认 `build-result.json` 的 `publishable` 为 `true`，安装验证通过，且 GitHub 预发布标签指向记录的 `head`。公开下载文件使用资源清单要求的名称 `Rin-Desktop-<候选版本>-Setup.exe`，并与测试安装器逐字节一致。下载指南直接链接候选发布页。验证公开附件后更新 `main` 上的资源清单并检查资源恢复。
 
 语音模型不打包、不上传到本项目 Release。`prototypes/live2d-codex/voice-resources.json` 只保存上游仓库、固定 revision、文件大小和 SHA-256。运行 `node tools/release/build-voice-manifest.mjs` 可从 Hugging Face 元数据重建清单；清单生成器不会下载权重。资源目录版本独立于应用版本，普通应用升级不触发重复模型下载。
 

@@ -1,15 +1,65 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { EventEmitter } from 'node:events';
 import { installRemoteSettings, installRemoteNavigation } from '../renderer/remote-ui.mjs';
+import { RemoteController } from '../backend/remote-controller.mjs';
 import { remoteSettings } from '../backend/remote-config.mjs';
 const tick=()=>new Promise(resolve=>setImmediate(resolve));
 
-test('manual connection can be cancelled from settings and its late response cannot restore connected UI',async t=>{
+function remoteSettingsDocument(t) {
   const old=globalThis.document;t.after(()=>globalThis.document=old);
   const nodes=new Map();
-  const element=()=>({dataset:{},classList:{toggle(){}},setAttribute(){},append(){},replaceChildren(){},closest(){return this;}});
+  const element=()=>({
+    dataset:{},children:[],classList:{toggle(){}},setAttribute(){},
+    append(...children){this.children.push(...children);},replaceChildren(){this.children=[];},closest(){return this;},
+  });
   const get=id=>{if(!nodes.has(id))nodes.set(id,element());return nodes.get(id);};
   globalThis.document={getElementById:get,createElement:element,activeElement:null};
+  return get;
+}
+
+test('a successful RC003 scan leaves its discovered device actionable in settings',async t=>{
+  const get=remoteSettingsDocument(t);
+  const device={id:'fixture',name:'RC003',paired:true};
+  const transport=Object.assign(new EventEmitter(),{
+    async start(){},
+    async close(){},
+    async request(command){
+      assert.equal(command,'scan');
+      return [device];
+    },
+  });
+  const controller=new RemoteController({createTransport:()=>transport,settings:{}});
+  t.after(async()=>{
+    controller.removeAllListeners('state');
+    await controller.close();
+  });
+  let scanResult;
+  installRemoteSettings({
+    onRemote:fn=>controller.on('state',fn),
+    remote:async command=>{
+      if(command==='scan') {
+        scanResult=await controller.scan();
+        return {ok:true,value:scanResult};
+      }
+      assert.equal(command,'snapshot');
+      return {ok:true,value:controller.snapshot()};
+    },
+  });
+  await tick();
+  get('rc003-scan').onclick();
+  await tick();
+  assert.equal(controller.snapshot().scanning,false);
+  assert.equal(get('rc003-scan').textContent,'搜索遥控器');
+  assert.equal(get('rc003-scan').disabled,false);
+  const [result]=get('rc003-devices').children;
+  assert.equal(result.textContent,'RC003 · 连接');
+  assert.equal(result.disabled,false);
+  assert.equal(scanResult.scanning,false);
+});
+
+test('manual connection can be cancelled from settings and its late response cannot restore connected UI',async t=>{
+  const get=remoteSettingsDocument(t);
   let state={phase:'disconnected',audio:'idle',config:remoteSettings({device:{id:'one',name:'RC003'}}),devices:[]},onRemote,finish;
   const calls=[];
   const api={onRemote:fn=>onRemote=fn,remote:async command=>{
