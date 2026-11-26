@@ -6,7 +6,14 @@ import { isPrivateProjectPath } from '../project/public-path.mjs';
 
 const root = resolve(import.meta.dirname, '../..');
 const generatedOrPersonalFile = /(^|\/)(auth|session|workspaces|appearance|provider)\.json$|(^|\/)custom-agents\.json(?:\..*)?$|\.(wav|pcm|mp4|zip|7z|exe|dll|safetensors)$/i;
-const secrets = [/sk-(?:proj-|svcacct-)?[A-Za-z0-9_-]{32,}/, /gh[pousr]_[A-Za-z0-9]{30,}/, /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/];
+const secrets = [
+  /sk-(?:proj-|svcacct-|ant-)?[A-Za-z0-9_-]{32,}/,
+  /gh[pousr]_[A-Za-z0-9]{30,}/,
+  /github_pat_[A-Za-z0-9_]{22,}/,
+  /xai-[A-Za-z0-9_-]{20,}/,
+  /AIza[0-9A-Za-z_-]{35}/,
+  /-----BEGIN (?:RSA |EC |OPENSSH |ENCRYPTED )?PRIVATE KEY-----/,
+];
 const normalizedText = value => value.replaceAll('\\\\', '\\').replaceAll('\\', '/').toLowerCase();
 
 export async function auditPublic(directory, { staged = false, worktree = false } = {}) {

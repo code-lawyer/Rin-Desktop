@@ -103,13 +103,18 @@ export function spawnAgent(binary, args, cwd, env = agentEnvironment()) {
 }
 export async function closeChild(child, grace = 2500) {
   if (!child || child.exitCode !== null || child.signalCode !== null || !child.pid) return;
-  const exited = new Promise(resolveExit => child.once('exit', resolveExit));
-  child.stdin?.end();
-  try { await deadline(exited, grace, 'CLI 退出'); return; } catch {}
-  // Only terminate the child process tree owned by this connection.
-  if (child.exitCode === null && child.signalCode === null) {
-    if (process.platform === 'win32') await execute('taskkill.exe', ['/PID', String(child.pid), '/T', '/F'], { windowsHide: true, timeout: 5000 }).catch(() => {});
-    else child.kill('SIGKILL');
+  let onExit;
+  const exited = new Promise(resolveExit => { onExit = resolveExit; child.once('exit', onExit); });
+  try {
+    child.stdin?.end();
+    try { await deadline(exited, grace, 'CLI 退出'); return; } catch {}
+    // Only terminate the child process tree owned by this connection.
+    if (child.exitCode === null && child.signalCode === null) {
+      if (process.platform === 'win32') await execute('taskkill.exe', ['/PID', String(child.pid), '/T', '/F'], { windowsHide: true, timeout: 5000 }).catch(() => {});
+      else child.kill('SIGKILL');
+    }
+    await deadline(exited, 1500, 'CLI 退出').catch(() => {});
+  } finally {
+    child.off('exit', onExit);
   }
-  await deadline(exited, 1500, 'CLI 退出').catch(() => {});
 }

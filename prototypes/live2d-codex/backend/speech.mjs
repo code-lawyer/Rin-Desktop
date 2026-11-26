@@ -19,7 +19,13 @@ export class LocalSpeech {
       const child = fork(fileURLToPath(new URL('./speech-worker.cjs', import.meta.url)), [this.modelRoot(channel)], { execPath: this.executable, execArgv: [], env, windowsHide: true, serialization: 'json', stdio: ['ignore', 'ignore', 'pipe', 'ipc'] });
       worker = { child, pending: null, timer: null, diagnostics: '' }; this.workers.set(channel, worker);
       child.stderr.on('data', chunk => { worker.diagnostics = (worker.diagnostics + chunk).slice(-2000); });
-      const fail = error => { if (this.workers.get(channel) === worker) this.workers.delete(channel); clearTimeout(worker.timer); worker.pending?.reject(error); worker.pending = null; this.onState?.(); };
+      const fail = error => {
+        const active = this.workers.get(channel) === worker;
+        if (active) this.workers.delete(channel);
+        clearTimeout(worker.timer); worker.pending?.reject(error); worker.pending = null;
+        this.onState?.();
+        if (active && channel === 'tts') this.onTtsExit?.(error);
+      };
       child.on('error', fail); child.on('exit', code => { if (worker.pending) console.error('[speech:worker]', code, worker.diagnostics); fail(new Error('本地语音进程已停止，请重试。')); });
       child.on('message', response => {
         if (worker.pending?.id !== response.id) return;

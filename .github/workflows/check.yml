@@ -17,5 +17,7 @@ jobs:
       - run: npm run check:project
       - run: npm test
       - run: npm run build
+      - run: npm run qa:remote-component
+      - run: powershell.exe -NoProfile -Command "Add-Type -Path 'prototypes/live2d-codex/scripts/wallpaper-pose-input.cs' -ReferencedAssemblies 'Accessibility.dll', 'System.dll', 'System.Core.dll'"
       - run: node tools/release/audit-public.mjs --staged
       - run: npm run check:public

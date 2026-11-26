@@ -36,8 +36,9 @@ try {
 }
 app.setPath('userData', join(storageDir, 'profile'));
 const debugPort = argument('debug-port');
-if (debugPort && /^\d{4,5}$/.test(debugPort)) {
-  app.commandLine.appendSwitch('remote-debugging-port', debugPort);
+const parsedDebugPort = debugPort && /^\d{4,5}$/.test(debugPort) ? Number(debugPort) : 0;
+if ((!packaged || portable?.testBuild?.channel === 'internal-test') && parsedDebugPort >= 1024 && parsedDebugPort <= 65535) {
+  app.commandLine.appendSwitch('remote-debugging-port', String(parsedDebugPort));
   app.commandLine.appendSwitch('remote-debugging-address', '127.0.0.1');
 }
 protocol.registerSchemesAsPrivileged([{ scheme: 'app', privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true, stream: true } }]);
@@ -473,7 +474,7 @@ else {
     // Keep native resizing enabled, and prevent user edge-resizing separately.
     chat = new BrowserWindow({ ...common, webPreferences: { ...common.webPreferences, autoplayPolicy: 'no-user-gesture-required' }, width: 440, height: 220, minWidth: 280, minHeight: 190, resizable: true, skipTaskbar: true, hasShadow: false, title: 'Vibe Voice · 对话气泡' });
     chat.on('will-resize', event => event.preventDefault());
-    workbench = new BrowserWindow({ ...common, transparent: false, backgroundColor: '#f3f6f7', alwaysOnTop: false, width: Math.min(1120, area.width - 40), height: Math.min(760, area.height - 50), minWidth: 760, minHeight: 540, resizable: true, skipTaskbar: false, title: 'Vibe Voice · 工作台' });
+    workbench = new BrowserWindow({ ...common, transparent: false, backgroundColor: '#131d27', alwaysOnTop: false, width: Math.min(1120, area.width - 40), height: Math.min(760, area.height - 50), minWidth: 480, minHeight: 420, resizable: true, skipTaskbar: false, title: 'Vibe Voice · 工作台' });
     for (const win of [avatar, chat, workbench]) secureWindow(win);
     workbench.on('blur', finishKeyLearning);
     workbench.webContents.on('render-process-gone', finishKeyLearning);
@@ -537,6 +538,7 @@ else {
     powerMonitor.on('resume',()=>{ suspended=false; notifyPresentation(); remote.resume(); });
     powerMonitor.on('lock-screen',()=>{ screenLocked=true; notifyPresentation(); stopSpeech(); remote.cancel(); chat.webContents.send('speech:cancel'); });
     powerMonitor.on('unlock-screen',()=>{ screenLocked=false; notifyPresentation(); });
+    powerMonitor.on('shutdown',()=>{ app.quit(); });
     chat.webContents.on('render-process-gone',()=>{ playbackRevision++; speaking=false; replyNarration.clear(); if(captureTarget?.origin!=='rc003')captureTarget=null; clearTimeout(captureTimer); notifyPresentation(); });
     avatar.webContents.on('did-start-loading',()=>ambientBarrier.startOwner());
     avatar.webContents.on('render-process-gone',()=>{
@@ -588,7 +590,7 @@ else {
     handler('companion:avatar-reset', resetAvatar);
     handler('companion:open-link', async (_event, href) => {
       const url = new URL(href);
-      if (!['https:', 'http:'].includes(url.protocol)) throw new Error('只能打开网页链接。');
+      if (!['https:', 'http:'].includes(url.protocol) || url.username || url.password) throw new Error('只能打开不含凭据的网页链接。');
       await shell.openExternal(url.href);
     });
     handler('companion:send', (_event, text, expected) => { if (captureTarget) throw new Error('请先完成听写。'); stopSpeech(); return isCliAgent(provider) ? submissions.send(backend, provider, text, expected) : backend.send(text); });
@@ -927,6 +929,8 @@ else {
       closing = true;
       tray?.destroy(); clearTimeout(captureTimer); ambientBarrier.close();
       await Promise.allSettled([remote?.close(), voiceResources?.close(), speech?.close(), wallpaperHost?.close(), backend?.close(), providerChange, store?.queue, characterBox ? saveAppearance() : Promise.resolve()]);
+      // A voice download cancellation settling concurrently with close can
+      // activate a late speech worker; close speech a second time before exit.
       try { await speech?.close(); } finally { app.exit(0); }
     })();
   });

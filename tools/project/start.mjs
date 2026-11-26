@@ -3,7 +3,6 @@ import { existsSync, readFileSync, mkdirSync, openSync, closeSync, statSync } fr
 import { createRequire } from 'node:module';
 import { resolve, join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import stills from '../../prototypes/live2d-codex/backend/still-settings.cjs';
 import characters from '../../prototypes/live2d-codex/backend/character-profiles.cjs';
 import { POSE_FILES } from '../../prototypes/live2d-codex/renderer/pose-assets.mjs';
 import { motionCatalog } from '../../prototypes/live2d-codex/renderer/motion-catalog.mjs';
@@ -71,11 +70,13 @@ export function inspectLaunch(plan, { platform = process.platform, nodeVersion =
   const resources = [];
   if (plan.mode === 'avatar') resources.push('vendor/live2dcubismcore.min.js', 'assets/hiyori/Hiyori.model3.json');
   else {
-    for (const pose of stills.POSES) resources.push(`assets/stills/female-v2-4k/${pose}.png`);
     for (const directory of characters.POSE_DIRECTORIES) {
       for (const file of [...POSE_FILES, 'manifest.json']) resources.push(`assets/scene/${directory}/${file}`);
     }
     resources.push('assets/ambience/light-rain.ogg', 'assets/ambience/soft-keyboard.ogg');
+    if (!existsSync(join(plan.appRoot, 'runtime/node.exe'))) {
+      warnings.push('Local CPU speech runtime (runtime/node.exe) is missing. Run npm run resources before loading SenseVoice or Kokoro.');
+    }
     const motion = join(plan.appRoot, 'assets/motion/female');
     try {
       const source = JSON.parse(readFileSync(join(motion, 'manifest.json'), 'utf8'));
@@ -101,7 +102,8 @@ export function electronEnvironment(env = process.env) {
 
 export async function buildAndLaunch(plan) {
   // Build errors must reach the calling CMD/PowerShell entry before it exits.
-  execFileSync(process.execPath, [plan.buildScript], { cwd: plan.appRoot, windowsHide: true, stdio: 'inherit' });
+  const buildArgs = plan.mode === 'avatar' ? [plan.buildScript, '--avatar'] : [plan.buildScript];
+  execFileSync(process.execPath, buildArgs, { cwd: plan.appRoot, windowsHide: true, stdio: 'inherit' });
   const handles = [];
   let child;
   try {

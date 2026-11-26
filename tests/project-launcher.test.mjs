@@ -24,8 +24,7 @@ test('source selection never falls back to an old release, and retains the exist
   assert.equal(checked.electron, null);
   assert.ok(checked.problems.some(problem => problem.includes('manifests')));
   const missing=checked.problems.find(problem=>problem.startsWith('Missing visual resources:'));
-  assert.match(missing,/female-v2-4k\/cup\.png/);
-  assert.match(missing,/female-v2-4k\/thinking\.png/);
+  assert.doesNotMatch(missing,/female-v2-4k\//);
   assert.match(missing,/scene\/rin-poses\/scene\.png/);
   assert.match(missing,/scene\/rin-poses\/cup-blink\.png/);
   assert.doesNotMatch(missing,/scene\/rin\//);
@@ -94,7 +93,6 @@ test('source preflight requires the active complete pose set and no retired skel
     'assets/ambience/light-rain.ogg':'fixture',
     'assets/ambience/soft-keyboard.ogg':'fixture',
   };
-  for(const pose of ['attention','cup','work','thinking','window'])files[`assets/stills/female-v2-4k/${pose}.png`]='fixture';
   for(const directory of ['rin-poses','rin-male-poses']) {
     for(const file of [...POSE_FILES,'manifest.json'])files[`assets/scene/${directory}/${file}`]='fixture';
   }
@@ -107,11 +105,14 @@ test('source preflight requires the active complete pose set and no retired skel
   assert.equal(animeOnly.ready,true);
   assert.deepEqual(animeOnly.problems,[]);
   assert.match(animeOnly.warnings.join('\n'),/Realistic wallpaper resources are incomplete/);
+  assert.match(animeOnly.warnings.join('\n'),/runtime\/node\.exe/);
   const motionDirectory=join(plan.appRoot,'assets/motion/female');
   const manifest=await readFile(join(projectRoot,'prototypes/live2d-codex/assets/motion/female/manifest.json'),'utf8');
   await mkdir(motionDirectory,{recursive:true});
   await writeFile(join(motionDirectory,'manifest.json'),manifest);
   for(const file of Object.keys(JSON.parse(manifest).integrity)) await writeFile(join(motionDirectory,file),'fixture');
+  await mkdir(join(plan.appRoot,'runtime'),{recursive:true});
+  await writeFile(join(plan.appRoot,'runtime/node.exe'),'fixture');
   assert.deepEqual(inspectLaunch(plan,options).warnings,[]);
   await rm(join(plan.appRoot,'assets/scene/rin-poses/cup-blink.png'));
   await rm(join(plan.appRoot,'assets/scene/rin-male-poses/scene.png'));

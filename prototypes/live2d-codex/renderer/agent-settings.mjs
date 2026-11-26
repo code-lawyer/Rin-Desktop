@@ -111,11 +111,13 @@ export function installAgentSettings({ api, document }) {
   }
 
   const guide = document.getElementById('agent-setup-guide');
-  guide.onclick = async event => {
+  const openGuide = async event => {
     event.preventDefault();
     try { await response(api.openLink(guide.href)); }
     catch (error) { notice.textContent = error.message; }
   };
+  guide.onclick = openGuide;
+  guide.onauxclick = event => { if (event.button === 1) openGuide(event); };
   render();
   return state => {
     if (!pendingAgent && (current?.provider !== state.provider || state.connection === 'connecting')) attemptError = null;

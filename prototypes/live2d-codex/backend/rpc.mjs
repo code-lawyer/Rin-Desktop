@@ -1,4 +1,5 @@
 import { EventEmitter } from 'node:events';
+import { spawn } from 'node:child_process';
 import { JsonLineDecoder } from './json-line-decoder.mjs';
 
 // The avatar owns its app-server connection, including server-initiated requests.
@@ -53,11 +54,16 @@ export class AvatarRpc extends EventEmitter {
     if (this.exited || !this.child.pid || this.child.exitCode != null || this.child.signalCode != null) { this.child.stdin.end(); return; }
     this.closing = new Promise(resolve => {
       let killTimer, deadline;
-      const finish = () => {
-        clearTimeout(killTimer); clearTimeout(deadline); this.child.off('exit', finish); resolve();
-      };
+      const finish = () => { clearTimeout(killTimer); clearTimeout(deadline); this.child.off('exit', finish); resolve(); };
       this.child.once('exit', finish);
-      killTimer = setTimeout(() => { try { this.child.kill('SIGKILL'); } catch {} }, 2000);
+      killTimer = setTimeout(() => {
+        if (!this.exited && this.child.exitCode == null && this.child.signalCode == null) {
+          try { this.child.kill('SIGKILL'); } catch {}
+          if (process.platform === 'win32' && this.child.pid && typeof this.child.spawnfile === 'string') {
+            try { spawn('taskkill.exe', ['/PID', String(this.child.pid), '/T', '/F'], { windowsHide: true, stdio: 'ignore' }).unref(); } catch {}
+          }
+        }
+      }, 2000);
       // A failed kill or missing exit event must not trap the Electron quit path.
       deadline = setTimeout(finish, 2500);
       this.child.stdin.end();

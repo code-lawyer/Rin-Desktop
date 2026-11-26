@@ -1,10 +1,11 @@
 import { EventEmitter } from 'node:events';
-import { spawn, execFileSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { mkdir, stat } from 'node:fs/promises';
 import { join, resolve, delimiter, basename } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { AvatarRpc } from './rpc.mjs';
+import { versionOf } from './agent-process.mjs';
 import { approvalView, approvalResult } from './approvals.mjs';
 import { isTaskBusy } from './task-state.mjs';
 import { AgentLifecycle } from './agent-lifecycle.mjs';
@@ -100,7 +101,8 @@ export class CodexCompanion extends EventEmitter {
       }
       operation.check();
       this.binary ??= findCodex();
-      this.state.version = execFileSync(this.binary, ['--version'], { encoding: 'utf8', windowsHide: true, timeout: 10_000, stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+      this.state.version = await versionOf(this.binary, [], cliEnvironment());
+      operation.check();
       const child = this.spawnServer ? this.spawnServer() : spawn(this.binary, ['app-server', '--listen', 'stdio://', '-c', 'forced_login_method="chatgpt"'],
         { cwd: projectError ? this.projectRoot : this.state.cwd, env: cliEnvironment(), windowsHide: true, shell: false, stdio: ['pipe', 'pipe', 'pipe'] });
       this.rpc = new AvatarRpc(child);

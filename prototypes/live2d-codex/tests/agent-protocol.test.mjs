@@ -515,3 +515,36 @@ test('forms reject unsupported, out-of-range and unlisted values without grantin
   assert.throws(()=>formAnswer({properties:{a:{type:'array',items:{enum:['a']}}}},{answers:{a:['b']}}),/选项/);
   assert.throws(()=>formAnswer({properties:{o:{type:'object'}}},{answers:{o:{}}}),/不支持/);
 });
+
+test('Claude permission extracts file paths and fails closed on empty input; effort failure disposes transport', async t => {
+  const f = await claude(t);
+  await f.agent.send('fixture'); await f.nextInput();
+  const deniedEmpty = await f.options.canUseTool('Write', {}, { signal: new AbortController().signal });
+  assert.equal(deniedEmpty.behavior, 'deny');
+  assert.equal(f.agent.pending.size, 0);
+  const fileAsk = f.options.canUseTool('Edit', { file_path: 'src/app.js' }, { signal: new AbortController().signal });
+  assert.deepEqual(f.agent.state.approvals[0].paths, ['src/app.js']);
+  await f.agent.respond(f.agent.state.approvals[0].id, { decision: 'decline' });
+  assert.equal((await fileAsk).behavior, 'deny');
+  await f.agent.interrupt();
+  await f.agent.chooseModel('fixture-model');
+  let closed = false;
+  f.agent.transport.q.close = () => { closed = true; f.stream.end(); };
+  f.agent.openNative = async () => { throw new Error('effort restart failed'); };
+  await assert.rejects(f.agent.chooseEffort('low'), /effort restart failed/);
+  assert.equal(closed, true);
+  assert.equal(f.agent.transport, null);
+});
+
+test('ACP non-destructive model error keeps connection ready and clearing effort resets to default', async t => {
+  const { agent, peer } = await acp(t, 'grok');
+  agent.state.models = [{ model: 'fixture', name: 'Fixture', efforts: [{ reasoningEffort: 'high' }] }];
+  agent.state.effort = 'high';
+  await agent.chooseEffort('');
+  assert.equal(agent.state.effort, null);
+  assert.equal(agent.state.connection, 'ready');
+  agent.active.conn.request = async () => { throw new Error('model rejected'); };
+  await assert.rejects(agent.chooseModel('fixture'), /model rejected/);
+  assert.equal(agent.state.connection, 'ready');
+  assert.equal(peer.calls.some(c => c.method === 'session/prompt'), false);
+});

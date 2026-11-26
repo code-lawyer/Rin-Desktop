@@ -14,7 +14,7 @@ const { isCliAgent, isStoredCliAgent } = catalog;
 
 export const { DEFAULT_SHORTCUTS, DEFAULT_REMOTE_KEYS } = actions;
 const { DEFAULT_CHARACTER, characterProfile, isQwenVoice, isChineseVoice } = characters;
-const defaults = () => ({ format: 1, projects: [], drafts: {}, settings: { character: DEFAULT_CHARACTER, wallpaperKind: 'artwork', animePlayback: 'poses', completionSound: true, ttsResident: false, ttsEngine: 'qwen', qwenVoice: 'Serena', qwenRoot: '', autoSpeak: false, prepareSpeech: false, voice: 3, speed: 1, microphone: '', shortcuts: { ...DEFAULT_SHORTCUTS }, remoteEnabled: false, remoteKeys: { ...DEFAULT_REMOTE_KEYS } } });
+const defaults = () => ({ format: 1, projects: [], drafts: {}, settings: { character: DEFAULT_CHARACTER, wallpaperKind: 'artwork', animePlayback: 'poses', theme: 'system', completionSound: true, ttsResident: false, ttsEngine: 'qwen', qwenVoice: 'Serena', qwenRoot: '', autoSpeak: false, prepareSpeech: false, voice: 3, speed: 1, microphone: '', shortcuts: { ...DEFAULT_SHORTCUTS }, remoteEnabled: false, remoteKeys: { ...DEFAULT_REMOTE_KEYS } } });
 export const draftKey = target => {
   if (!target || typeof target.cwd !== 'string') throw new Error('草稿目标无效。');
   const provider = target?.provider ?? 'codex';
@@ -90,6 +90,7 @@ export class WorkspaceStore {
       const profile = characterProfile(this.data.settings.wallpaperMotion ? DEFAULT_CHARACTER : saved.settings?.character);
       this.data.settings.character = profile.id;
       this.data.settings.rc003 = remoteSettings(saved.settings?.rc003);
+      if (!['system', 'dark', 'light'].includes(saved.settings?.theme)) this.data.settings.theme = 'system';
       if (!isQwenVoice(saved.settings?.qwenVoice)) this.data.settings.qwenVoice = profile.qwenVoice;
       if (!isChineseVoice(saved.settings?.voice)) this.data.settings.voice = profile.voice;
     } catch (error) { if (error.code !== 'ENOENT') throw new Error(`工作台记录未能读取，原文件已保留：${error.message}`); }
@@ -97,14 +98,17 @@ export class WorkspaceStore {
   }
   snapshot() { return structuredClone({ projects: this.data.projects, settings: this.data.settings }); }
   transaction(change) {
-    this.queue = this.queue.catch(() => {}).then(async () => {
+    // Keep this.queue as an always-fulfilled serialization barrier so an
+    // earlier validation or disk failure cannot poison later drain/quit checks.
+    const run = this.queue.then(async () => {
       const next = structuredClone(this.data);
       const result = await change(next);
       await writeJson(this.file, next, this.io);
       this.data = next;
       return structuredClone(result);
     });
-    return this.queue;
+    this.queue = run.then(() => {}, () => {});
+    return run;
   }
   async add(cwd) {
     if (typeof cwd !== 'string' || !cwd.trim()) throw new Error('请选择项目文件夹。');
@@ -176,7 +180,7 @@ export class WorkspaceStore {
   }
   prepareSettings(patch) {
     const ready = Promise.withResolvers();
-    this.queue = this.queue.catch(() => {}).then(async () => {
+    const task = this.queue.then(async () => {
       const next = structuredClone(this.data);
       this.applySettings(next, patch);
       const staged = await prepareJson(this.file, next, this.io);
@@ -189,13 +193,15 @@ export class WorkspaceStore {
       } });
       if (!await finished.promise) await staged.discard();
     });
-    this.queue.catch(ready.reject);
+    this.queue = task.then(() => {}, () => {});
+    task.catch(ready.reject);
     return ready.promise;
   }
   applySettings(data, patch) {
     const next = data.settings;
     const wallpaper = wallpaperChoices.wallpaperChoice(patch, next);
     Object.assign(next, stills.validateStillPatch(patch), wallpaper);
+    if ('theme' in patch) { if (!['system', 'dark', 'light'].includes(patch.theme)) throw new Error('界面主题无效。'); next.theme = patch.theme; }
     if ('rc003' in patch) next.rc003 = remoteSettings(patch.rc003);
     if ('completionSound' in patch) { if (typeof patch.completionSound !== 'boolean') throw new Error('提示音开关无效。'); next.completionSound = patch.completionSound; }
     if ('playbackVolume' in patch) { if (!Number.isFinite(patch.playbackVolume) || patch.playbackVolume < 0 || patch.playbackVolume > 1) throw new Error('播报音量应在 0–100% 之间。'); next.playbackVolume = patch.playbackVolume; }

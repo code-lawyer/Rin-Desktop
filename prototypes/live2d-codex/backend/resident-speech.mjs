@@ -98,7 +98,10 @@ export class ResidentSpeech extends EventEmitter {
 }
 
 class KokoroResident {
-  constructor(models, executable) { this.service = new LocalSpeech(models, { executable, retainTts: true }); }
+  constructor(models, executable) {
+    this.service = new LocalSpeech(models, { executable, retainTts: true });
+    this.service.onTtsExit = error => this.onExit?.(error);
+  }
   load() { return this.service.run('load-tts', {}); }
   synthesize(text, settings) { return this.service.synthesize(text, settings); }
   cancel() { return this.service.cancelTts(); }

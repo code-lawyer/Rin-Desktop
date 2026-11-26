@@ -2,7 +2,7 @@
 <html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'"><title>Rin Desktop · 工作台</title><link rel="stylesheet" href="app://local/renderer/workbench.css"><link rel="stylesheet" href="app://local/renderer/remote-focus.css"></head>
 <body>
 <header class="titlebar"><button id="toggle-sidebar" class="icon" aria-label="打开项目导航" aria-expanded="false" aria-controls="workbench-sidebar"><svg class="ui-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M3 5h14M3 10h14M3 15h14"/></svg></button><span class="brand">Rin Desktop</span><span class="title-sub">工作台</span><div class="window-actions"><button id="back-chat">回到对话</button><button id="close" class="close" aria-label="收起工作台"><svg class="ui-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="m5 5 10 10M15 5 5 15"/></svg></button></div></header>
-<div id="notice" role="alert" hidden></div>
+<div id="notice" role="alert" hidden><span id="notice-text"></span><button id="notice-close" class="icon" type="button" aria-label="关闭提示"><svg class="ui-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="m5 5 10 10M15 5 5 15"/></svg></button></div>
 <div class="layout">
   <button id="sidebar-backdrop" aria-label="关闭项目导航" tabindex="-1"></button>
   <aside id="workbench-sidebar" class="sidebar" aria-label="项目导航">
@@ -23,8 +23,8 @@
         <section class="detail-pane" aria-label="所选对话"><div id="empty-detail" class="empty"><h3>从这里接着聊</h3><p>选择一段对话查看历史，或在当前项目开始新对话。文件与会话保留在本机。</p></div><div id="detail" hidden><div class="detail-heading"><input id="thread-title" maxlength="100" aria-label="对话名称"><button id="rename" class="quiet">重命名</button></div><div class="detail-actions"><span id="thread-info"></span><button id="resume" class="primary">继续这段对话</button></div><button id="more-history" class="load-more" hidden>查看更早的消息</button><div id="history"></div></div></section></div>
     </section>
     <section id="settings" class="page settings" hidden>
-      <div class="page-heading"><div><h2>壁纸与设置</h2></div><span id="settings-save-status" role="status"></span><button id="save-settings" class="primary" hidden>保存更改</button></div>
-      <nav class="settings-nav" aria-label="设置分类"><button type="button" data-setting-target="wallpaper-settings" aria-pressed="true">壁纸</button><button type="button" data-setting-target="remote-settings" aria-pressed="false">遥控器</button><button type="button" data-setting-target="playback-settings" aria-pressed="false">声音与听写</button><button type="button" data-setting-target="conversation-settings" aria-pressed="false">对话</button><button type="button" data-setting-target="agent-settings" aria-pressed="false">Agent</button><button type="button" data-setting-target="shortcut-settings" aria-pressed="false">键盘</button><button type="button" data-setting-target="data-settings" aria-pressed="false">数据</button></nav>
+      <div class="page-heading"><div><h2>壁纸与设置</h2></div><span id="settings-save-status" role="status"></span><button id="discard-settings" class="quiet" type="button" hidden>放弃更改</button><button id="save-settings" class="primary" hidden>保存更改</button></div>
+      <nav class="settings-nav" role="tablist" aria-label="设置分类"><button type="button" role="tab" data-setting-target="wallpaper-settings" aria-selected="true">壁纸</button><button type="button" role="tab" data-setting-target="agent-settings" aria-selected="false">Agent</button><button type="button" role="tab" data-setting-target="playback-settings" aria-selected="false">声音与听写</button><button type="button" role="tab" data-setting-target="conversation-settings" aria-selected="false">对话</button><button type="button" role="tab" data-setting-target="shortcut-settings" aria-selected="false">键盘</button><button type="button" role="tab" data-setting-target="remote-settings" aria-selected="false">遥控器</button><button type="button" role="tab" data-setting-target="data-settings" aria-selected="false">数据</button></nav>
       <div class="settings-scroll">
       <section class="setting-section" id="wallpaper-settings" data-settings-group="wallpaper" aria-labelledby="wallpaper-heading">
         <h3 id="wallpaper-heading">壁纸风格</h3>
@@ -36,7 +36,7 @@
         <p id="character-help" class="hint">壁纸风格自动保存，朗读声线独立设置。</p>
         <p id="character-status" class="hint" role="status" aria-live="polite"></p>
         <button id="retry-character" aria-describedby="character-status" hidden>重试加载</button>
-        <div class="field-grid still-controls"><label>陪伴状态<select id="still-pose"><option value="auto">自动 · 随工作与对话切换</option><option value="work">专注工作</option><option value="cup">持杯休息</option><option value="thinking">托腮思考</option><option value="window">看向窗外</option><option value="attention">看向你</option></select></label><button id="pause-stills" aria-pressed="false">暂停壁纸与环境音</button></div>
+        <div class="still-controls"><label>陪伴状态<select id="still-pose"><option value="auto">自动 · 随工作与对话切换</option><option value="work">专注工作</option><option value="cup">持杯休息</option><option value="thinking">托腮思考</option><option value="window">看向窗外</option><option value="attention">看向你</option></select></label><label>界面主题<select id="ui-theme"><option value="system">跟随系统</option><option value="dark">雨夜深色</option><option value="light">晨雾浅色</option></select></label><button id="pause-stills" aria-pressed="false">暂停壁纸与环境音</button></div>
         <p id="still-status" class="hint" role="status" aria-live="polite"></p>
         <div id="still-previews" class="still-previews" role="group" aria-label="预览人物姿态"></div>
         <p id="still-help" class="hint">选择陪伴状态可调整朝向；选择“自动”随工作与对话变化。</p>
@@ -44,7 +44,7 @@
       <section class="setting-section" id="ambience-settings" data-settings-group="wallpaper" aria-labelledby="ambience-heading">
         <h3 id="ambience-heading">窗边环境音</h3>
         <label class="check"><input id="ambience-enabled" type="checkbox">开启小雨与轻敲键盘</label>
-        <div class="field-grid ambience-levels"><label for="rain-volume">窗外小雨 <output id="rain-volume-label">12%</output><input id="rain-volume" type="range" min="0" max="100" step="1" value="12"></label><label for="key-volume">轻敲键盘 <output id="key-volume-label">8%</output><input id="key-volume" type="range" min="0" max="100" step="1" value="8"></label></div>
+        <div class="field-grid ambience-levels"><div class="range-field"><div class="range-header"><label for="rain-volume">窗外小雨</label><output id="rain-volume-label" for="rain-volume">12%</output></div><input id="rain-volume" type="range" min="0" max="100" step="1" value="12"></div><div class="range-field"><div class="range-header"><label for="key-volume">轻敲键盘</label><output id="key-volume-label" for="key-volume">8%</output></div><input id="key-volume" type="range" min="0" max="100" step="1" value="8"></div></div>
         <p class="hint">轻敲只在专注工作时出现，句间留白。听写时静音，朗读时压低小雨并停止键盘声；与播报音量独立。这里的调整自动保存。</p>
         <p id="ambience-status" class="hint" role="status" aria-live="polite"></p><button id="retry-ambience" hidden>重试加载环境音</button>
       </section>
@@ -55,7 +55,7 @@
         <p id="tts-error" class="tts-error" role="alert" hidden></p><button id="retry-tts" hidden>重新加载</button>
         <div class="field-grid"><label>播报引擎<select id="tts-engine"><option value="qwen">Qwen3-TTS · 试用</option><option value="kokoro">Kokoro · 原有轻量版</option></select></label><label id="qwen-voice-field">中文声线<select id="qwen-voice"></select></label></div>
         <div id="kokoro-fields" class="field-grid" hidden><label>中文声线<select id="voice"><option value="3">女声 01 · zf_001</option><option value="4">女声 02 · zf_002</option><option value="46">女声 43 · zf_079</option><option value="48">女声 45 · zf_084</option><option value="58">男声 01 · zm_009</option><option value="59">男声 02 · zm_010</option></select></label><label>语速<select id="speed"><option value="0.9">稍慢 · 0.9×</option><option value="1">自然 · 1.0×</option><option value="1.1">稍快 · 1.1×</option></select></label></div>
-        <div class="setting-row narration-choice"><label class="check"><input id="auto-speak" type="checkbox">自动朗读完整回复</label><button id="preview-voice">保存并试听</button></div>
+        <div class="setting-row narration-choice"><label class="check"><input id="auto-speak" type="checkbox">自动朗读完整回复</label><button id="preview-voice">试听声线</button></div>
         <details class="setting-details"><summary>准备方式与资源占用</summary><label class="check"><input id="prepare-speech" type="checkbox">回复完成后提前准备语音</label><p class="hint">提前准备会占用算力，但不会自动发声。长回复需要更久；停止朗读、切换对话或开始听写会取消待播放内容。</p><p id="tts-footprint" class="hint"></p></details>
       </section>
       <section class="setting-section" id="dictation-settings" data-settings-group="voice" hidden><h3>语音听写</h3><p id="model-status" class="hint"></p><div class="microphone-source"><strong>遥控器麦克风</strong><p id="remote-microphone-status" class="hint" role="status" aria-live="polite">遥控器麦克风未连接</p></div><label>电脑麦克风<select id="microphone"><option value="">系统默认麦克风</option></select></label><div class="setting-row"><p class="hint">用于「电脑听写」。按一下开始，再按一下结束；最长 60 秒。</p><button id="refresh-microphones">刷新设备</button></div></section>

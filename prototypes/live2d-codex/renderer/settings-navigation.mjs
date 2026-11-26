@@ -9,15 +9,26 @@ export function installSettingsNavigation(document) {
     for (const section of sections) section.hidden = section.dataset.settingsGroup !== group;
     for (const button of buttons) {
       const selected = document.getElementById(button.dataset.settingTarget)?.dataset.settingsGroup === group;
-      button.setAttribute('aria-pressed', String(selected));
+      button.setAttribute('aria-selected', String(selected));
       button.setAttribute('aria-controls', button.dataset.settingTarget);
       if (selected) selectedButton = button;
     }
     target.scrollIntoView({ block: 'start' });
     // Keep a focusable navigation anchor: headings are outside the remote's
     // control order and would send the next direction back to the title bar.
-    if (focus) selectedButton?.focus({preventScroll:true});
+    if (focus) selectedButton?.focus({ preventScroll: true });
   }
-  for (const button of buttons) button.onclick = () => show(button.dataset.settingTarget, {focus:true});
+  for (const button of buttons) {
+    button.onclick = () => show(button.dataset.settingTarget, { focus: true });
+    button.addEventListener?.('keydown', event => {
+      if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+      event.preventDefault();
+      const index = buttons.indexOf(button);
+      const nextIndex = event.key === 'Home' ? 0 : event.key === 'End' ? buttons.length - 1
+        : (index + (event.key === 'ArrowRight' ? 1 : -1) + buttons.length) % buttons.length;
+      const next = buttons[nextIndex];
+      if (next) show(next.dataset.settingTarget, { focus: true });
+    });
+  }
   return { show };
 }

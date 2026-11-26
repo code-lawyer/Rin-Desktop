@@ -91,6 +91,7 @@ export function installSpeech({ api, state, insert, error, measure, isBusy = () 
     if (narration?.playRequested && narration.turnId) api.settleReplySpeech?.(narration.turnId);
     playGeneration++; pendingCompletion = null; narration?.modelReady?.(); narration = null; readRequested = false;
     audioSource?.stop(); audioSource?.disconnect?.(); audioSource = null; finishPlayback?.(); finishPlayback = null;
+    audioContext?.suspend?.().catch?.(() => {});
     api.playbackState?.(false);
     const drained = audio.cancel();
     $('stop-speech').hidden = true; playbackLabel(''); updateControls();
@@ -137,7 +138,7 @@ export function installSpeech({ api, state, insert, error, measure, isBusy = () 
         if (generation !== playGeneration) return;
         audioSource?.disconnect?.(); audioSource = null; finishPlayback = null;
       } catch(e) { if (generation === playGeneration && e.name !== 'AbortError') error(e.message); }
-      finally { if (generation === playGeneration) { stopMouth(); api.playbackState?.(false); narration = null; $('stop-speech').hidden = true; playbackLabel(!session.playRequested && audio.has(key) ? '已就绪' : ''); updateControls(); } }
+      finally { if (generation === playGeneration) { stopMouth(); audioContext?.suspend?.().catch?.(() => {}); api.playbackState?.(false); narration = null; $('stop-speech').hidden = true; playbackLabel(!session.playRequested && audio.has(key) ? '已就绪' : ''); updateControls(); } }
     })();
     return session.promise;
   }
@@ -250,7 +251,7 @@ export function installSpeech({ api, state, insert, error, measure, isBusy = () 
     refresh();
   }
   api.onWorkspace(workspace); api.workspace().then(r => { if (r.ok) workspace(r.value); });
-  window.addEventListener('beforeunload',() => { stream?.getTracks().forEach(t => t.stop()); api.capture(null); api.stopSpeech(); });
+  window.addEventListener('beforeunload',() => { stream?.getTracks().forEach(t => t.stop()); audioContext?.close?.().catch?.(() => {}); api.capture(null); api.stopSpeech(); });
   document.addEventListener('keydown',event => { if (event.key === 'Escape' && (recording || starting)) { event.stopImmediatePropagation(); event.preventDefault(); cancel(); } },true);
   return { isCapturing: () => recording || starting || recognizing || remoteBusy, refresh,
     cancelCapture: cancel,

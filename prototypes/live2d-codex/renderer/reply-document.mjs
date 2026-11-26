@@ -1,8 +1,10 @@
 import { marked } from 'marked';
 
 export function webLink(href) {
-  try { const url = new URL(href); return ['http:', 'https:'].includes(url.protocol) ? url.href : null; }
-  catch { return null; }
+  try {
+    const url = new URL(href);
+    return ['http:', 'https:'].includes(url.protocol) && !url.username && !url.password ? url.href : null;
+  } catch { return null; }
 }
 
 // Only the lexer is used. Model HTML never enters an HTML parser or innerHTML.
@@ -18,9 +20,14 @@ export function renderReply(host, source, onLink = () => {}) {
       else if (token.type === 'br') child = node('br');
       else if (token.type === 'link') {
         const url = webLink(token.href);
-        child = node(url ? 'a' : 'span'); child.title = token.title ?? token.href;
+        child = node(url ? 'a' : 'span');
+        child.title = url ? (token.title ? `${url}\n${token.title}` : url) : (token.title ?? token.href);
         child.className = url ? 'reply-link' : 'reply-reference'; inline(child, token.tokens);
-        if (url) { child.href = url; child.addEventListener('click', event => { event.preventDefault(); onLink(url); }); }
+        if (url) {
+          child.href = url;
+          child.addEventListener('click', event => { event.preventDefault(); onLink(url); });
+          child.addEventListener('auxclick', event => { if (event.button === 1) { event.preventDefault(); onLink(url); } });
+        }
       } else if (token.type === 'image') { child = node('span', token.text || token.href); child.title = token.href; child.className = 'reply-reference'; }
       else if (token.tokens) { inline(parent, token.tokens); continue; }
       else { text(parent, token.type === 'html' ? token.raw : token.text ?? token.raw); continue; }

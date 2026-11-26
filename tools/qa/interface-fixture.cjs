@@ -197,13 +197,15 @@ if(process.argv.includes('--video') || process.argv.includes('--fixture-video'))
     assert.equal(await evaluate(workbench,`document.activeElement.dataset.threadId`),'fixture-first','conversation selection retains remote focus');
     await evaluate(workbench,`interfaceFixture.emit('remoteAction','down')`);
     assert.equal(await evaluate(workbench,`document.activeElement.dataset.threadId`),'fixture-second','next direction continues to the next conversation');
-    const categories=await evaluate(workbench,`(() => {document.getElementById('settings-tab').click();const speed=document.getElementById('speed');speed.value='1.1';speed.dispatchEvent(new Event('change',{bubbles:true}));return [...document.querySelectorAll('[data-setting-target]')].map(button=>button.dataset.settingTarget);})()`);
+    const categories=await evaluate(workbench,`(() => {document.getElementById('settings-tab').click();const speed=document.getElementById('speed');speed.value='1.1';speed.dispatchEvent(new Event('change',{bubbles:true}));const shortcut=document.querySelector('#shortcuts input[data-action="chat"]');shortcut.dispatchEvent(new KeyboardEvent('keydown',{key:'k',ctrlKey:true,altKey:true,bubbles:true}));return [...document.querySelectorAll('[data-setting-target]')].map(button=>button.dataset.settingTarget);})()`);
     for(const id of categories) {
       await evaluate(workbench,`document.querySelector('[data-setting-target="${id}"]').focus();interfaceFixture.emit('remoteAction','confirm')`);
       assert.equal(await evaluate(workbench,`document.activeElement.dataset.settingTarget`),id,'category retains remote navigation focus');
       assert.equal(await evaluate(workbench,`document.getElementById('${id}').hidden`),false,'selected category is visible');
     }
-    assert.equal(await evaluate(workbench,`document.getElementById('speed').value`),'1.1','category navigation preserves unsaved input');
+    assert.equal(await evaluate(workbench,`document.getElementById('speed').value`),'1.1','speed auto-saves without losing value');
+    assert.equal(await evaluate(workbench,`document.querySelector('#shortcuts input[data-action="chat"]').value`),'Control+Alt+K','category navigation preserves unsaved shortcut input');
+    await evaluate(workbench,`document.getElementById('discard-settings').click()`);
     await evaluate(workbench,`document.querySelector('[data-setting-target="playback-settings"]').focus();interfaceFixture.emit('remoteAction','confirm');interfaceFixture.emit('remoteAction','down')`);
     assert.equal(await evaluate(workbench,`document.activeElement.dataset.settingTarget`),'conversation-settings','direction after category confirmation continues through controls');
     checks.push('remote-project-thread-and-category-focus');

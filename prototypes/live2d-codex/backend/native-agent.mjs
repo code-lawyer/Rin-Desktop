@@ -219,7 +219,7 @@ export class NativeAgent extends EventEmitter {
     if (answer?.decision === 'cancel') return this.interrupt();
     pending.finish(pending.convert(answer));
   }
-  async configure(action, { validate, allowDisconnected = false, disposeOnError = false } = {}) {
+  async configure(action, { validate, allowDisconnected = false, disposeOnError = false, connectionError = disposeOnError } = {}) {
     if (!allowDisconnected) this.idle();
     else if (this.busy) throw new Error('请先停止当前任务。');
     const operation = this.lifecycle.begin(), previous = this.snapshot();
@@ -234,7 +234,8 @@ export class NativeAgent extends EventEmitter {
       if (this.closed || validated && disposeOnError) await this.disposeNative().catch(() => {});
       if (!this.closed) {
         if (!validated) this.state = previous;
-        else this.report(error, { connection: true });
+        else if (connectionError) this.report(error, { connection: true });
+        else { this.state.status = 'idle'; this.state.error = safeError(error); }
       }
       throw error;
     } finally { operation.release(); this.changed(); }

@@ -7,6 +7,7 @@ import { releaseVersion, requireFreshDirectory, reserveFreshDirectory } from '..
 import { inspectMotionAssets, copyMotionAssets } from '../../../tools/release/motion-assets.mjs';
 import { inspectPuppetAssets, copyPuppetAssets } from '../../../tools/release/puppet-assets.mjs';
 import { retiredWallpaperAsset, sourceAvatarAsset } from '../../../tools/release/resource-assets.mjs';
+import { flipElectronFuses } from '../../../tools/release/electron-fuses.mjs';
 import { copyAgentDependencies } from './copy-agent-dependencies.mjs';
 import catalog from '../backend/agent-catalog.cjs';
 import characters from '../backend/character-profiles.cjs';
@@ -28,6 +29,7 @@ await reserveFreshDirectory(output);
 const appDir = join(output,'resources/app'); await mkdir(appDir,{recursive:true});
 await cp(join(root,'node_modules/electron/dist'),output,{recursive:true,filter:src=>!src.endsWith('electron.exe')});
 await cp(join(root,'node_modules/electron/dist/electron.exe'),join(output,'VibeVoice.exe'));
+await flipElectronFuses(join(output,'VibeVoice.exe'));
 for (const file of ['main.cjs','preload.cjs','voice-resources.json']) await cp(join(root,file),join(appDir,file));
 for (const dir of ['backend','renderer','dist']) await cp(join(root,dir),join(appDir,dir),{
   recursive:true,
@@ -37,7 +39,7 @@ for (const dir of ['backend','renderer','dist']) await cp(join(root,dir),join(ap
 await mkdir(join(appDir,'runtime'),{recursive:true});
 await cp(await buildRemoteHelper(join(root,'native/rc003-helper.cs'),join(workspace,'work/build/remote')),join(appDir,'runtime/rc003-helper.exe'));
 await cp(join(resources,'runtime/node.exe'),join(appDir,'runtime/node.exe'));
-for (const name of ['character-previews','stills','ambience']) await cp(join(root,'assets',name),join(appDir,'assets',name),{
+for (const name of ['ambience']) await cp(join(root,'assets',name),join(appDir,'assets',name),{
   recursive:true, filter:source=>!retiredWallpaperAsset(relative(join(root,'assets'),source)),
 });
 await copyMotionAssets(motionDirectory, join(appDir, 'assets/motion/female'));

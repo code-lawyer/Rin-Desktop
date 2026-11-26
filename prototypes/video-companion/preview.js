@@ -64,6 +64,6 @@ el('run-tests').addEventListener('click', async () => {
 });
 el('cancel-tests').addEventListener('click', () => testController?.abort());
 document.addEventListener('visibilitychange', () => player.setSuspended(document.hidden));
-window.addEventListener('pagehide', () => { testController?.abort(); player.close(); });
-setInterval(() => render(), 250);
+const refreshTimer = setInterval(() => render(), 250);
+window.addEventListener('pagehide', () => { clearInterval(refreshTimer); testController?.abort(); player.close(); });
 player.setSuspended(document.hidden); initialize();

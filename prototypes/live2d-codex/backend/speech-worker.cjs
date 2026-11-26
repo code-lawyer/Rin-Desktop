@@ -2,6 +2,7 @@ const { join } = require('node:path');
 const sherpa = require('sherpa-onnx-node');
 let recognizer, tts;
 const models = process.argv[2];
+process.on('disconnect', () => process.exit(0));
 process.on('message', async ({ id, kind, data }) => {
   try {
     let result;

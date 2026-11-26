@@ -225,9 +225,17 @@ export class AcpCompanion extends NativeAgent {
   async chooseEffort(effort) {
     const model = this.state.models.find(m => m.model === this.state.model);
     if (effort && !model?.efforts?.some(e => e.reasoningEffort === effort)) throw new Error('当前模型不支持此推理强度。');
-    if (!effort) return;
     return this.configure(async () => {
       const option = this.configOptions?.find(o => o.category === 'thought_level');
+      if (!effort) {
+        const fallback = option?.defaultValue;
+        if (fallback && option) {
+          const result = await deadline(this.active.conn.setSessionConfigOption({ sessionId: this.state.threadId, configId: option.id, value: fallback }), 30000, '推理强度切换');
+          this.models(result);
+        }
+        this.state.effort = null;
+        return;
+      }
       const result = await deadline(this.active.conn.setSessionConfigOption({ sessionId: this.state.threadId, configId: option?.id || 'reasoning_effort', value: effort }), 30000, '推理强度切换');
       this.models(result); this.state.effort = effort;
     });

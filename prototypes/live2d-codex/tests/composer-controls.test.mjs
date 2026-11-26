@@ -63,10 +63,12 @@ test('one remote confirmation sends a draft; clear, undo and reading work withou
 });
 test('settings categories hide unrelated sections without recreating edited inputs',()=>{
   const sections=[{id:'wall',dataset:{settingsGroup:'wall'}},{id:'voice',dataset:{settingsGroup:'voice'},input:{value:'unsaved'}},{id:'models',dataset:{settingsGroup:'voice'}}].map(section=>({...section,scrollIntoView(){},querySelector:()=>null}));
-  const buttons=['wall','voice'].map(id=>({dataset:{settingTarget:id},attributes:{},setAttribute(key,value){this.attributes[key]=value;}}));
+  const buttons=['wall','voice'].map(id=>({dataset:{settingTarget:id},attributes:{},listeners:{},setAttribute(key,value){this.attributes[key]=value;},addEventListener(name,fn){this.listeners[name]=fn;},focus(){this.focused=true;}}));
   const navigation=installSettingsNavigation({querySelectorAll:selector=>selector==='[data-setting-target]'?buttons:sections,getElementById:id=>sections.find(s=>s.id===id)});
-  navigation.show('voice');assert.deepEqual(sections.map(s=>s.hidden),[true,false,false]);assert.equal(buttons[1].attributes['aria-pressed'],'true');
+  navigation.show('voice');assert.deepEqual(sections.map(s=>s.hidden),[true,false,false]);assert.equal(buttons[1].attributes['aria-selected'],'true');assert.equal(buttons[0].attributes['aria-selected'],'false');
   navigation.show('wall');assert.equal(sections[1].input.value,'unsaved');assert.deepEqual(sections.map(s=>s.hidden),[false,true,true]);
+  let prevented=false;buttons[0].listeners.keydown({key:'ArrowRight',preventDefault(){prevented=true;}});
+  assert.equal(prevented,true);assert.equal(buttons[1].attributes['aria-selected'],'true');assert.equal(buttons[1].focused,true);
 });
 test('confirming a settings category keeps focus in the remote control order',()=>{
   let focused;

@@ -38,14 +38,21 @@ module.exports = async function (fixture) {
   await control('pause',false);
   await delay(300);await capture(wallpaper,'anime-original');await capture(workbench,'wallpaper-options');
   const savedEngine = store.data.settings.ttsEngine;
+  const savedShortcut = store.data.settings.shortcuts.chat;
   await save({ttsEngine:'kokoro'});
   await js(workbench, `(() => {
     document.querySelector('[data-setting-target="playback-settings"]').click();
     const voice = document.getElementById('voice'); voice.value = '59';
     voice.dispatchEvent(new Event('change', { bubbles: true }));
+    document.querySelector('[data-setting-target="shortcut-settings"]').click();
+    const chatKey = document.querySelector('#shortcuts input[data-action="chat"]');
+    chatKey.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true, altKey: true, bubbles: true }));
     document.querySelector('[data-setting-target="wallpaper-settings"]').click();
   })()`);
-  const draftVoice = "document.getElementById('voice').value==='59' && !document.getElementById('save-settings').hidden";
+  await until(workbench, "document.getElementById('settings-save-status').textContent==='已自动保存' || document.getElementById('save-settings').hidden===false");
+  for (let i = 0; i < 40 && store.data.settings.voice !== 59; i++) await delay(25);
+  assert.equal(store.data.settings.voice, 59);
+  const draftShortcut = "document.querySelector('#shortcuts input[data-action=\"chat\"]').value==='Control+Alt+K' && !document.getElementById('save-settings').hidden";
   await style('realistic');
   await rig('motion');
   await until(workbench, "document.getElementById('still-previews').children.length===2");
@@ -61,7 +68,7 @@ module.exports = async function (fixture) {
   checks.push('realistic style decodes actual videos with two states; pause freezes playback and resume restarts it');
   await save({wallpaperMotion:false,animePlayback:'video',stillPose:'window'});await rig('scene');await pose('window');
   await until(workbench, "document.getElementById('still-previews').children.length===5");
-  assert.equal(await js(workbench, draftVoice), true);
+  assert.equal(await js(workbench, draftShortcut), true);
   assert.equal(store.data.settings.wallpaperMotion,false);assert.equal(store.data.settings.animePlayback,'poses');
   assert.equal(await js(wallpaper,"document.querySelectorAll('.wallpaper-anime,video').length"),0);
   assert.equal((await js(workbench,"companion.wallpaperControl('video-action','nod')")).ok,false);
@@ -78,13 +85,13 @@ module.exports = async function (fixture) {
   await js(workbench, "document.getElementById('retry-character').click()");
   await animeMale(); await pose('window');
   assert.equal(await selectedStyle(), 'anime-male');
-  assert.equal(store.data.settings.qwenVoice, 'Vivian'); assert.equal(store.data.settings.voice, 48);
-  assert.equal(await js(workbench, draftVoice), true);
+  assert.equal(store.data.settings.qwenVoice, 'Vivian'); assert.equal(store.data.settings.voice, 59);
+  assert.equal(await js(workbench, draftShortcut), true);
   await js(workbench, "document.getElementById('save-settings').click()");
   await until(workbench, "document.getElementById('save-settings').hidden");
-  assert.equal(store.data.settings.voice, 59);
-  await save({voice:48,ttsEngine:savedEngine});
-  checks.push('deferred Kokoro voice remains editable and saves after all three styles switch; pose choices track the committed style');
+  assert.equal(store.data.settings.shortcuts.chat, 'Control+Alt+K');
+  await save({voice:48,ttsEngine:savedEngine,shortcuts:{...store.data.settings.shortcuts,chat:savedShortcut}});
+  checks.push('Kokoro voice saves immediately and deferred shortcuts remain editable across all three style switches; pose choices track the committed style');
   checks.push('a failed male texture retains the accepted original female scene; Retry loads the male pack without changing either voice');
 
   for (const id of ['attention', 'cup', 'thinking', 'window', 'work']) {

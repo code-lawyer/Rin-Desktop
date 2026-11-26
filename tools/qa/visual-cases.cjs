@@ -174,8 +174,14 @@ module.exports=async function visualCases({open,evaluate,delay,output,extended=f
   await evaluate(workbench,`document.querySelector('[data-setting-target="wallpaper-settings"]').click();document.querySelector('[name="wallpaper-style"]').focus();interfaceFixture.emit('remoteAction','down')`);
   await capture(workbench,'character-focus',1120,760);
   await verify(workbench,'an unchanged wallpaper page has no save button',"document.getElementById('save-settings').hidden");
-  await evaluate(workbench,`document.querySelector('[data-setting-target="playback-settings"]').click();const speed=document.getElementById('speed');speed.value='1.1';speed.dispatchEvent(new Event('change',{bubbles:true}));`);
-  await verify(workbench,'editing a deferred setting exposes save',"!document.getElementById('save-settings').hidden");
+  await evaluate(workbench,`(() => {document.querySelector('[data-setting-target="playback-settings"]').click();const speed=document.getElementById('speed');speed.value='1.1';speed.dispatchEvent(new Event('change',{bubbles:true}));})()`);
+  await delay(60);
+  await verify(workbench,'voice speed saves immediately without exposing manual save',"document.getElementById('save-settings').hidden && document.getElementById('speed').value==='1.1'");
+  await evaluate(workbench,`(() => {document.querySelector('[data-setting-target="shortcut-settings"]').click();const input=document.querySelector('#shortcuts input[data-action="chat"]');input.dispatchEvent(new KeyboardEvent('keydown',{key:'k',ctrlKey:true,altKey:true,bubbles:true}));})()`);
+  await verify(workbench,'editing a shortcut exposes save and discard',"!document.getElementById('save-settings').hidden && !document.getElementById('discard-settings').hidden");
+  await evaluate(workbench,"document.getElementById('discard-settings').click()");
+  await verify(workbench,'discarding restores saved shortcuts and hides save',"document.getElementById('save-settings').hidden && document.querySelector('#shortcuts input[data-action=\"chat\"]').value==='Control+Alt+Space'");
+  await evaluate(workbench,`(() => {const input=document.querySelector('#shortcuts input[data-action="chat"]');input.dispatchEvent(new KeyboardEvent('keydown',{key:'m',ctrlKey:true,altKey:true,bubbles:true}));})()`);
   await evaluate(workbench,"document.getElementById('save-settings').click()");
   await wait(workbench,"document.getElementById('save-settings').hidden");
   await verify(workbench,'save confirmation is inline and leaves the workbench unobstructed',
@@ -209,7 +215,7 @@ module.exports=async function visualCases({open,evaluate,delay,output,extended=f
   await capture(workbench,'realistic-settings-standard',1120,760);
   await capture(workbench,'realistic-settings-compact',760,540);
   await reachable(workbench,'both realistic orientations remain reachable',['#still-previews button:first-child','#still-previews button:last-child','#still-pose']);
-  const wallpaperStyles=await evaluate(workbench,`(()=>{
+  const measureWallpaperContrast = () => evaluate(workbench,`(()=>{
     const rgb=s=>(s.match(/[\\d.]+/g)||[]).map(Number);
     const luminance=values=>values.slice(0,3).map(v=>{v/=255;return v<=.04045?v/12.92:((v+.055)/1.055)**2.4;}).reduce((a,v,i)=>a+v*[.2126,.7152,.0722][i],0);
     return [...document.querySelectorAll('#wallpaper-heading,#character-help,#character-status,.character-caption strong,.character-caption > span')].map(el=>{
@@ -219,7 +225,22 @@ module.exports=async function visualCases({open,evaluate,delay,output,extended=f
       return {text:el.textContent.trim(),fontSize:style.fontSize,fontWeight:style.fontWeight,color:style.color,background,contrast:(Math.max(foreground,back)+.05)/(Math.min(foreground,back)+.05)};
     });
   })()`);
-  for(const entry of wallpaperStyles)if(entry.contrast<4.5)failures.push({name:'wallpaper text contrast',...entry});
+  await evaluate(workbench,`(() => {const theme=document.getElementById('ui-theme');theme.value='light';theme.dispatchEvent(new Event('change',{bubbles:true}));})()`);
+  await delay(80);
+  await capture(workbench,'wallpaper-settings-light',1120,760);
+  const wallpaperStyles=await measureWallpaperContrast();
+  for(const entry of wallpaperStyles)if(entry.contrast<4.5)failures.push({name:'wallpaper text contrast (light)',...entry});
+  await evaluate(workbench,`(() => {const theme=document.getElementById('ui-theme');theme.value='dark';theme.dispatchEvent(new Event('change',{bubbles:true}));})()`);
+  await delay(80);
+  await capture(workbench,'wallpaper-settings-dark',1120,760);
+  const darkWallpaperStyles=await measureWallpaperContrast();
+  for(const entry of darkWallpaperStyles)if(entry.contrast<4.5)failures.push({name:'wallpaper text contrast (dark)',...entry});
+  await emit(chat,'workspace',{settings:{theme:'dark'}});
+  await capture(chat,'bubble-dark',440,420);
+  await emit(chat,'workspace',{settings:{theme:'light'}});
+  await capture(chat,'bubble-light',440,420);
+  await evaluate(workbench,`(() => {const theme=document.getElementById('ui-theme');theme.value='system';theme.dispatchEvent(new Event('change',{bubbles:true}));})()`);
+  await delay(80);
   if(extended) {
     await evaluate(workbench,`document.querySelector('[data-setting-target="agent-settings"]').click();document.querySelector('.settings-scroll').scrollTop=0`);
     await capture(workbench,'agent-settings-minimum-zoom-200',760,540,2);
@@ -229,9 +250,10 @@ module.exports=async function visualCases({open,evaluate,delay,output,extended=f
     await capture(workbench,'agent-claude-minimum-zoom-200',760,540,2);
     for(const zoom of [1.25,1.5,2]) {
       await evaluate(workbench,`document.querySelector('[data-setting-target="playback-settings"]').click();document.querySelector('.settings-scroll').scrollTop=0`);
-      await evaluate(workbench,`(()=>{const speed=document.getElementById('speed');speed.value=speed.value==='1.1'?'1':'1.1';speed.dispatchEvent(new Event('change',{bubbles:true}));})()`);
       await capture(workbench,'voice-minimum-zoom-'+Math.round(zoom*100),760,540,zoom);
-      await reachable(workbench,'voice controls at minimum window and '+Math.round(zoom*100)+'%',['#tts-engine','#qwen-voice','#preview-voice','#save-settings']);
+      await reachable(workbench,'voice controls at minimum window and '+Math.round(zoom*100)+'%',['#tts-engine','#qwen-voice','#preview-voice']);
+      await evaluate(workbench,`(() => {document.querySelector('[data-setting-target="shortcut-settings"]').click();const input=document.querySelector('#shortcuts input[data-action="chat"]');input.dispatchEvent(new KeyboardEvent('keydown',{code:'Space',key:' ',ctrlKey:true,altKey:true,bubbles:true}));})()`);
+      await reachable(workbench,'shortcut save and discard controls at minimum window and '+Math.round(zoom*100)+'%',['#save-settings','#discard-settings']);
       await evaluate(workbench,"document.getElementById('save-settings').click()");
       await wait(workbench,"document.getElementById('save-settings').hidden");
       await evaluate(workbench,`document.querySelector('[data-setting-target="wallpaper-settings"]').click();document.querySelector('.settings-scroll').scrollTop=0`);

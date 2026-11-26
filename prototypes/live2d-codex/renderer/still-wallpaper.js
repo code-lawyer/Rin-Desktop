@@ -21,9 +21,9 @@ export async function startStillWallpaper({ host, api }) {
   let received = false, audioRevision = 0, committedRequest = -1;
   let motion, motionInfo, puppet, puppetError, fallbackFrame;
   let thinkTimer, replyWaitSince, thinking = false, thinkingTurn, dialoguePose, replyStarted = false;
-  function loadImage(pose, override) {
-    const url = override || `app://local/assets/stills/female-v2-4k/${pose}.png`;
+  function loadImage(url) {
     if (!cache.has(url)) {
+      if (cache.size >= 2) cache.clear();
       const promise = (async () => { const image = new Image(); image.src = `${url}?attempt=${++imageAttempt}`; await image.decode(); return image; })();
       cache.set(url, promise); promise.catch(() => cache.delete(url));
     }
@@ -44,7 +44,7 @@ export async function startStillWallpaper({ host, api }) {
     }
     puppet?.fit();
     const [sourceWidth, sourceHeight, headX, headY, headLeft, headRight] = shown?.catalog
-      ? [1280, 720, 940, 210, 830, 1055] : [3840, 2400, 2800, 550, 2580, 3040];
+      ? [3840, 2160, 2820, 630, 2490, 3165] : [3840, 2400, 2800, 550, 2580, 3040];
     const scale = Math.max(width / sourceWidth, height / sourceHeight), left = (width - sourceWidth * scale) / 2, top = (height - sourceHeight * scale) / 2;
     const bounded = v => Math.max(0, Math.min(1, v));
     api.avatarAnchor({ x: bounded((headX * scale + left) / width), y: bounded((headY * scale + top) / height), left: bounded((headLeft * scale + left) / width), right: bounded((headRight * scale + left) / width) });
@@ -60,7 +60,7 @@ export async function startStillWallpaper({ host, api }) {
       const assetRoot = `app://local/assets/scene/${poseDirectory}/`;
       let catalog, image, motionLayer;
       if (animated) {
-        catalog = await loadMotionCatalog(); image = await loadImage(pose, catalog.posters.work);
+        catalog = await loadMotionCatalog(); image = await loadImage(catalog.posters.work);
         try {
           motionLayer = await MotionWallpaper.prepare({ host, catalog, changed(info) { if (motion === motionLayer) motionChanged(info); } });
         } catch (error) {
@@ -68,7 +68,7 @@ export async function startStillWallpaper({ host, api }) {
           throw error;
         }
       }
-      image ??= await loadImage('attention', character === characters.DEFAULT_CHARACTER ? undefined : assetRoot + 'scene.png');
+      image ??= await loadImage(assetRoot + 'scene.png');
       const frame = { frame: compose(image), frameRevision: revision, requestId, character, pose, animated, animePlayback, motion: motionLayer, catalog, sourceWidth: image.naturalWidth, sourceHeight: image.naturalHeight };
       if (!animated) {
         try {

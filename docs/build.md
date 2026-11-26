@@ -77,10 +77,10 @@ npm run resources
 
 这条命令按 `tools/release/resource-manifest.json` 下载基础安装包，校验 SHA-256 后以不注册安装项的方式解包到 `work/release-resources/版本号`。源码树缺失的运行时目录会连接到解包目录，壁纸资源递归补齐缺失文件，已有文件保留。补齐后校验动态媒体的大小与哈希。历史资源包若带有 Core，也可用于准备源码旧头像模式。
 
-当前清单锁定 0.6.3-rc.12 安装包，默认从保留的同版 Release 下载；已有同版安装包时可使用下列命令，仍须通过清单的大小和 SHA-256 校验，不能换成任意安装器。它仅提供锁定的视觉/基础运行资源，不会用安装包中的应用代码覆盖当前源码或 Electron 依赖。使用候选包提供资源不代表其已完成稳定版验收。
+当前清单锁定 0.6.3-rc.13 安装包，默认从保留的同版 Release 下载；已有同版安装包时可使用下列命令，仍须通过清单的大小和 SHA-256 校验，不能换成任意安装器。它仅提供锁定的视觉/基础运行资源，不会用安装包中的应用代码覆盖当前源码或 Electron 依赖。使用候选包提供资源不代表其已完成稳定版验收。
 
 ```powershell
-npm run resources -- --installer="release/test-builds/v0.6.3-rc.12/Rin-Desktop-0.6.3-rc.12-Setup.exe"
+npm run resources -- --installer="release/test-builds/v0.6.3-rc.13/Rin-Desktop-0.6.3-rc.13-Setup.exe"
 ```
 
 资源清单指向可下载的 GitHub 安装器。发布候选版时用已构建的安装器生成资源清单，标签包含最终清单。清理旧 Release 前验证新标签的资源恢复入口。从较早的 Git 标签源码归档构建时，若资源链接已失效，可使用当前 `main` 的资源清单和本说明。

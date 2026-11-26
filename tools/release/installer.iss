@@ -161,8 +161,9 @@ Type: filesandordirs; Name: "{app}\resources\app\node_modules\zod-to-json-schema
 Type: filesandordirs; Name: "{app}\resources\app\node_modules\@anthropic-ai\claude-agent-sdk"; Check: HasBundledClaudeSdk
 Type: filesandordirs; Name: "{app}\resources\app\assets\rainy-window-male"
 Type: filesandordirs; Name: "{app}\resources\app\assets\rainy-window-v2-4k"
-Type: filesandordirs; Name: "{app}\resources\app\assets\stills\male"
-Type: files; Name: "{app}\resources\app\assets\character-previews\male.png"
+Type: filesandordirs; Name: "{app}\resources\app\assets\stills"
+Type: filesandordirs; Name: "{app}\resources\app\assets\character-previews"
+Type: filesandordirs; Name: "{app}\resources\app\dist\chunks"
 Type: files; Name: "{app}\resources\app\vendor\live2dcubismcore.min.js"
 Type: files; Name: "{app}\resources\app\vendor\LICENSE-CubismCore.md"
 Type: files; Name: "{app}\resources\app\vendor\LICENSE-AgentAvatar"

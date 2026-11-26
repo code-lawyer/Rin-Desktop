@@ -44,7 +44,7 @@ async function fixture(t, { reload = true, pose = 'work', legacyVideo = false, r
     setTimeout(fn, delay) { timers.set(++timerId, { fn, at: now + delay }); return timerId; },
     clearTimeout(id) { timers.delete(id); },
     window: { devicePixelRatio: 1, addEventListener() {}, removeEventListener() {} },
-    Image: class { get naturalWidth() { return this.src.includes('female-v2-4k') ? 3840 : 1586; } get naturalHeight() { return this.src.includes('female-v2-4k') ? 2400 : 992; } decode() { requests.push(this.src); return Promise.resolve(); } },
+    Image: class { get naturalWidth() { return this.src.includes('rin-poses/scene.png') ? 3840 : 1586; } get naturalHeight() { return this.src.includes('rin-poses/scene.png') ? 2400 : 992; } decode() { requests.push(this.src); return Promise.resolve(); } },
     ResizeObserver: class { observe() {} disconnect() {} },
     AmbientPreview: class { update() { return { rain: 0, keys: 0 }; } enable() { return Promise.resolve(true); } close() {} },
     PuppetWallpaper: class {
@@ -124,14 +124,14 @@ test('wallpaper fault injection matches actual anime requests and only approved 
   assert.ok(h.requests.length);
   for(const url of h.requests)assert.equal(isCharacterImageRequest(url,'anime'),true);
   assert.equal(isCharacterImageRequest('app://local/assets/motion/female/work.png?attempt=1','realistic'),true);
-  for(const url of ['app://local/assets/stills/male/work.png','https://local/assets/stills/female-v2-4k/work.png','app://local/assets/ambience/rain.mp3'])for(const style of ['anime','realistic'])assert.equal(isCharacterImageRequest(url,style),false);
+  for(const url of ['app://local/assets/stills/male/work.png','https://local/assets/scene/rin-poses/scene.png','app://local/assets/ambience/rain.mp3'])for(const style of ['anime','realistic'])assert.equal(isCharacterImageRequest(url,style),false);
 });
 
 test('legacy anime video input loads original poses without requesting the withdrawn media', async t => {
   const h = await fixture(t, { reload: false, legacyVideo: true, pose: 'window' });
   assert.equal(h.reports.at(-1).ready, true); assert.equal(h.reports.at(-1).animePlayback, 'poses');
   assert.equal(h.reports.at(-1).model, 'rin-scene'); assert.equal(h.reports.at(-1).pose, 'window');
-  assert.match(h.requests[0], /female-v2-4k\/attention\.png/);
+  assert.match(h.requests[0], /scene\/rin-poses\/scene\.png/);
   assert.equal(h.requests.some(url => url.includes('/motion/anime/')), false);
   assert.equal(h.decisions.at(-1)[1], true); assert.equal(h.puppets.length, 1); assert.equal(h.motions.length, 0);
 });
@@ -140,7 +140,7 @@ test('anime states reuse one scene and preserve its full-size original loading f
   const h=await fixture(t,{reload:false,pose:'cup'});
   const imageDraws=h.draws.filter(args=>args[0]?.src);
   assert.equal(imageDraws.length,1);
-  assert.match(imageDraws[0][0].src,/stills\/female-v2-4k\/attention\.png/);
+  assert.match(imageDraws[0][0].src,/scene\/rin-poses\/scene\.png/);
   assert.equal(imageDraws[0].length,3,'draw the full image, not a cropped head region');
   assert.equal(h.reports.at(-1).activity,'manual');
   assert.equal(h.reports.at(-1).model,'rin-scene');

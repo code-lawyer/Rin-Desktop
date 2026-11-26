@@ -1,8 +1,8 @@
 import { EventEmitter } from 'node:events';
 import { spawn, execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { readFile, mkdir, access } from 'node:fs/promises';
-import { createHash } from 'node:crypto';
+import { readFile, mkdir, access, rename, unlink } from 'node:fs/promises';
+import { createHash, randomUUID } from 'node:crypto';
 import { join, resolve } from 'node:path';
 const exec = promisify(execFile);
 export async function buildRemoteHelper(source, directory) {
@@ -15,8 +15,15 @@ export async function buildRemoteHelper(source, directory) {
   const windows=process.env.WINDIR || 'C:\\Windows', framework=join(windows,'Microsoft.NET','Framework64','v4.0.30319');
   const refs=['System.Runtime','System.ObjectModel','System.Runtime.InteropServices.WindowsRuntime'].map(x=>join(framework,x+'.dll'));
   refs.push(...['Windows.Foundation','Windows.Devices','Windows.Storage'].map(x=>join(windows,'System32','WinMetadata',x+'.winmd')));
-  try { await exec(join(framework,'csc.exe'),['/nologo','/target:exe','/platform:x64','/optimize+','/out:'+output,'/r:System.Windows.Forms.dll','/r:System.Drawing.dll','/r:System.Web.Extensions.dll',...refs.map(x=>'/r:'+x),source],{windowsHide:true,timeout:30000,maxBuffer:65536}); }
-  catch { throw new Error('遥控器组件未能准备，请确认 Windows 的 .NET Framework 4.8 可用，或重新安装应用。'); }
+  const staged=join(directory,`rc003-${hash}.${process.pid}-${randomUUID().slice(0,8)}.tmp.exe`);
+  try {
+    await exec(join(framework,'csc.exe'),['/nologo','/target:exe','/platform:x64','/optimize+','/out:'+staged,'/r:System.Windows.Forms.dll','/r:System.Drawing.dll','/r:System.Web.Extensions.dll',...refs.map(x=>'/r:'+x),source],{windowsHide:true,timeout:30000,maxBuffer:65536});
+    await rename(staged, output);
+  } catch {
+    await unlink(staged).catch(() => {});
+    try { await access(output); return output; } catch {}
+    throw new Error('遥控器组件未能准备，请确认 Windows 的 .NET Framework 4.8 可用，或重新安装应用。');
+  }
   return output;
 }
 const ERRORS={ NO_DEVICE:'没有找到这只遥控器，请重新搜索。', PAIR_FAILED:'配对未完成。请让遥控器进入配对状态，并确认 Windows 的配对提示。', CONNECT_FAILED:'遥控器未能连接。请唤醒遥控器，并关闭占用它的其他遥控工具后重试。', NO_SERVICE:'这只设备没有提供 RC003 语音服务。', SUBSCRIBE_FAILED:'无法接收遥控器的声音，请重新连接。', WRITE_FAILED:'遥控器没有响应，请重新连接。', TIMEOUT:'遥控器响应超时，请靠近电脑后重试。', RAW_FAILED:'无法读取遥控器按钮，请重启应用。' };

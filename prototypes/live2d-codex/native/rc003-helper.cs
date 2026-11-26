@@ -62,15 +62,19 @@ class RemoteWindow : Form {
                 try { var request=Json.Deserialize<Dictionary<string,object>>(line); BeginInvoke(new Action(async delegate { await Command(request); })); }
                 catch { break; }
             }
-            if(!IsDisposed) BeginInvoke(new Action(async delegate { exiting=true; await Disconnect(); Application.Exit(); }));
+            if(!IsDisposed) BeginInvoke(new Action(async delegate { exiting=true; await Commands.WaitAsync(); try { await Disconnect(); } finally { Commands.Release(); } Application.Exit(); }));
         });
     }
     static void Emit(object value) { lock(OutputLock) { try { Console.WriteLine(Json.Serialize(value)); Console.Out.Flush(); } catch {} } }
     // Explicit completion avoids a build dependency on the Windows SDK's merged Windows.winmd.
-    static async Task<T> Wait<T>(IAsyncOperation<T> operation) {
+    static async Task<T> Wait<T>(IAsyncOperation<T> operation, int timeoutMs = 15000) {
         var completion=new TaskCompletionSource<T>();
         operation.Completed=(op,status)=>{ try { completion.TrySetResult(op.GetResults()); } catch(Exception e) { completion.TrySetException(e); } };
-        if(await Task.WhenAny(completion.Task,Task.Delay(15000))!=completion.Task) { operation.Cancel(); throw new Exception("TIMEOUT"); }
+        using(var cancel=new CancellationTokenSource()) {
+            var delay=Task.Delay(timeoutMs, cancel.Token);
+            if(await Task.WhenAny(completion.Task, delay)!=completion.Task) { operation.Cancel(); throw new Exception("TIMEOUT"); }
+            cancel.Cancel();
+        }
         try { return await completion.Task; } finally { operation.Close(); }
     }
     async Task Command(Dictionary<string,object> request) {
@@ -126,7 +130,7 @@ class RemoteWindow : Form {
         if(info==null || !Supported(info))throw new Exception("NO_DEVICE");
         if(!info.Pairing.IsPaired) {
             Emit(new {type="pairing",generation=generation});
-            var paired=await Wait(info.Pairing.PairAsync());
+            var paired=await Wait(info.Pairing.PairAsync(), 30000);
             if(paired.Status!=DevicePairingResultStatus.Paired && paired.Status!=DevicePairingResultStatus.AlreadyPaired)throw new Exception("PAIR_FAILED");
         }
         device=await Wait(BluetoothLEDevice.FromIdAsync(id));

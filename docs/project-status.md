@@ -1,6 +1,6 @@
 # 当前项目状态
 
-当前候选版本为 [0.6.3-rc.12](https://github.com/code-lawyer/Rin-Desktop/releases/tag/v0.6.3-rc.12)。测试版使用独立安装和数据目录，下载页提供安装器与第三方对应源码。
+当前候选版本为 [0.6.3-rc.13](https://github.com/code-lawyer/Rin-Desktop/releases/tag/v0.6.3-rc.13)。测试版使用独立安装和数据目录，下载页提供安装器与第三方对应源码。
 
 Agent 页提供 Codex、Google Antigravity CLI、Grok Build、Claude Agent 和 DeepSeek Harness。侧栏「选择与管理」可直达。连接错误显示在对应选项旁。保存选择失败时继续使用当前连接。旧 OpenCode 或自定义 Agent 的选择回退到 Codex，旧配置、会话记录与草稿保存在原数据目录。
 
@@ -30,7 +30,7 @@ Codex/Grok 的实际界面审批允许、拒绝和审批中停止，以及所属
 
 包内 Kokoro 与 SenseVoice 的 CPU 推理、现有 Qwen 的应用内推理已运行；使用的是固定合成音频，没有做麦克风或主观音质验收，识别仍出现个别错字。缺 CLI/模型、下载取消/失败、绘图中断及隐藏子进程 CUDA 的错误路径已验证；后几项使用明确的故障注入，不代替真实无 GPU 或网络环境矩阵。
 
-rc.12 延续未签名预发布方式。当前源码提供 Authenticode 正式构建入口，正式候选包仍需要可用的发布者签名、分发许可复核和干净 Windows 的安装、升级、数据迁移、卸载及回退验收。Windows 系统 DPI、锁屏、Explorer 恢复、持续使用与视觉认可待补齐。Codex 及其他 CLI 的未覆盖交互按各自支持范围验收。RC003 的录音、按键、IME 共存、休眠重连矩阵仍未完成。执行时使用 [验收清单](../tools/release/TEST-ACCEPTANCE.md)。
+rc.13 延续未签名预发布方式，新增雨夜深色/晨雾浅色/跟随系统主题切换、桌面气泡与工作台对比度及无障碍改进、打包去除冗余静态底图与 Electron Fuses 加固，以及后端存储队列、Agent 审批与子进程生命周期修复。当前源码提供 Authenticode 正式构建入口，正式候选包仍需要可用的发布者签名、分发许可复核和干净 Windows 的安装、升级、数据迁移、卸载及回退验收。Windows 系统 DPI、锁屏、Explorer 恢复、持续使用与视觉认可待补齐。Codex 及其他 CLI 的未覆盖交互按各自支持范围验收。RC003 的录音、按键、IME 共存、休眠重连矩阵仍未完成。执行时使用 [验收清单](../tools/release/TEST-ACCEPTANCE.md)。
 
 主应用保留 `prototypes/live2d-codex` 路径，源码默认数据为 `work/runtime/avatar`。模型、runtime、原始美术和私人 Dots 不进入公开源码。可复用验证在 `tools/qa` 与 `tools/probes`，运行输出在忽略的 `work/qa`。独立 `prototypes/video-companion` 的播放器仍被当前动态壁纸复用，不能按旧原型名称整目录删除。
 

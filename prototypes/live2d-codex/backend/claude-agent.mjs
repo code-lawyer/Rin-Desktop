@@ -72,24 +72,39 @@ export class ClaudeCompanion extends NativeAgent {
         }
       }
     })();
-    const account = await deadline(q.accountInfo(), 30000, 'Claude 认证状态读取');
-    if (this.closed || this.transport !== transport) throw new Error('Agent 已关闭。');
-    // Only authentication kind crosses the renderer boundary.
-    this.state.login = claudeAuthentication(account);
-    const models = await deadline(q.supportedModels(), 30000, 'Claude 模型列表读取');
-    if (this.closed || this.transport !== transport) throw new Error('Agent 已关闭。');
-    this.state.models = [{ id: '', model: '', name: 'CLI 默认模型', efforts: [] }, ...models.map(m => ({ id: m.value, model: m.value, name: m.displayName, efforts: (m.supportedEffortLevels ?? []).map(reasoningEffort => ({ reasoningEffort })) }))];
-    if (resume) {
-      const history = await this.sdk.getSessionMessages(resume, { dir: this.state.cwd });
+    try {
+      const account = await deadline(q.accountInfo(), 30000, 'Claude 认证状态读取');
       if (this.closed || this.transport !== transport) throw new Error('Agent 已关闭。');
-      this.state.messages = restoreHistory(messagesOf(history), this.state.messages).slice(-200); this.state.restored = true;
+      // Only authentication kind crosses the renderer boundary.
+      this.state.login = claudeAuthentication(account);
+      const models = await deadline(q.supportedModels(), 30000, 'Claude 模型列表读取');
+      if (this.closed || this.transport !== transport) throw new Error('Agent 已关闭。');
+      this.state.models = [{ id: '', model: '', name: 'CLI 默认模型', efforts: [] }, ...models.map(m => ({ id: m.value, model: m.value, name: m.displayName, efforts: (m.supportedEffortLevels ?? []).map(reasoningEffort => ({ reasoningEffort })) }))];
+      if (resume) {
+        const history = await this.sdk.getSessionMessages(resume, { dir: this.state.cwd });
+        if (this.closed || this.transport !== transport) throw new Error('Agent 已关闭。');
+        this.state.messages = restoreHistory(messagesOf(history), this.state.messages).slice(-200); this.state.restored = true;
+      }
+    } catch (error) {
+      if (this.transport === transport) await this.disposeNative().catch(() => {});
+      throw error;
     }
   }
   permission(tool, input, context) {
     const cancelled = { behavior: 'deny', message: 'User stopped this turn.', interrupt: true };
     if (tool === 'AskUserQuestion') return this.ask({ kind: 'questions', questions: questionsView(input.questions) }, answer => ({ behavior: 'allow', updatedInput: { ...input, answers: questionAnswers(input.questions ?? [], answer) } }), cancelled, context.signal);
+    const nonEmpty = value => typeof value === 'string' && value.trim();
+    const command = tool === 'Bash' && nonEmpty(input?.command) ? input.command : '';
+    const cwd = [input?.cwd, input?.workdir, input?.working_directory].find(nonEmpty) || '';
+    const paths = [...new Set([input?.file_path, input?.notebook_path, input?.path, input?.url, input?.query].filter(nonEmpty))];
+    const inputProvided = typeof input === 'string' ? input.trim() : input && Object.keys(input).length;
+    if (!command && !paths.length && !inputProvided) {
+      this.state.activity = 'Agent 未提供操作详情，已拒绝工具请求';
+      this.changed(false);
+      return Promise.resolve({ behavior: 'deny', message: 'Tool request omitted operation details.' });
+    }
     const kind = /Write|Edit|Notebook/.test(tool) ? 'files' : 'command';
-    return this.ask({ kind, reason: `Claude 请求使用 ${tool}`, command: tool === 'Bash' ? input.command || '' : '', details: JSON.stringify(input, null, 2).slice(0, 256000) }, answer => {
+    return this.ask({ kind, reason: `Claude 请求使用 ${tool}`, command, ...(cwd ? { cwd } : {}), ...(paths.length ? { paths } : {}), details: JSON.stringify(input ?? {}, null, 2).slice(0, 256000) }, answer => {
       if (!['accept', 'decline'].includes(answer?.decision)) throw new Error('请选择允许或拒绝。');
       return answer.decision === 'accept' ? { behavior: 'allow', updatedInput: input } : { behavior: 'deny', message: 'User denied this operation. Do not retry or work around the denial.' };
     }, cancelled, context.signal);
@@ -160,7 +175,7 @@ export class ClaudeCompanion extends NativeAgent {
   }
   async chooseEffort(effort) {
     if (effort && !this.state.models.find(m => m.model === this.state.model)?.efforts?.some(v => v.reasoningEffort === effort)) throw new Error('当前模型不支持此推理强度。');
-    return this.configure(async () => { await this.disposeNative(); this.state.effort = effort || null; await this.openNative(); });
+    return this.configure(async () => { await this.disposeNative(); this.state.effort = effort || null; await this.openNative(); }, { disposeOnError: true });
   }
   async listThreads(cwd, cursor = null, search = '') {
     this.assertReady(); const all = await this.sdk.listSessions({ dir: cwd, includeWorktrees: false });

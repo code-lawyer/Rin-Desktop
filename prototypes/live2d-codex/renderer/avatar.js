@@ -67,7 +67,7 @@ export async function startAvatar() {
   }
   // Pixi renders at priority -25; calibrate from the frame after the fit is drawn.
   app.ticker.add(() => { if (anchorFrames && --anchorFrames === 0) updateMask(); }, undefined, -101);
-  fit(); new ResizeObserver(fit).observe(host);
+  fit(); const observer = new ResizeObserver(fit); observer.observe(host);
   const timer = setInterval(updateMask, 500); setTimeout(updateMask, 200);
   const onMove = event => {
     if (dragging) {
@@ -92,7 +92,7 @@ export async function startAvatar() {
     if (down && Math.hypot(event.screenX - down.x, event.screenY - down.y) < 6) window.companion.windowAction('toggle-chat'); down = null;
   });
   host.addEventListener('keydown', event => { if (!event.isComposing && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); window.companion.windowAction('toggle-chat'); } });
-  window.addEventListener('beforeunload', () => { clearInterval(timer); clearTimeout(fitTimer); app.destroy(true); });
+  window.addEventListener('beforeunload', () => { clearInterval(timer); clearTimeout(fitTimer); observer.disconnect(); app.destroy(true); });
   window.companion.renderReady({ ready: true, model: 'Hiyori' });
   return { app, model };
 }

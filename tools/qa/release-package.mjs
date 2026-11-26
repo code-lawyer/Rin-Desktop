@@ -8,6 +8,7 @@ import { createRunDirectory, writeRunReport } from './run-output.mjs';
 import { inspectMotionAssets } from '../release/motion-assets.mjs';
 import { inspectPuppetAssets } from '../release/puppet-assets.mjs';
 import { retiredWallpaperAsset, sourceAvatarAsset } from '../release/resource-assets.mjs';
+import { readElectronFuses, PACKAGED_FUSES } from '../release/electron-fuses.mjs';
 import catalog from '../../prototypes/live2d-codex/backend/agent-catalog.cjs';
 import characters from '../../prototypes/live2d-codex/backend/character-profiles.cjs';
 
@@ -44,8 +45,12 @@ const retiredAgentFile = /(?:^|\/)(?:custom-agents|custom-agent-settings|agent-s
 // Source-owned asset metadata and READMEs intentionally updated since earlier
 // baselines: verify them against current source, and compare all other assets
 // to the baseline package byte-for-byte.
-const revisedAssetMetadata = new Set(['assets/stills/manifest.json', 'assets/stills/README.md', 'assets/ambience/README.md']);
+const revisedAssetMetadata = new Set(['assets/ambience/README.md']);
 const wallpaperScripts = new Set(['scripts/wallpaper-host.ps1', 'scripts/wallpaper-pose-input.cs']);
+const fuses = await readElectronFuses(join(directory, 'VibeVoice.exe'));
+for (const [name, expected] of Object.entries(PACKAGED_FUSES)) {
+  assert.equal(fuses.values[name], expected, `Unexpected Electron fuse state for ${name}: ${fuses.values[name]}`);
+}
 let bytes = 0, sourceMatches = 0;
 for (const entry of manifest.files) {
   const file = resolve(directory, entry.file), inside = relative(directory, file);
@@ -59,6 +64,7 @@ for (const entry of manifest.files) {
   const local = entry.file.replace(/^resources\/app\//, '');
   assert.ok(!/^(assets\/motion\/anime\/|renderer\/anime-(catalog|player|wallpaper)\.mjs$)/.test(local), 'Experimental anime video must not be packaged: ' + entry.file);
   assert.ok(!/^assets\/livliv\//.test(local), 'Rejected split character must not be packaged: ' + entry.file);
+  assert.ok(!/^assets\/(stills|character-previews)\//.test(local), 'Unused authoring artwork must not be packaged: ' + entry.file);
   assert.ok(!retiredWallpaperAsset(local.replace(/^assets\//, '')), 'Retired wallpaper in package: ' + entry.file);
   if (entry.file !== local && (/^(main\.cjs|preload\.cjs|voice-resources\.json|backend\/|renderer\/|dist\/)/.test(local) || revisedAssetMetadata.has(local) || wallpaperScripts.has(local))) {
     assert.equal(await hash(join(root, 'prototypes/live2d-codex', local)), entry.sha256, 'Source mismatch: ' + local);
@@ -94,12 +100,14 @@ if (option('baseline')) {
     && !sourceAvatarAsset(item.file)
     && !retiredWallpaperAsset(item.file.replace(/^resources\/app\/assets\//, ''))
     && !item.file.startsWith('resources/app/assets/motion/anime/')
+    && !item.file.startsWith('resources/app/assets/stills/')
+    && !item.file.startsWith('resources/app/assets/character-previews/')
     && !revisedAssetMetadata.has(item.file.replace(/^resources\/app\//, '')))) {
     assert.equal(await hash(join(directory,entry.file)), entry.sha256, 'Changed artwork or CPU speech component: ' + entry.file);
     preserved++;
   }
   assert.ok(preserved > 10);
 }
-const report = {version:manifest.version,files:names.size,bytes,sourceMatches,backends:portable.backends,claudeSdkSuppliedByUser:true,motionMediaFiles:motion.names.length,animeVideoExcluded:true,sourceAvatarExcluded:true,puppetFiles,preservedArtworkAndCpuFiles:preserved,noModelsCredentialsOrCli:true,accounts:false,hardware:false,passed:true};
+const report = {version:manifest.version,files:names.size,bytes,sourceMatches,backends:portable.backends,claudeSdkSuppliedByUser:true,electronFusesHardened:true,motionMediaFiles:motion.names.length,animeVideoExcluded:true,sourceAvatarExcluded:true,puppetFiles,preservedArtworkAndCpuFiles:preserved,noModelsCredentialsOrCli:true,accounts:false,hardware:false,passed:true};
 await writeRunReport(output,report);
 console.log(JSON.stringify({output,...report}));

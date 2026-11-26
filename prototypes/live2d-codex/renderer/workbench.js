@@ -3,6 +3,7 @@ import { isTaskBusy } from '../backend/task-state.mjs';
 import characters from '../backend/character-profiles.cjs';
 import stills from '../backend/still-settings.cjs';
 import catalog from '../backend/agent-catalog.cjs';
+import inputActions from '../backend/input-actions.cjs';
 import { populateAgentPicker } from './agent-picker.mjs';
 import { installRemoteSettings, installRemoteNavigation } from './remote-ui.mjs';
 import { installSettingsNavigation } from './settings-navigation.mjs';
@@ -19,6 +20,7 @@ function closeNavigation() {
   $('toggle-sidebar').setAttribute('aria-expanded', 'false');
   $('toggle-sidebar').setAttribute('aria-label', '打开项目导航');
   document.querySelector('main').inert = false;
+  document.querySelector('.window-actions').inert = false;
   if (restoreFocus && narrowNavigation.matches) $('toggle-sidebar').focus();
 }
 $('toggle-sidebar').onclick = () => {
@@ -27,20 +29,27 @@ $('toggle-sidebar').onclick = () => {
   $('toggle-sidebar').setAttribute('aria-expanded', 'true');
   $('toggle-sidebar').setAttribute('aria-label', '关闭项目导航');
   document.querySelector('main').inert = true;
+  document.querySelector('.window-actions').inert = true;
   $('workbench-sidebar').querySelector('button:not(:disabled),select:not(:disabled)')?.focus();
 };
 $('sidebar-backdrop').onclick = closeNavigation;
 narrowNavigation.addEventListener('change', closeNavigation);
 populateAgentPicker($('agent-select'), { annotate: false });
-let workspace = { projects: [], settings: {} }, current, projectId, selected, threads = [], listCursor, historyCursor, listVersion = 0, historyVersion = 0, noticeTimer, searchTimer, settingsDirty = false, ready = false;
+let workspace = { projects: [], settings: {} }, current, projectId, selected, threads = [], listCursor, historyCursor, listVersion = 0, historyVersion = 0, noticeTimer, saveStatusTimer, searchTimer, settingsDirty = false, ready = false;
 let settingsRevision = 0;
+function showSaveStatus(text) {
+  clearTimeout(saveStatusTimer);
+  $('settings-save-status').textContent = text;
+  if (text) saveStatusTimer = setTimeout(() => { if ($('settings-save-status').textContent === text) $('settings-save-status').textContent = ''; }, 4000);
+}
 function markSettingsDirty(dirty) {
   settingsDirty = dirty;
   if (dirty) {
     settingsRevision++;
-    $('settings-save-status').textContent = '';
+    showSaveStatus('');
   }
   $('save-settings').hidden = !dirty;
+  $('discard-settings').hidden = !dirty;
 }
 const node = (tag, text, cls) => { const n = document.createElement(tag); if (text !== undefined) n.textContent = text; if (cls) n.className = cls; return n; };
 function setStatusText(id, text) {
@@ -48,19 +57,23 @@ function setStatusText(id, text) {
   if (status.textContent !== text) status.textContent = text;
 }
 for (const [id, voice] of Object.entries(characters.QWEN_VOICES)) $('qwen-voice').append(Object.assign(node('option', voice.label), { value: id }));
-function notice(text) {
+function notice(text, kind = 'error') {
   clearTimeout(noticeTimer);
-  $('notice').textContent = text;
+  $('notice-text').textContent = text;
+  $('notice').dataset.kind = kind;
+  $('notice').setAttribute('role', kind === 'info' ? 'status' : 'alert');
   $('notice').hidden = !text;
-  if (text) noticeTimer = setTimeout(() => $('notice').hidden = true, 10000);
+  if (text) noticeTimer = setTimeout(() => { $('notice').hidden = true; }, kind === 'info' ? 4000 : 10000);
 }
-async function run(promise) { try { const r = await promise; if (!r?.ok) throw new Error(r?.error || '操作未完成。'); return r.value; } catch (e) { notice(e.message); throw e; } }
+$('notice-close').onclick = () => notice('');
+async function run(promise) { try { const r = await promise; if (!r?.ok) throw new Error(r?.error || '操作未完成。'); return r.value; } catch (e) { notice(e.message, 'error'); throw e; } }
 const act = action => event => { Promise.resolve().then(() => action(event)).catch(() => {}); };
 // A completed unload event may arrive before the older IPC save response.
 // Never replace a newer snapshot with that stale response.
 function acceptWorkspace(value) {
   if ((value.version ?? 0) < (workspace.version ?? 0)) return false;
   workspace = value;
+  document.documentElement.dataset.theme = workspace.settings?.theme || 'system';
   updateActivity();
   return true;
 }
@@ -86,14 +99,21 @@ function updateActivity() {
   $('permission-hint').textContent = [current?.permissionHint, current?.canResume === false ? '此 Agent 不支持恢复会话；历史仅显示本地缓存，重启后需新建对话。' : current?.historyLocalOnly ? '可以恢复会话上下文；历史仅显示本机缓存的最近消息，可能不完整。' : ''].filter(Boolean).join(' ');
   $('new-thread').disabled = busy() || !available() && !current?.canStartNew || !projectId;
   $('resume').disabled = busy() || !available() || !selected || current?.canResume === false;
-  $('rename').disabled = !available() || !selected;
+  $('thread-title').disabled = !available() || !selected;
+  updateRenameButton();
   $('busy-note').hidden = !busy(); $('model').disabled = busy() || !available(); $('effort').disabled = busy() || !available() || !(current?.models?.find(m => m.model === current.model)?.efforts?.length);
+}
+function updateRenameButton() {
+  const trimmed = $('thread-title').value.trim();
+  $('rename').disabled = !available() || !selected || !trimmed || trimmed === selected.name;
 }
 function renderProjects() {
   const host = $('projects'), focusedId = host.contains(document.activeElement) ? document.activeElement.dataset.projectId : undefined;
   host.replaceChildren();
   for (const p of workspace.projects) {
-    const b = node('button', undefined, 'project-row'); b.setAttribute('aria-pressed', String(p.id === projectId && $('settings').hidden)); b.title = p.cwd;
+    const b = node('button', undefined, 'project-row');
+    if (p.id === projectId && $('settings').hidden) b.setAttribute('aria-current', 'true');
+    b.title = p.cwd;
     b.dataset.projectId = p.id;
     b.append(node('strong', p.name), node('small', p.cwd)); b.addEventListener('click', act(() => selectProject(p.id))); host.append(b);
     if (p.id === focusedId) b.focus({preventScroll:true});
@@ -132,7 +152,9 @@ function renderThreads() {
   const host = $('threads'), focusedId = host.contains(document.activeElement) ? document.activeElement.dataset.threadId : undefined;
   host.replaceChildren();
   for (const t of threads) {
-    const b = node('button', undefined, 'thread-row'); b.setAttribute('aria-pressed', String(t.id === selected?.id)); b.title = t.name;
+    const b = node('button', undefined, 'thread-row');
+    if (t.id === selected?.id) b.setAttribute('aria-current', 'true');
+    b.title = t.name;
     b.dataset.threadId = t.id;
     const date = new Date(t.updatedAt * 1000); b.append(node('strong', t.name), node('small', `${t.id === current?.threadId ? '当前 · ' : ''}${Number.isNaN(+date) ? '' : date.toLocaleString('zh-CN',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})}`));
     b.addEventListener('click', act(() => selectThread(t))); host.append(b);
@@ -161,7 +183,11 @@ async function loadHistory(older = false) {
       const article = node('article', undefined, 'history-message'); article.append(node('p', item.type === 'userMessage' ? '你' : item.phase === 'commentary' ? `${name} · 进度` : name, 'role'));
       const body = node('div'); renderReply(body, text, href => run(api.openLink(href)).catch(() => {})); article.append(body); fragment.append(article);
     }
-    older ? $('history').prepend(fragment) : $('history').append(fragment);
+    if (older) {
+      const pane = document.querySelector('.detail-pane'), prevHeight = pane.scrollHeight;
+      $('history').prepend(fragment);
+      pane.scrollTop += pane.scrollHeight - prevHeight;
+    } else $('history').append(fragment);
     if (!$('history').children.length) $('history').append(node('p', '还没有可显示的文字消息。', 'hint'));
     historyCursor = result.nextCursor; $('more-history').hidden = !historyCursor;
   } catch { if (version === historyVersion && selected === target && projectId === project && !older) $('history').replaceChildren(node('p', '历史暂时无法读取，可以刷新后重试。', 'hint')); }
@@ -216,17 +242,24 @@ async function saveWallpaperStyle(style) {
   try { acceptWorkspace(await run(api.saveSettings({ character, wallpaperMotion: style === 'realistic' }))); }
   finally { updateCharacterStatus(); fillStills(); }
 }
-function fillSettings() {
+function fillSettings({ forceKeys = false } = {}) {
   fillStills();
-  // Replacing a focused input does not reliably emit blur. Preserve the key
-  // learner through backend updates until the user explicitly leaves it.
-  if (document.activeElement?.matches('#shortcuts input,#remote-keys input')) { updateSpeechStatus(); return; }
-  const s = workspace.settings; $('auto-speak').checked = s.autoSpeak; $('speed').value = String(s.speed); $('remote-enabled').checked = s.remoteEnabled;
+  const s = workspace.settings;
+  $('ui-theme').value = s.theme || 'system';
+  $('auto-speak').checked = s.autoSpeak; $('speed').value = String(s.speed); $('remote-enabled').checked = s.remoteEnabled;
   fillVoices();
-  keyFields('shortcuts',s.shortcuts); keyFields('remote-keys',s.remoteKeys); fillModels();
+  fillModels();
   $('tts-engine').value = s.ttsEngine || 'qwen';
+  // Replacing a focused key learner does not reliably emit blur, and unsaved
+  // hotkey edits stay local until saved or explicitly discarded.
+  const editingKey = document.activeElement?.matches('#shortcuts input,#remote-keys input');
+  if (forceKeys || (!editingKey && !settingsDirty)) {
+    keyFields('shortcuts', s.shortcuts);
+    keyFields('remote-keys', s.remoteKeys);
+    markSettingsDirty(false);
+  }
   updateSpeechStatus();
-  refreshDevices().catch(() => {}); markSettingsDirty(false);
+  refreshDevices().catch(() => {});
 }
 function updateSpeechStatus() {
   updateCharacterStatus();
@@ -282,10 +315,12 @@ function updateResourceStatus() {
   $('cancel-resource').hidden = !resource.cancelable;
 }
 async function saveSpeechChoice(patch) {
-  acceptWorkspace(await run(api.saveSettings(patch))); updateSpeechStatus();
+  acceptWorkspace(await run(api.saveSettings(patch)));
+  updateSpeechStatus();
+  showSaveStatus('已自动保存');
 }
 async function refreshDevices() {
-  const devices = await navigator.mediaDevices.enumerateDevices(); const selectedDevice = settingsDirty ? $('microphone').value : workspace.settings.microphone;
+  const devices = await navigator.mediaDevices.enumerateDevices(); const selectedDevice = workspace.settings.microphone;
   $('microphone').replaceChildren(Object.assign(node('option','系统默认麦克风'),{value:''}));
   for (const d of devices.filter(d => d.kind === 'audioinput' && d.deviceId && d.deviceId !== 'default')) { const o = node('option',d.label || '麦克风（听写后显示名称）'); o.value = d.deviceId; $('microphone').append(o); }
   if (selectedDevice && ![...$('microphone').options].some(o => o.value === selectedDevice)) { const o = node('option','已选设备（当前不可用）'); o.value = selectedDevice; $('microphone').append(o); }
@@ -294,41 +329,45 @@ async function refreshDevices() {
 async function saveSettings() {
   const values = id => Object.fromEntries([...$(id).querySelectorAll('input')].map(f => [f.dataset.action,f.value]));
   const revision = settingsRevision;
-  const saved = await run(api.saveSettings({voice:Number($('voice').value),speed:Number($('speed').value),microphone:$('microphone').value,remoteEnabled:$('remote-enabled').checked,shortcuts:values('shortcuts'),remoteKeys:values('remote-keys')}));
+  const saved = await run(api.saveSettings({shortcuts:values('shortcuts'),remoteKeys:values('remote-keys')}));
   if (revision === settingsRevision) markSettingsDirty(false);
   acceptWorkspace(saved);
   const warning = workspace.shortcutErrors?.join(' ');
-  if (warning) notice(warning);
+  if (warning) notice(warning, 'error');
   else if (revision === settingsRevision) {
     notice('');
-    $('settings-save-status').textContent = '设置已保存';
+    showSaveStatus('设置已保存');
   }
 }
 async function refreshWorkspace() {
   acceptWorkspace(await run(api.workspace()));
   if (!projectId || !workspace.projects.some(p => p.id === projectId)) { const p = workspace.projects.find(p => p.cwd.toLowerCase() === current?.cwd?.toLowerCase()) ?? workspace.projects[0]; if (p) await selectProject(p.id, { preservePage: true }); }
-  renderProjects(); if (!settingsDirty) fillSettings(); updateActivity();
+  renderProjects(); fillSettings(); updateActivity();
 }
 $('add-project').onclick = act(async () => { const p = await run(api.addProject()); if (p) { await refreshWorkspace(); await selectProject(p.id); } });
 $('remove-project').onclick = act(async () => { await run(api.removeProject(projectId)); projectId = null; await refreshWorkspace(); });
 $('new-thread').onclick = act(async () => { await run(api.newThread(projectId, current.provider)); await refreshThreads(); });
 $('resume').onclick = act(async () => { if (selected) await run(api.resumeThread(projectId,selected.id,current.provider)); });
-$('rename').onclick = act(async () => { if (!selected) return; const target = selected, name = $('thread-title').value.trim(), provider = current.provider; await run(api.renameThread(target.id,name,provider,projectId)); if (current.provider !== provider || selected !== target) return; target.name = name; const t = threads.find(t => t.id === target.id); if (t) t.name = name; renderThreads(); notice(current.renameLocal ? '已更新 Rin 中的会话名称。' : '对话已重命名。'); });
+$('thread-title').oninput = updateRenameButton;
+$('thread-title').addEventListener('keydown', event => { if (event.key === 'Enter' && !event.isComposing && !$('rename').disabled) { event.preventDefault(); $('rename').click(); } });
+$('rename').onclick = act(async () => { if (!selected) return; const target = selected, name = $('thread-title').value.trim(), provider = current.provider; if (!name || name === target.name) return; await run(api.renameThread(target.id,name,provider,projectId)); if (current.provider !== provider || selected !== target) return; target.name = name; const t = threads.find(t => t.id === target.id); if (t) t.name = name; renderThreads(); updateRenameButton(); notice(current.renameLocal ? '已更新 Rin 中的会话名称。' : '对话已重命名。', 'info'); });
 $('agent-select').onchange = act(async () => { try { await run(api.chooseProvider($('agent-select').value)); } finally { updateActivity(); } });
 $('agent-reconnect').onclick = act(() => run(api.reconnect()));
 $('refresh').onclick = act(() => refreshThreads()); $('more-threads').onclick = act(() => refreshThreads(true)); $('more-history').onclick = act(() => loadHistory(true));
 $('search').oninput = () => { clearTimeout(searchTimer); searchTimer = setTimeout(() => refreshThreads(),250); };
-function showSettings() { closeNavigation(); $('settings').hidden = false; $('conversations').hidden = true; $('settings-tab').setAttribute('aria-pressed','true'); renderProjects(); if (!settingsDirty) fillSettings(); }
+function showSettings() { closeNavigation(); $('settings').hidden = false; $('conversations').hidden = true; $('settings-tab').setAttribute('aria-pressed','true'); renderProjects(); fillSettings(); }
 $('settings-tab').onclick = showSettings;
 $('manage-agents').onclick = () => { showSettings(); document.querySelector('[data-setting-target="agent-settings"]').click(); };
 for (const radio of document.querySelectorAll('[name="wallpaper-style"]')) radio.onchange = act(() => saveWallpaperStyle(radio.value));
 $('retry-character').onclick = act(() => saveWallpaperStyle(wallpaperStyle(workspace.wallpaper)));
 let stillSaving = 0;
-let previewMotion;
+let previewStyleKey;
 function fillStills() {
   if(stillSaving) return;
   const s=stills.stillSettings(workspace.settings);
   const animated=s.wallpaperMotion;
+  const profile=characters.characterProfile(workspace.settings.character);
+  const styleKey=animated?'realistic':profile.poseDirectory;
   const allowed=animated?['auto','work','attention']:['auto',...stills.POSES];
   $('still-pose').value=s.stillPose;
   for(const option of $('still-pose').options) option.disabled=!allowed.includes(option.value);
@@ -336,14 +375,20 @@ function fillStills() {
   $('still-help').textContent=animated
       ? '点击小图可固定朝向；选择“自动”随工作与对话切换。工作与看向你各自循环播放，在动作接点转身。'
       : '五种完整坐姿保留眨眼和轻微视线变化，用约 2.8 秒的马赛克分解、聚合切换姿态，背景保持固定。呼出对话、听写或朗读时切到看向你，结束后恢复所选姿态；朗读口型随声音变化。系统减少动态效果时直接切换姿态。';
-  if(previewMotion!==animated) {
-    previewMotion=animated;
+  if(previewStyleKey!==styleKey) {
+    previewStyleKey=styleKey;
     $('still-previews').replaceChildren();
     for(const pose of animated?['work','attention']:stills.POSES) {
       const label=animated?(pose==='work'?'专注工作':'看向你'):stills.POSE_LABELS[pose];
       const button=node('button'); button.type='button'; button.dataset.pose=pose; button.setAttribute('aria-label','固定查看：'+label);
-      if(animated) { const image=node('img'); image.alt=''; image.src=`app://local/assets/motion/female/${pose==='work'?'work':'user'}.png`; button.append(image); }
-      button.append(node('span',label)); button.onclick=act(()=>saveStillSetting({stillPose:pose})); $('still-previews').append(button);
+      const image=node('img'); image.alt='';
+      if(animated) image.src=`app://local/assets/motion/female/${pose==='work'?'work':'user'}.png`;
+      else {
+        image.src=`app://local/assets/scene/${profile.poseDirectory}/${pose}.png`;
+        image.className='pose-thumb';
+        image.dataset.posePack=profile.poseDirectory;
+      }
+      button.append(image, node('span',label)); button.onclick=act(()=>saveStillSetting({stillPose:pose})); $('still-previews').append(button);
     }
   }
   for(const button of $('still-previews').children) button.setAttribute('aria-pressed',String(button.dataset.pose===$('still-pose').value));
@@ -372,6 +417,7 @@ async function saveStillSetting(patch) {
   finally { stillSaving--; fillStills(); }
 }
 $('still-pose').onchange=act(()=>saveStillSetting({stillPose:$('still-pose').value}));
+$('ui-theme').onchange=act(()=>saveSpeechChoice({theme:$('ui-theme').value}));
 $('ambience-enabled').onchange=act(()=>saveStillSetting({ambienceEnabled:$('ambience-enabled').checked}));
 for(const [field,key] of [['rain-volume','rainVolume'],['key-volume','keyVolume']]) {
   $(field).oninput=()=>{ $(field+'-label').textContent=$(field).value+'%'; };
@@ -384,6 +430,10 @@ $('tts-resident').onchange = act(async () => { const enabled = $('tts-resident')
 $('cancel-resource').onclick = act(async () => { await run(api.cancelDownload()); });
 $('tts-engine').onchange = act(() => saveSpeechChoice({ttsEngine:$('tts-engine').value}));
 $('qwen-voice').onchange = act(() => saveSpeechChoice({qwenVoice:$('qwen-voice').value}));
+$('voice').onchange = act(() => saveSpeechChoice({voice:Number($('voice').value)}));
+$('speed').onchange = act(() => saveSpeechChoice({speed:Number($('speed').value)}));
+$('microphone').onchange = act(() => saveSpeechChoice({microphone:$('microphone').value}));
+$('remote-enabled').onchange = act(() => saveSpeechChoice({remoteEnabled:$('remote-enabled').checked}));
 $('auto-speak').onchange = act(() => saveSpeechChoice({autoSpeak:$('auto-speak').checked}));
 $('prepare-speech').onchange = act(() => saveSpeechChoice({prepareSpeech:$('prepare-speech').checked}));
 $('completion-sound').onchange = act(() => saveSpeechChoice({completionSound:$('completion-sound').checked}));
@@ -391,14 +441,22 @@ $('preview-completion-sound').onclick = act(() => run(api.previewCompletionSound
 $('retry-tts').onclick = act(() => saveSpeechChoice({ttsResident:true}));
 $('choose-qwen').onclick = act(async () => { acceptWorkspace(await run(api.chooseQwen())); updateSpeechStatus(); });
 $('use-existing-data').onclick = act(() => run(api.useData()));
-$('save-settings').onclick = act(saveSettings); $('preview-voice').onclick = act(async () => { if (settingsDirty) await saveSettings(); await run(api.previewVoice()); }); $('refresh-microphones').onclick = act(refreshDevices);
-for (const id of ['voice','speed','microphone','remote-enabled']) $(id).addEventListener('change', () => markSettingsDirty(true));
+$('save-settings').onclick = act(saveSettings);
+$('discard-settings').onclick = () => { fillSettings({ forceKeys: true }); showSaveStatus('已恢复已保存快捷键'); };
+$('preview-voice').onclick = act(async () => { await run(api.previewVoice()); });
+$('refresh-microphones').onclick = act(refreshDevices);
 $('model').onchange = act(async () => { await run(api.chooseModel($('model').value)); }); $('effort').onchange = act(async () => { await run(api.chooseEffort($('effort').value)); });
 $('close').onclick = () => api.windowAction('hide-workbench'); $('back-chat').onclick = () => api.windowAction('show-chat');
 window.addEventListener('blur', () => { if (document.activeElement?.matches('#shortcuts input,#remote-keys input')) document.activeElement.blur(); });
 document.addEventListener('keydown',e => {
   if (e.isComposing) return;
-  if (e.key === 'Escape') { if (document.body.dataset.navigationOpen === 'true') { e.preventDefault(); closeNavigation(); return; } if (!$('settings').hidden && projectId) selectProject(projectId).catch(() => {}); else api.windowAction('hide-workbench'); }
+  if (e.key === 'Escape') {
+    if (document.body.dataset.navigationOpen === 'true') { e.preventDefault(); closeNavigation(); return; }
+    if (e.target === $('search') && $('search').value) { e.preventDefault(); $('search').value = ''; refreshThreads().catch(() => {}); return; }
+    if (e.target === $('thread-title') && selected) { e.preventDefault(); $('thread-title').value = selected.name; updateRenameButton(); $('thread-title').blur(); return; }
+    if (e.target?.matches?.('input, select, textarea')) { e.preventDefault(); e.target.blur(); return; }
+    if (!$('settings').hidden && projectId) selectProject(projectId).catch(() => {}); else api.windowAction('hide-workbench');
+  }
   if (['ArrowDown','ArrowUp'].includes(e.key) && e.target.matches('.thread-row,.project-row')) { e.preventDefault(); const siblings = [...e.target.parentElement.querySelectorAll('button')]; const i = siblings.indexOf(e.target); siblings[(i+(e.key==='ArrowDown'?1:-1)+siblings.length)%siblings.length]?.focus(); }
 });
 api.onState(state => {
@@ -417,7 +475,7 @@ api.onWorkspace(value => {
   if (JSON.stringify(value.projects) !== JSON.stringify(previous.projects)) renderProjects();
   if (!projectId) refreshWorkspace().catch(() => {});
   const settingsChanged = JSON.stringify(value.settings) !== JSON.stringify(previous.settings);
-  if (settingsChanged && !settingsDirty) fillSettings();
+  if (settingsChanged) fillSettings();
   else {
     if (wallpaperStyle(value.settings) !== wallpaperStyle(previous.settings)) fillStills();
     updateSpeechStatus();
@@ -425,4 +483,3 @@ api.onWorkspace(value => {
 });
 api.onWorkbenchRefresh(page => { refreshWorkspace().then(() => { if (['speech','remote','wallpaper'].includes(page)) { showSettings(); settingsNavigation.show(page === 'remote' ? 'remote-settings' : page === 'wallpaper' ? 'wallpaper-settings' : 'playback-settings'); } else if ($('settings').hidden) return refreshThreads(); }).catch(() => {}); });
 try { current = await run(api.snapshot()); await refreshWorkspace(); ready = true; } catch { ready = true; }
-import inputActions from '../backend/input-actions.cjs';

@@ -249,3 +249,24 @@ test('test build storage is isolated and broken adopted-directory pointers canno
   assert.equal(storage.storageLocation({ defaultStorage: normal, packaged: true }), normal);
   assert.equal(storage.storageLocation({ defaultStorage: testing, packaged: true, override: root }), root);
 });
+
+test('a rejected store transaction does not poison store.queue or block later saves', async t => {
+  const { store, target } = await fixture(t);
+  await assert.rejects(store.transaction(() => { throw new Error('rejected mutation'); }), /rejected mutation/);
+  await assert.doesNotReject(store.queue);
+  await store.saveDraft(target, 'saved after rejection');
+  assert.equal(store.draft(target), 'saved after rejection');
+});
+
+test('theme preference persists valid modes and rejects invalid values', async t => {
+  const { store } = await fixture(t);
+  assert.equal(store.data.settings.theme, 'system');
+  await store.updateSettings({ theme: 'dark' });
+  assert.equal(store.data.settings.theme, 'dark');
+  const reloaded = new WorkspaceStore(join(store.file, '..'));
+  await reloaded.load();
+  assert.equal(reloaded.data.settings.theme, 'dark');
+  await assert.rejects(reloaded.updateSettings({ theme: 'neon' }), /主题/);
+  await reloaded.updateSettings({ theme: 'light' });
+  assert.equal(reloaded.data.settings.theme, 'light');
+});

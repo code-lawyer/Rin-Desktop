@@ -91,10 +91,21 @@ function renderMessages(messages) {
   $('welcome').textContent = busy() ? '正在为你处理…' : reply.userId ? '可以接着问我。' : '想一起做点什么？';
   $('current-message').hidden = !text; $('current-message').dataset.messageId = reply.messageId ?? '';
   const replyChanged = replyText !== text || replyComplete !== reply.complete;
+  $('messages').setAttribute('aria-busy', String(Boolean(text && !reply.complete)));
   if (replyChanged) {
-    renderReply($('reply-body'), text, href => call(api.openLink(href)));
-    if (text && !reply.complete) $('reply-body').append(element('span', 'stream-caret'));
-    replyText = text; replyComplete = reply.complete;
+    const selection = window.getSelection?.();
+    const selectingReply = !reply.complete && selection && !selection.isCollapsed && $('reply-body').contains(selection.anchorNode);
+    if (!selectingReply) {
+      renderReply($('reply-body'), text, href => call(api.openLink(href)));
+      if (text && !reply.complete) {
+        const caret = element('span', 'stream-caret');
+        const tail = $('reply-body').lastElementChild;
+        if (tail && ['P', 'H1', 'H2', 'H3', 'H4', 'BLOCKQUOTE'].includes(tail.tagName)) tail.append(caret);
+        else if (tail && ['UL', 'OL'].includes(tail.tagName) && tail.lastElementChild) tail.lastElementChild.append(caret);
+        else $('reply-body').append(caret);
+      }
+      replyText = text; replyComplete = reply.complete;
+    }
   }
   replyKey = reply.key;
   if (changedTurn || finishedAtBottom) host.scrollTop = 0;
@@ -118,7 +129,8 @@ function measureBubble() {
   const textHeight = $('messages').hidden ? 0 : Math.max(number(replyStyle.minHeight), $('reply-content').getBoundingClientRect().height) + number(replyStyle.marginTop) + number(replyStyle.marginBottom);
   const chrome = number(outer.paddingTop) + number(outer.paddingBottom) + number(card.paddingTop) + number(card.paddingBottom) + 2;
   const fixed = [document.querySelector('.bubble-header'), $('current-target'), $('context-panel'), $('approval'), $('login-panel'), $('error-banner'), $('submission-panel'), $('activity-line'), $('reply-player'), $('composer')].reduce((sum, node) => sum + height(node), 0);
-  const size = { width: (replyText?.length ?? 0) > 900 ? 560 : 440, height: Math.ceil(chrome + fixed + textHeight + 3), viewport: { width: innerWidth, height: innerHeight } };
+  const approvalText = $('approval').hidden ? 0 : $('approval').textContent?.length ?? 0;
+  const size = { width: (replyText?.length ?? 0) > 900 || approvalText > 220 ? 560 : 440, height: Math.ceil(chrome + fixed + textHeight + 3), viewport: { width: innerWidth, height: innerHeight } };
   const key = JSON.stringify(size);
   if (key !== lastMeasurement) { lastMeasurement = key; api.resizeBubble(size); }
 }
@@ -128,11 +140,19 @@ function refreshComposer() {
 }
 function renderApproval(approvals) {
   const host = $('approval');
-  const key = JSON.stringify(approvals); if (key === approvalKey) return; approvalKey = key;
+  const first = approvals[0] ?? null;
+  const key = JSON.stringify(first);
+  const queueText = approvals.length > 1 ? `还有 ${approvals.length - 1} 个请求等待处理` : '';
+  if (key === approvalKey) {
+    const note = host.querySelector('.approval-queue-note');
+    if (note) { note.textContent = queueText; note.hidden = !queueText; }
+    return;
+  }
+  approvalKey = key;
   $('messages').hidden = approvals.length > 0;
   host.replaceChildren(); host.hidden = !approvals.length; if (!approvals.length) return;
   $('bubble-card').scrollTop = 0;
-  const request = approvals[0];
+  const request = first;
   host.dataset.kind = request.kind;
   const name = catalog.agentName(current?.provider);
   const titles = { command: `${name} 需要确认这次操作`, files: `${name} 需要文件修改权限`, permissions: `${name} 需要额外权限`, questions: `${name} 想请你补充信息` };
@@ -159,19 +179,21 @@ function renderApproval(approvals) {
     for (const text of explanation) details.append(element('p', '', text));
     body.append(details);
   }
-  if (approvals.length > 1) body.append(element('p', '', `还有 ${approvals.length - 1} 个请求等待处理`));
+  const queueNote = element('p', 'approval-queue-note', queueText);
+  queueNote.hidden = !queueText;
+  body.append(queueNote);
   const actions = element('div', 'approval-actions');
   const fields = {};
   if (request.kind === 'questions') {
     for (const question of request.questions) {
       const label = element('label', '', question.question); const field = element('input');
       field.type = question.secret ? 'password' : 'text'; field.maxLength = 8000; field.setAttribute('aria-label', question.question);
-      field.placeholder = question.required === false ? '可选' : question.fieldType === 'boolean' ? 'true 或 false' : '';
+      field.placeholder = question.options.length && !question.multiSelect ? '或输入自定义回答' : question.required === false ? '可选' : question.fieldType === 'boolean' ? 'true 或 false' : '';
       fields[question.id] = { field, selected: null };
       if (question.options.length) {
         const select = element('select'); select.setAttribute('aria-label', `${question.header}选项`);
         select.multiple = !!question.multiSelect;
-        if (!select.multiple) { const empty = element('option', '', '选择建议答案，或在下方输入'); empty.value = ''; select.append(empty); }
+        if (!select.multiple) { const empty = element('option', '', '从建议答案中选择…'); empty.value = ''; select.append(empty); }
         for (const option of question.options) { const node = element('option', '', option.label); node.value = option.value ?? option.label; node.title = option.description ?? ''; select.append(node); }
         if (select.multiple) { fields[question.id].selected = select; field.placeholder = '补充答案（可选）'; }
         else select.addEventListener('change', () => { field.value = select.value; });
@@ -242,10 +264,10 @@ function render(state) {
   $('open-dot').hidden = !dots; $('reconnect-dot').hidden = false;
   $('reconnect-dot').disabled = sending || active || state.connection === 'connecting';
   $('new-chat').hidden = dots;
-  $('bubble-status').textContent = state.connection === 'error' ? '需要处理' : state.connection !== 'ready' ? '连接中' : state.status === 'waiting' ? '等待确认' : active ? '处理中' : '已就绪';
-  $('bubble-status').hidden = !active && state.connection === 'ready';
-  $('connection-signal').setAttribute('aria-label', $('bubble-status').textContent);
-  $('connection-signal').title = $('bubble-status').textContent;
+  const statusText = state.connection === 'error' ? '需要处理' : state.connection !== 'ready' ? '连接中' : state.status === 'waiting' ? '等待确认' : active ? '处理中' : '已就绪';
+  $('bubble-status').textContent = statusText;
+  $('bubble-status').classList.toggle('visually-hidden', !active && state.connection === 'ready');
+  $('connection-signal').title = statusText;
   const authentication = codex ? '现有 ChatGPT 登录' : state.login || (claude ? 'API 认证' : state.provider === 'deepseek' ? 'Harness ACP 配置' : 'CLI 原生认证');
   $('connection-label').textContent = dots ? (state.connection === 'ready' ? '已连接 · 私人 dot 通道' : 'Dots 连接需要处理') : state.connection === 'ready' ? `已连接 · ${authentication}` : state.connection === 'authentication' ? `${name} 需要认证` : state.connection === 'error' ? `${name} 连接需要处理` : `正在连接 ${name}`;
   $('connection-label').title = [state.version, state.permissionHint].filter(Boolean).join('\n');
@@ -255,7 +277,7 @@ function render(state) {
   const nextModelKey = JSON.stringify([state.provider, state.models]);
   if (nextModelKey !== modelKey) { modelKey = nextModelKey; $('model-select').replaceChildren(); for (const model of state.models) { const option = element('option', '', model.name); option.value = model.model; $('model-select').append(option); } }
   $('model-select').value = state.model ?? '';
-  $('model-select').disabled = active || state.connection !== 'ready' || state.status === 'error'; $('choose-project').disabled = false; $('new-chat').disabled = active || state.connection !== 'ready' && !state.canStartNew;
+  $('model-select').disabled = active || state.connection !== 'ready' || state.status === 'error'; $('choose-project').disabled = false; $('new-chat').disabled = active || !state.threadId || (state.connection !== 'ready' && !state.canStartNew);
   const submission = state.submission, unresolved = ['pending', 'unknown'].includes(submission?.status);
   if (unresolved) seenSubmissions.add(submission.id);
   if (submission?.status === 'confirmed' && seenSubmissions.delete(submission.id)) drafts.consume(submission);
@@ -265,6 +287,11 @@ function render(state) {
   $('submission-check').disabled = active || sending || state.connection !== 'ready';
   $('submission-release').hidden = !submission?.checkedAt;
   $('submission-release').disabled = active || sending;
+  if (!unresolved || $('submission-release').dataset.submissionId !== submission?.id) {
+    $('submission-release').dataset.armed = 'false';
+    $('submission-release').dataset.submissionId = submission?.id || '';
+    $('submission-release').textContent = '我已核对，保留草稿';
+  }
   $('send-button').disabled = unresolved || active || sending || state.connection !== 'ready' || state.status === 'error';
   $('stop-button').hidden = !active || state.status === 'configuring' || state.approvals.length > 0; $('stop-button').disabled = state.status === 'stopping';
   $('stop-button').textContent = dots ? '打开凛 ↗' : '停止';
@@ -305,12 +332,13 @@ if (isWallpaper) {
   installCompletionSound(api);
   installRemoteNavigation(api,{notice:error,compose:(action,active)=>composerControls?.action(action,active)});
   api.onRemoteText(value=>drafts.appendExternal(value).then(()=>{composerControls?.refresh();}).catch(()=>error('听写文字已保存在草稿中，请重新打开这段对话。')));
-  const showAgentChoices = value => {
+  const applyWorkspace = value => {
+    document.documentElement.dataset.theme = value?.settings?.theme || 'system';
     const changed = populateAgentPicker($('provider-select'), { dots: value.legacyDotsAvailable });
     if (changed && current) render(current);
   };
-  api.workspace().then(r => { if (r.ok) showAgentChoices(r.value); });
-  api.onWorkspace(showAgentChoices);
+  api.workspace().then(r => { if (r.ok) applyWorkspace(r.value); });
+  api.onWorkspace(applyWorkspace);
   speechControls = installSpeech({ api, state: () => current, isBusy: () => busy() || sending || pendingReply, error, measure: refreshComposer, insert: text => { const prompt = $('prompt'); prompt.value += (prompt.value && !/\s$/.test(prompt.value) ? ' ' : '') + text; drafts.edited(); refreshComposer(); saveDraft(); prompt.focus(); } });
   composerControls = installComposerControls({api,drafts,submit:submitDraft,readReply:()=>speechControls.readReply(),isLocked:()=>quitRequest !== null || sending || ['pending','unknown'].includes(current?.submission?.status) || ! $('approval').hidden,isCapturing:()=>speechControls.isCapturing(),error,measure:scheduleMeasure});
   installDraftShutdown();
@@ -364,24 +392,33 @@ if (isWallpaper) {
     lastLayout = layout;
     const shell = $('chat-view'); shell.dataset.reading = String(!!layout.fullscreen);
     if (!layout.fullscreen) shell.dataset.detached = String(!!layout.detached);
+    $('align-chat').disabled = !layout.detached;
     if (layout.side) shell.dataset.side = layout.side;
     positionTail();
     $('reading-label').textContent = layout.fullscreen ? '返回气泡' : '展开阅读';
     $('reading-button').setAttribute('aria-label', layout.fullscreen ? '返回气泡' : '展开阅读');
     scheduleMeasure();
   });
+  $('chat-view').addEventListener('click', event => {
+    if ($('chat-view').dataset.reading === 'true' && event.target === $('chat-view')) api.windowAction('leave-reading');
+  });
   window.addEventListener('resize', () => { updateReplyScroller(); positionTail(); scheduleMeasure(); });
   $('reading-button').addEventListener('click', () => api.windowAction('toggle-reading'));
   $('settings-button').addEventListener('click', () => {
-    $('context-panel').hidden = !$('context-panel').hidden;
-    if (!$('context-panel').hidden) $('context-panel').scrollIntoView({ block: 'start' });
-    $('settings-button').setAttribute('aria-expanded', String(!$('context-panel').hidden)); scheduleMeasure();
+    const opening = $('context-panel').hidden;
+    $('context-panel').hidden = !opening;
+    $('reply-player').hidden = opening;
+    if (opening) $('context-panel').scrollIntoView({ block: 'start' });
+    $('settings-button').setAttribute('aria-expanded', String(opening)); scheduleMeasure();
   });
   document.addEventListener('keydown', event => {
     if (event.isComposing) return;
     if (event.key === 'Escape') {
+      if (event.target?.closest?.('#approval') && event.target.matches('input, select, textarea')) {
+        event.preventDefault(); event.target.blur(); return;
+      }
       if ($('chat-view').dataset.reading === 'true') api.windowAction('leave-reading');
-      else if (!$('context-panel').hidden) { $('context-panel').hidden = true; $('settings-button').setAttribute('aria-expanded', 'false'); scheduleMeasure(); }
+      else if (!$('context-panel').hidden) { $('context-panel').hidden = true; $('reply-player').hidden = false; $('settings-button').setAttribute('aria-expanded', 'false'); scheduleMeasure(); }
       else api.windowAction('hide-chat');
     }
   });
@@ -402,7 +439,7 @@ if (isWallpaper) {
     const reject = message => { error(message); if (fromShortcut) api.windowAction('show-chat'); };
     if (['pending','unknown'].includes(current?.submission?.status)) { reject('请先核查上次发送结果，原稿已保留。'); return; }
     if (busy() || sending) { reject('当前任务尚未结束，请等待回复完成后再发送。'); return; }
-    if (current?.connection !== 'ready' || current?.status === 'error') { reject('Codex 尚未就绪，草稿已保留。'); return; }
+    if (current?.connection !== 'ready' || current?.status === 'error') { reject(`${catalog.agentName(current?.provider)} 尚未就绪，草稿已保留。`); return; }
     if (speechControls?.isCapturing()) { reject('请先完成听写、等待识别结束，再按发送键。'); return; }
     if (composing) { reject('请先确认输入法中的文字，再发送。'); return; }
     const text = $('prompt').value.trim(); if (!text) { if (fromShortcut) reject('当前没有可发送的草稿。'); return; }
@@ -421,10 +458,18 @@ if (isWallpaper) {
   $('composer').addEventListener('submit', event => { event.preventDefault(); submitDraft(); });
   $('submission-check').addEventListener('click', () => call(api.submission('check', current.submission?.id)));
   $('submission-release').addEventListener('click', async () => {
-    if (confirm('请先在会话记录中核对原稿。解除保护不会重新发送；之后手动发送仍可能重复执行。确认已核对并保留原稿？')) {
-      const result = await call(api.submission('release', current.submission?.id));
-      if (result.ok) await drafts.recover(result.value);
+    const button = $('submission-release');
+    if (button.dataset.armed !== 'true') {
+      button.dataset.armed = 'true';
+      button.textContent = '再次点击确认解除保护';
+      $('submission-message').textContent = '请先在会话记录中核对原稿。解除保护不会重新发送；再次点击确认保留原稿。';
+      scheduleMeasure();
+      return;
     }
+    button.dataset.armed = 'false';
+    button.textContent = '我已核对，保留草稿';
+    const result = await call(api.submission('release', current.submission?.id));
+    if (result.ok) await drafts.recover(result.value);
   });
   $('prompt').addEventListener('compositionstart', () => { composing = true; });
   $('prompt').addEventListener('compositionend', () => { composing = false; });
