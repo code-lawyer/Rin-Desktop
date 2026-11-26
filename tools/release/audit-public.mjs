@@ -16,6 +16,23 @@ const secrets = [
 ];
 const normalizedText = value => value.replaceAll('\\\\', '\\').replaceAll('\\', '/').toLowerCase();
 
+export function publicTextEncoding(data) {
+  if (data[0] === 0xff && data[1] === 0xfe) return 'utf-16le';
+  if (data[0] === 0xfe && data[1] === 0xff) return 'utf-16be';
+  return data.subarray(0, 8192).includes(0) ? null : 'utf-8';
+}
+
+export function publicTextProblems(data, directory) {
+  const encoding = publicTextEncoding(data);
+  if (!encoding) return [];
+  const content = encoding === 'utf-8' ? data.toString('utf8') : new TextDecoder(encoding).decode(data);
+  const problems = [], normalized = normalizedText(content);
+  if (secrets.some(pattern => pattern.test(content))) problems.push('secret pattern');
+  const privateLocations = [directory, process.env.USERPROFILE].filter(Boolean).map(normalizedText);
+  if (privateLocations.some(path => normalized.includes(path))) problems.push('private machine reference');
+  return problems;
+}
+
 export async function auditPublic(directory, { staged = false, worktree = false } = {}) {
   if (staged && worktree) throw new Error('Choose --staged or --worktree, not both.');
   const git = (args, options) => execFileSync('git', ['-c', `safe.directory=${directory}`, ...args], { cwd: directory, windowsHide: true, ...options });
@@ -30,7 +47,6 @@ export async function auditPublic(directory, { staged = false, worktree = false 
     }
   }
   const names = staged ? index.keys() : new Set(files(...(worktree ? ['--cached'] : []), '--others', '--exclude-standard'));
-  const privateLocations = [directory, process.env.USERPROFILE].filter(Boolean).map(normalizedText);
   const report = { staged, worktree, files: 0, bytes: 0, problems: [] };
   const problem = (file, reason) => report.problems.push({ file, reason });
 
@@ -63,11 +79,7 @@ export async function auditPublic(directory, { staged = false, worktree = false 
     report.files++;
     report.bytes += data.length;
     if (data.length > 20 * 1024 * 1024) problem(name, 'unexpected large source file');
-    if (data.subarray(0, 8192).includes(0)) continue;
-    const content = data.toString('utf8');
-    if (secrets.some(pattern => pattern.test(content))) problem(name, 'secret pattern');
-    const normalized = normalizedText(content);
-    if (privateLocations.some(path => normalized.includes(path))) problem(name, 'private machine reference');
+    for (const reason of publicTextProblems(data, directory)) problem(name, reason);
   }
   return report;
 }

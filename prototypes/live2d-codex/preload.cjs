@@ -31,6 +31,7 @@ contextBridge.exposeInMainWorld('companion', {
   renameThread: (id, name, provider, projectId) => ipcRenderer.invoke('workbench:rename', id, name, provider, projectId),
   chooseEffort: effort => ipcRenderer.invoke('workbench:effort', effort),
   draft: (target, text) => ipcRenderer.invoke('workbench:draft', target, text),
+  swapRecoveredDraft: (target, id) => ipcRenderer.invoke('workbench:swap-recovered-draft', target, id),
   draftFlushed: (id, result) => ipcRenderer.send('draft:flushed', id, result),
   onDraftFlush: callback => { const listener = (_event, id) => callback(id); ipcRenderer.on('draft:flush', listener); return () => ipcRenderer.removeListener('draft:flush', listener); },
   onDraftFlushCancelled: callback => { const listener = (_event, message) => callback(message); ipcRenderer.on('draft:flush-cancelled', listener); return () => ipcRenderer.removeListener('draft:flush-cancelled', listener); },

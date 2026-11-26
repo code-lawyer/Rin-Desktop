@@ -60,7 +60,7 @@ async function fixture({ autoFlush = true, hasRenderer = true, crashed = false }
   const target = { provider: 'codex', cwd: 'project', threadId: 'thread' };
   drafts.restore(target); await tick();
   const renderer = vm.createContext({
-    quitRequest: null, draftTimer: null, drafts, $: () => prompt, window: { addEventListener: (name, fn) => rendererEvents.set(name, fn) },
+    quitRequest: null, recoveringDraft: false, draftTimer: null, drafts, $: () => prompt, window: { addEventListener: (name, fn) => rendererEvents.set(name, fn) },
     api: { onDraftFlush: fn => rendererEvents.set('draft:flush', fn), onDraftFlushCancelled: fn => rendererEvents.set('draft:flush-cancelled', fn),
       draftFlushed: (id, result) => ipcEvents.get('draft:flushed')(event, id, result) },
     speechControls: { cancelCapture: async () => events.push('capture-cancelled') }, composerControls: { refresh() {} },

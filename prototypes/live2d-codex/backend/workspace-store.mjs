@@ -13,6 +13,7 @@ export { pathKey } from './path-identity.mjs';
 const { isCliAgent, isStoredCliAgent } = catalog;
 
 export const { DEFAULT_SHORTCUTS, DEFAULT_REMOTE_KEYS } = actions;
+export const DRAFT_LIMIT = 64000;
 const { DEFAULT_CHARACTER, characterProfile, isQwenVoice, isChineseVoice } = characters;
 const defaults = () => ({ format: 1, projects: [], drafts: {}, settings: { character: DEFAULT_CHARACTER, wallpaperKind: 'artwork', animePlayback: 'poses', theme: 'system', completionSound: true, ttsResident: false, ttsEngine: 'qwen', qwenVoice: 'Serena', qwenRoot: '', autoSpeak: false, prepareSpeech: false, voice: 3, speed: 1, microphone: '', shortcuts: { ...DEFAULT_SHORTCUTS }, remoteEnabled: false, remoteKeys: { ...DEFAULT_REMOTE_KEYS } } });
 export const draftKey = target => {
@@ -33,6 +34,11 @@ export function validateWorkspace(saved) {
   }
   if (!object(saved.drafts ?? {})) throw new Error('草稿记录无效。');
   for (const d of Object.values(saved.drafts ?? {})) if (!object(d) || typeof d.text !== 'string' || d.dictationIds !== undefined && (!Array.isArray(d.dictationIds) || d.dictationIds.some(id => typeof id !== 'string'))) throw new Error('草稿记录无效。');
+  if (!object(saved.recoveredDrafts ?? {})) throw new Error('保留草稿记录无效。');
+  for (const drafts of Object.values(saved.recoveredDrafts ?? {})) {
+    if (!Array.isArray(drafts) || drafts.some(d => !object(d) || typeof d.id !== 'string' || typeof d.text !== 'string' || d.text.length > DRAFT_LIMIT) ||
+        new Set(drafts.map(d => d.id)).size !== drafts.length) throw new Error('保留草稿记录无效。');
+  }
   if (!object(saved.submissions ?? {})) throw new Error('发送记录无效。');
   for (const [provider, s] of Object.entries(saved.submissions ?? {})) {
     if (!isStoredCliAgent(provider) || !object(s) || typeof s.id !== 'string' || typeof s.text !== 'string' || s.target?.provider !== provider || !['pending','unknown','confirmed','released','not-sent'].includes(s.status)) throw new Error('发送记录无效。');
@@ -152,9 +158,32 @@ export class WorkspaceStore {
     });
   }
   draft(target) { return this.data.drafts[draftKey(target)]?.text ?? ''; }
-  draftSnapshot(target) {
-    const draft=this.data.drafts[draftKey(target)];
-    return {text:draft?.text ?? '',dictationIds:[...(draft?.dictationIds ?? [])]};
+  draftSnapshot(target, data = this.data) {
+    const key = draftKey(target), draft = data.drafts[key], saved = data.recoveredDrafts?.[key];
+    return { text: draft?.text ?? '', dictationIds: [...(draft?.dictationIds ?? [])],
+      ...(saved?.length ? { recoveries: saved.map(({ id, text }) => ({ id, length: text.length })) } : {}) };
+  }
+  preserveDraft(data, target, id, text) {
+    const key = draftKey(target);
+    if (typeof text !== 'string' || text.length > DRAFT_LIMIT) throw new Error('保留草稿内容无效。');
+    data.recoveredDrafts ??= {};
+    const drafts = data.recoveredDrafts[key] ??= [];
+    drafts.push({ id, text });
+  }
+  swapRecoveredDraft(target, id) {
+    return this.transaction(data => {
+      const key = draftKey(target), drafts = data.recoveredDrafts?.[key];
+      const index = drafts?.findIndex(draft => draft.id === id) ?? -1;
+      if (index < 0) throw new Error('这份保留草稿已变更，请重新选择。');
+      const selected = drafts[index].text;
+      const current = data.drafts[key]?.text ?? '';
+      if (current.length > DRAFT_LIMIT) throw new Error('请先缩短当前输入，再切换保留草稿。');
+      this.setDraft(data, target, selected);
+      if (current && current !== selected) drafts[index].text = current;
+      else drafts.splice(index, 1);
+      if (!drafts.length) delete data.recoveredDrafts[key];
+      return this.draftSnapshot(target, data);
+    });
   }
   async appendDictation(target, text, id) {
     return this.transaction(data => {
@@ -167,7 +196,7 @@ export class WorkspaceStore {
   setDraft(data, target, text, dictationId) {
     const key = draftKey(target);
     if (target.provider !== 'dots' && (typeof target.cwd !== 'string' || !data.projects.some(p => pathKey(p.cwd) === pathKey(target.cwd)))) throw new Error('草稿的项目不存在。');
-    if (typeof text !== 'string' || text.length > 64000 || (target.threadId !== null && target.threadId !== undefined && (typeof target.threadId !== 'string' || target.threadId.length > 200))) throw new Error('草稿内容无效。');
+    if (typeof text !== 'string' || text.length > DRAFT_LIMIT || (target.threadId !== null && target.threadId !== undefined && (typeof target.threadId !== 'string' || target.threadId.length > 200))) throw new Error('草稿内容无效。');
     const dictationIds=[...(data.drafts[key]?.dictationIds ?? []),...(dictationId?[dictationId]:[])].slice(-32);
     if (text) data.drafts[key] = { text, updatedAt: Date.now(), ...(dictationIds.length?{dictationIds}:{}) }; else delete data.drafts[key];
     // Unsent input is user data, not a bounded/reconstructible history cache.

@@ -11,9 +11,10 @@ if(process.argv.includes('--video') || process.argv.includes('--fixture-video'))
   let remote={phase:'connected',audio:'idle',config:{device:{name:'RC003',id:'fixture'},buttons,autoConnect:true},devices:[],keysAvailable:true};
   const state={provider:'codex',connection:'ready',status:'idle',cwd:'C:/Projects/Example',projectName:'Documents',threadId:'fixture-thread',threadName:'遥控器语音体验',model:'fixture-model',models:[{name:'Fixture model',model:'fixture-model',efforts:[{reasoningEffort:'medium'}]}],effort:'medium',messages:[{role:'assistant',text:'可以用，已收到你的消息，中文显示和回复都正常。',complete:true}],approvals:[],activity:''};
   const workspace={version:1,projects:[{id:'example',name:'Documents',cwd:state.cwd}],settings:{character:'female',animePlayback:'poses',ttsResident:true,ttsEngine:'qwen',qwenVoice:'Serena',autoSpeak:false,prepareSpeech:false,playbackVolume:.8,completionSound:true,shortcuts:{chat:'Control+Alt+Space',record:'Control+Alt+V',send:'Control+Alt+Enter',readReply:'Control+Alt+R',stopSpeech:'Control+Alt+S',workbench:'Control+Alt+P'},remoteKeys:{},rc003:remote.config},speech:{phase:'ready',asr:true,engine:'qwen',engines:{qwen:true,kokoro:true}},resources:{phase:'idle',packs:[{id:'asr',label:'本地听写',installed:true,bytes:200000000},{id:'qwen',label:'自然语音',installed:true,bytes:4000000000},{id:'kokoro',label:'轻量语音',installed:true,bytes:200000000}]}};
-  let draft='',sends=0,spoken=0,renderInfo=null,interruptions=0,openedLink='';
+  let draft='',sends=0,spoken=0,renderInfo=null,interruptions=0,openedLink='',settingsError='',desktopRetries=0;
   let presentation={mode:'wallpaper',wallpaperKind:'artwork',character:'female',characterRequest:0,chatVisible:false,paused:false,manualPause:false,stills:{animePlayback:'poses'}};
   const applyEvent=(name,value)=>{
+    if(name==='settings-error'){settingsError=value;return;}
     if(name==='presentation')presentation={...presentation,...value,stills:{...presentation.stills,...value.stills}};
     if(name==='state')Object.assign(state,value);
     if(name==='workspace'){if(value.version===undefined)workspace.version++;Object.assign(workspace,value);value=workspace;}
@@ -27,10 +28,11 @@ if(process.argv.includes('--video') || process.argv.includes('--fixture-video'))
     interrupt:()=>{interruptions++;applyEvent('state',{status:'idle',approvals:[]});return ok();},
     remote:()=>ok(remote),draft:(_target,text)=>{if(text!==undefined)draft=text;return ok({text:draft});},resizeBubble(){},windowAction:()=>ok(),stopSpeech:()=>ok(),capture:()=>ok(),listThreads:()=>ok({data:[{id:'fixture-first',name:'第一段对话',updatedAt:1},{id:'fixture-second',name:'第二段对话',updatedAt:2}],nextCursor:null}),history:()=>ok({turns:[],nextCursor:null,localOnly:!!state.historyLocalOnly}),learnKey:()=>ok(),send:()=>{sends++;return ok({cancelled:true});},synthesize:()=>{spoken++;return new Promise(()=>{});},setPlaybackVolume:value=>{workspace.settings.playbackVolume=value;workspace.version++;emit('workspace',workspace);return ok(workspace);},
     presentation:()=>ok(presentation),onPresentation:fn=>on('presentation',fn),avatarAnchor(){},commitWallpaper:()=>ok(true),finishWallpaper:()=>({ok:true,value:true}),
+    wallpaperControl:action=>{if(action==='retry-desktop'){desktopRetries++;applyEvent('workspace',{desktopWallpaper:{phase:'ready'}});}return ok(workspace);},
     renderReady:info=>{renderInfo=info;},
-    saveSettings:async patch=>{if('character' in patch || 'wallpaperKind' in patch)await ipcRenderer.invoke('fixture:wallpaper-choice',patch);else{Object.assign(workspace.settings,patch);workspace.version++;emit('workspace',workspace);}return {ok:true,value:workspace};}};
+    saveSettings:async patch=>{if(settingsError)return {ok:false,error:settingsError};if('character' in patch || 'wallpaperKind' in patch)await ipcRenderer.invoke('fixture:wallpaper-choice',patch);else{Object.assign(workspace.settings,patch);workspace.version++;emit('workspace',workspace);}return {ok:true,value:workspace};}};
   contextBridge.exposeInMainWorld('companion',api);
-  contextBridge.exposeInMainWorld('interfaceFixture',{emit:(name,value)=>{if(name==='remote')remote={...remote,...value};applyEvent(name,name==='remote'?remote:value);},stats:()=>({sends,draft,spoken,renderInfo,interruptions,openedLink,volume:workspace.settings.playbackVolume})});
+  contextBridge.exposeInMainWorld('interfaceFixture',{emit:(name,value)=>{if(name==='remote')remote={...remote,...value};applyEvent(name,name==='remote'?remote:value);},stats:()=>({sends,draft,spoken,renderInfo,interruptions,openedLink,desktopRetries,volume:workspace.settings.playbackVolume})});
 } else {
   const {app,BrowserWindow,protocol,net,ipcMain}=require('electron');
   const {join,resolve}=require('node:path');

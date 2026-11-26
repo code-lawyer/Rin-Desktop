@@ -24,11 +24,36 @@ let pendingReply = false, previousUserId = null, replyKey = '', replyText = null
 let replyScroller;
 let measureTimer, lastMeasurement = '';
 let draftTimer, speechControls, composerControls;
-let quitRequest = null;
+let quitRequest = null, recoveringDraft = false;
 const seenSubmissions = new Set();
 const drafts = createDraftSession({ request: (...args) => api.draft(...args), getText: () => $('prompt').value,
-  setText: text => { $('prompt').value = text; refreshComposer(); }, error });
+  setText: text => { $('prompt').value = text; refreshComposer(); }, error, onRecovery: renderDraftRecoveries });
 function saveDraft() { clearTimeout(draftTimer); return drafts.save(); }
+function renderDraftRecoveries(copies) {
+  $('draft-recoveries').hidden = copies.length === 0;
+  const buttons = copies.map(({ id, length }, index) => {
+    const button = element('button', 'text-button', `切换到保留稿 ${index + 1}（${length} 字）`);
+    button.type = 'button'; button.dataset.recoveryId = id;
+    button.disabled = recoveringDraft || busy() || sending || ['pending', 'unknown'].includes(current?.submission?.status);
+    return button;
+  });
+  $('draft-recovery-options').replaceChildren(...buttons);
+  scheduleMeasure();
+}
+async function recoverDraft(destination, operation) {
+  if (quitRequest !== null || recoveringDraft || busy() || sending || composing || speechControls?.isCapturing()) return;
+  recoveringDraft = true; $('prompt').readOnly = true; clearTimeout(draftTimer); render(current);
+  let failure;
+  try {
+    const result = await drafts.recover(destination, operation);
+    if (!result?.ok) failure = result?.error || '未能切换草稿，请重试。';
+  } catch (cause) { failure = cause.message; }
+  finally {
+    recoveringDraft = false; $('prompt').readOnly = quitRequest !== null; render(current);
+    if (failure) error(failure);
+    else $('prompt').focus();
+  }
+}
 function installDraftShutdown() {
   api.onDraftFlush?.(async id => {
     quitRequest = id; $('prompt').readOnly = true; clearTimeout(draftTimer); composerControls?.refresh();
@@ -41,7 +66,7 @@ function installDraftShutdown() {
     }
   });
   api.onDraftFlushCancelled?.(message => {
-    quitRequest = null; $('prompt').readOnly = false; composerControls?.refresh(); error(message); $('prompt').focus();
+    quitRequest = null; $('prompt').readOnly = recoveringDraft; composerControls?.refresh(); error(message); $('prompt').focus();
   });
 }
 function restoreDraft(state) {
@@ -128,7 +153,7 @@ function measureBubble() {
   const replyStyle = getComputedStyle($('messages'));
   const textHeight = $('messages').hidden ? 0 : Math.max(number(replyStyle.minHeight), $('reply-content').getBoundingClientRect().height) + number(replyStyle.marginTop) + number(replyStyle.marginBottom);
   const chrome = number(outer.paddingTop) + number(outer.paddingBottom) + number(card.paddingTop) + number(card.paddingBottom) + 2;
-  const fixed = [document.querySelector('.bubble-header'), $('current-target'), $('context-panel'), $('approval'), $('login-panel'), $('error-banner'), $('submission-panel'), $('activity-line'), $('reply-player'), $('composer')].reduce((sum, node) => sum + height(node), 0);
+  const fixed = [document.querySelector('.bubble-header'), $('current-target'), $('context-panel'), $('approval'), $('login-panel'), $('error-banner'), $('submission-panel'), $('draft-recoveries'), $('activity-line'), $('reply-player'), $('composer')].reduce((sum, node) => sum + height(node), 0);
   const approvalText = $('approval').hidden ? 0 : $('approval').textContent?.length ?? 0;
   const size = { width: (replyText?.length ?? 0) > 900 || approvalText > 220 ? 560 : 440, height: Math.ceil(chrome + fixed + textHeight + 3), viewport: { width: innerWidth, height: innerHeight } };
   const key = JSON.stringify(size);
@@ -280,19 +305,23 @@ function render(state) {
   $('model-select').disabled = active || state.connection !== 'ready' || state.status === 'error'; $('choose-project').disabled = false; $('new-chat').disabled = active || !state.threadId || (state.connection !== 'ready' && !state.canStartNew);
   const submission = state.submission, unresolved = ['pending', 'unknown'].includes(submission?.status);
   if (unresolved) seenSubmissions.add(submission.id);
-  if (submission?.status === 'confirmed' && seenSubmissions.delete(submission.id)) drafts.consume(submission);
+  else if (submission && seenSubmissions.delete(submission.id)) {
+    if (submission.status === 'confirmed') drafts.consume(submission);
+    else if (submission.status === 'not-sent') pendingReply = false;
+  }
   $('submission-panel').hidden = !unresolved;
   $('submission-message').textContent = submission?.error || (submission?.status === 'pending' ? '正在确认是否送达。原稿已保存，请勿重复发送。' : submission?.checkMessage || '上次发送结果尚未确定。原稿已保留，请先核查会话。');
   $('submission-copy').textContent = unresolved ? submission.text : '';
-  $('submission-check').disabled = active || sending || state.connection !== 'ready';
+  $('submission-check').disabled = active || sending || recoveringDraft || state.connection !== 'ready';
   $('submission-release').hidden = !submission?.checkedAt;
-  $('submission-release').disabled = active || sending;
+  $('submission-release').disabled = active || sending || recoveringDraft;
   if (!unresolved || $('submission-release').dataset.submissionId !== submission?.id) {
     $('submission-release').dataset.armed = 'false';
     $('submission-release').dataset.submissionId = submission?.id || '';
     $('submission-release').textContent = '我已核对，保留草稿';
   }
-  $('send-button').disabled = unresolved || active || sending || state.connection !== 'ready' || state.status === 'error';
+  $('send-button').disabled = unresolved || active || sending || recoveringDraft || state.connection !== 'ready' || state.status === 'error';
+  for (const button of $('draft-recovery-options').querySelectorAll('button')) button.disabled = unresolved || active || sending || recoveringDraft;
   $('stop-button').hidden = !active || state.status === 'configuring' || state.approvals.length > 0; $('stop-button').disabled = state.status === 'stopping';
   $('stop-button').textContent = dots ? '打开凛 ↗' : '停止';
   $('activity-label').textContent = state.activity; $('session-label').textContent = state.threadId ? `${state.restored ? '已恢复' : '会话'} · ${state.threadId.slice(-8)}` : '新对话';
@@ -339,11 +368,11 @@ if (isWallpaper) {
   };
   api.workspace().then(r => { if (r.ok) applyWorkspace(r.value); });
   api.onWorkspace(applyWorkspace);
-  speechControls = installSpeech({ api, state: () => current, isBusy: () => busy() || sending || pendingReply, error, measure: refreshComposer, insert: text => { const prompt = $('prompt'); prompt.value += (prompt.value && !/\s$/.test(prompt.value) ? ' ' : '') + text; drafts.edited(); refreshComposer(); saveDraft(); prompt.focus(); } });
-  composerControls = installComposerControls({api,drafts,submit:submitDraft,readReply:()=>speechControls.readReply(),isLocked:()=>quitRequest !== null || sending || ['pending','unknown'].includes(current?.submission?.status) || ! $('approval').hidden,isCapturing:()=>speechControls.isCapturing(),error,measure:scheduleMeasure});
+  speechControls = installSpeech({ api, state: () => current, isBusy: () => busy() || sending || recoveringDraft || pendingReply, error, measure: refreshComposer, insert: text => { const prompt = $('prompt'); prompt.value += (prompt.value && !/\s$/.test(prompt.value) ? ' ' : '') + text; drafts.edited(); refreshComposer(); saveDraft(); prompt.focus(); } });
+  composerControls = installComposerControls({api,drafts,submit:submitDraft,readReply:()=>speechControls.readReply(),isLocked:()=>quitRequest !== null || sending || recoveringDraft || ['pending','unknown'].includes(current?.submission?.status) || ! $('approval').hidden,isCapturing:()=>speechControls.isCapturing(),error,measure:scheduleMeasure});
   installDraftShutdown();
   api.onInputAction(action => {
-    if (quitRequest !== null) return;
+    if (quitRequest !== null || recoveringDraft) return;
     if (action === 'record') speechControls.toggleCapture();
     else if (action === 'readReply') speechControls.readReply();
     else if (action === 'send') submitDraft(true);
@@ -435,7 +464,7 @@ if (isWallpaper) {
   $('cancel-login-button').addEventListener('click', () => call(api.cancelLogin()));
   $('stop-button').addEventListener('click', () => call(current?.provider === 'dots' ? api.openDot() : api.interrupt()));
   async function submitDraft(fromShortcut = false) {
-    if (quitRequest !== null) return;
+    if (quitRequest !== null || recoveringDraft) return;
     const reject = message => { error(message); if (fromShortcut) api.windowAction('show-chat'); };
     if (['pending','unknown'].includes(current?.submission?.status)) { reject('请先核查上次发送结果，原稿已保留。'); return; }
     if (busy() || sending) { reject('当前任务尚未结束，请等待回复完成后再发送。'); return; }
@@ -468,9 +497,16 @@ if (isWallpaper) {
     }
     button.dataset.armed = 'false';
     button.textContent = '我已核对，保留草稿';
-    const result = await call(api.submission('release', current.submission?.id));
-    if (result.ok) await drafts.recover(result.value);
+    const { id, target } = current.submission;
+    await recoverDraft(target, () => api.submission('release', id));
   });
+  $('draft-recovery-options').addEventListener('click', event => {
+    const id = event.target.closest('button')?.dataset.recoveryId;
+    if (!id) return;
+    const target = { provider: current.provider ?? 'codex', cwd: current.cwd, threadId: current.threadId };
+    recoverDraft(target, () => api.swapRecoveredDraft(target, id));
+  });
+  $('draft-recoveries').addEventListener('toggle', scheduleMeasure);
   $('prompt').addEventListener('compositionstart', () => { composing = true; });
   $('prompt').addEventListener('compositionend', () => { composing = false; });
   $('prompt').addEventListener('keydown', event => {

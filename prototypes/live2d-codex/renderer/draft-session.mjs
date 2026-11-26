@@ -1,11 +1,16 @@
 // Own the draft target separately from the backend's in-flight thread creation.
-export function createDraftSession({ request, getText, setText, error }) {
+export function createDraftSession({ request, getText, setText, error, onRecovery = () => {} }) {
   let target, version = 0, loaded = false, dirty = false, baseline = '', reading;
   let applied = new Set(), cleared;
   // Keep the latest unsaved copy for each destination, even after navigating
   // away. A late acknowledgement can only discard the copy that it saved.
   const unsaved = new Map(), writes = new Map(), pending = new Set();
   const key = value => JSON.stringify([value?.provider ?? 'codex', value?.cwd, value?.threadId ?? null]);
+  function applySnapshot(snapshot) {
+    loaded = true; dirty = false; baseline = snapshot.text;
+    applied = new Set(snapshot.dictationIds ?? []);
+    setText(snapshot.text);
+  }
   function write(destination, text, dictationIds = [...applied]) {
     const id = key(destination), copy = { target: { ...destination }, text, dictationIds };
     unsaved.set(id, copy); writes.set(id, (writes.get(id) ?? 0) + 1);
@@ -43,6 +48,7 @@ export function createDraftSession({ request, getText, setText, error }) {
   function restore(next, { creatingThread = false } = {}) {
     if (key(next) === key(target)) return;
     cleared = null;
+    onRecovery([]);
     const promoted = creatingThread && (target?.provider ?? 'codex') === (next.provider ?? 'codex') && target?.cwd === next.cwd && !target.threadId && !!next.threadId && (loaded || dirty || getText());
     if (promoted) {
       // Text typed while thread/start was pending belongs to this new thread,
@@ -58,18 +64,17 @@ export function createDraftSession({ request, getText, setText, error }) {
       return reading;
     }
     save(); target = { ...next }; loaded = false; dirty = false; baseline = ''; applied = new Set();
-    const expected = ++version; setText('');
+    const expected = ++version, destination = target; setText('');
     const retained = unsaved.get(key(next));
     if (retained) {
       loaded = true; dirty = true; baseline = retained.text;
       applied = new Set(retained.dictationIds); setText(retained.text);
-      reading = Promise.resolve();
-      return reading;
     }
     reading = request(next).then(result => {
-      if (result?.ok && expected === version && !getText()) {
-        const snapshot=typeof result.value==='string'?{text:result.value}:result.value;
-        loaded = true; baseline = snapshot.text; applied = new Set(snapshot.dictationIds ?? []); setText(snapshot.text);
+      if (result?.ok && destination === target) {
+        const snapshot = typeof result.value === 'string' ? { text: result.value } : result.value;
+        onRecovery(snapshot.recoveries ?? []);
+        if (!retained && expected === version && !getText()) applySnapshot(snapshot);
       }
       else if (!result?.ok && expected === version) error(result?.error || '草稿未能读取。');
     }).catch(() => { if (expected === version) error('草稿未能读取，请稍后重试。'); });
@@ -90,12 +95,19 @@ export function createDraftSession({ request, getText, setText, error }) {
     if (getText().trim() !== submission.text.trim()) return;
     setText(''); edited(); await save();
   }
-  async function recover(submission) {
-    await reading;
-    if (key(submission.target) !== key(target)) return;
-    const current = getText();
-    if (current.trim() === submission.text.trim()) return;
-    setText(submission.text + (current ? '\n\n' + current : '')); edited(); await save();
+  async function recover(destination, operation) {
+    const editor = target;
+    await flush();
+    if (editor !== target) return { ok: false, error: '项目或会话已切换，请重试。' };
+    const expected = version;
+    const result = await operation();
+    if (result?.ok && expected === version && key(destination) === key(target)) {
+      const snapshot = result.value.draft ?? result.value;
+      cleared = null;
+      applySnapshot(snapshot);
+      onRecovery(snapshot.recoveries ?? []);
+    }
+    return result;
   }
   async function flush() {
     await reading;

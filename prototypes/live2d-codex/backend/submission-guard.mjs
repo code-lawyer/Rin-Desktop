@@ -1,6 +1,6 @@
 import { EventEmitter } from 'node:events';
 import { randomUUID, createHash } from 'node:crypto';
-import { draftKey } from './workspace-store.mjs';
+import { draftKey, DRAFT_LIMIT } from './workspace-store.mjs';
 
 export const unresolvedSubmission = record => ['pending', 'unknown'].includes(record?.status);
 const fingerprint = rows => createHash('sha256').update(JSON.stringify(rows.map(row => row.text))).digest('hex');
@@ -38,7 +38,7 @@ export class SubmissionGuard extends EventEmitter {
     });
   }
   async update(provider, id, patch) {
-    await this.store.transaction(data => {
+    const draft = await this.store.transaction(data => {
       const record = data.submissions?.[provider];
       if (record?.id !== id || !unresolvedSubmission(record)) return;
       const { status, target, userMessageId, baseline, checkedAt, checkMessage } = patch;
@@ -54,15 +54,19 @@ export class SubmissionGuard extends EventEmitter {
       }
       if (status === 'released') {
         const current = data.drafts[draftKey(record.target)]?.text ?? '';
-        this.store.setDraft(data, record.target, !current || current.trim() === record.text.trim() ? record.text : record.text + '\n\n' + current);
+        const combined = !current || current.trim() === record.text.trim() ? record.text : record.text + '\n\n' + current;
+        if (combined.length <= DRAFT_LIMIT) this.store.setDraft(data, record.target, combined);
+        else this.store.preserveDraft(data, record.target, record.id, record.text);
+        return this.store.draftSnapshot(record.target, data);
       }
     });
     this.errors.delete(provider); this.publish(provider);
+    return draft;
   }
   async send(backend, provider, text, expected) {
     if (this.active.has(provider) || unresolvedSubmission(this.snapshot(provider))) throw new Error('上次发送结果尚未确定，请先核查；原稿已保留。');
     if (backend.busy || backend.closed || backend.state.connection !== 'ready' || backend.state.status === 'error') throw new Error('Agent 尚未就绪，请先完成任务或恢复连接。');
-    if (typeof text !== 'string' || !text.trim() || text.length > 64000) throw new Error('请输入 1 至 64000 个字符的任务。');
+    if (typeof text !== 'string' || !text.trim() || text.length > DRAFT_LIMIT) throw new Error('请输入 1 至 64000 个字符的任务。');
     const id = randomUUID(), target = { provider, cwd: backend.state.cwd, threadId: backend.state.threadId ?? null };
     if (expected && draftKey(expected) !== draftKey(target)) throw new Error('项目或会话已切换，草稿未发送。');
     this.active.add(provider); this.bind(backend, provider);
@@ -112,7 +116,8 @@ export class SubmissionGuard extends EventEmitter {
     const record = this.snapshot(provider);
     if (record?.id !== id || !unresolvedSubmission(record) || !record.checkedAt) throw new Error('请先核查发送结果，再决定如何处理原稿。');
     if (this.active.has(provider) || backend.busy) throw new Error('请先停止当前任务。');
-    await this.update(provider, id, { status: 'released' });
-    return this.snapshot(provider);
+    const draft = await this.update(provider, id, { status: 'released' });
+    if (!draft) throw new Error('这次发送已处理，请刷新状态。');
+    return { ...this.snapshot(provider), draft };
   }
 }
