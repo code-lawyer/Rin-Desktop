@@ -25,7 +25,9 @@ export function trackedPackageInputs(root) {
 }
 
 export async function checkedSourcePath(root, name) {
-  const file = join(root, name);
+  // Windows can supply the checkout root as a DOS short path. Normalize the
+  // root once per lookup while still checking paths below it for redirects.
+  const file = join(await realpath(root), name);
   if (!(await lstat(file)).isFile() || relative(file, await realpath(file)) !== '') {
     throw new Error(`Source input must be an ordinary file without linked ancestors: ${name}`);
   }

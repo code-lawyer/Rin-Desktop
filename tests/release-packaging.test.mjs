@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, realpath, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { test } from 'node:test';
 import { inspectPackage, writeManifest } from '../tools/release/manifest.mjs';
-import { releaseGit, trackedPackageInputs } from '../tools/release/package-inputs.mjs';
+import { checkedSourcePath, releaseGit, trackedPackageInputs } from '../tools/release/package-inputs.mjs';
 import { captureSourceState, verifySourceState } from '../tools/release/source-state.mjs';
 
 async function fixture(t) {
@@ -27,6 +27,18 @@ test('portable packaging selects tracked runtime sources and excludes ignored an
   for (const name of [...files, 'backend/untracked.mjs', 'renderer/.env']) await put(prefix + name);
   releaseGit(directory, ['add', '-f', '--', ...files.map(name => prefix + name)]);
   assert.deepEqual(trackedPackageInputs(directory), ['backend/agent.mjs', 'renderer/index.html']);
+});
+
+test('source checks accept a canonical checkout root while rejecting links below that root', async t => {
+  const { directory, put } = await fixture(t);
+  const root = join(directory, 'checkout'), alias = join(directory, 'checkout-alias');
+  await put('checkout/backend/agent.mjs');
+  await put('external/foreign.mjs');
+  const linkType = process.platform === 'win32' ? 'junction' : 'dir';
+  await symlink(root, alias, linkType);
+  await symlink(join(directory, 'external'), join(root, 'linked'), linkType);
+  assert.equal(await checkedSourcePath(alias, 'backend/agent.mjs'), await realpath(join(root, 'backend/agent.mjs')));
+  await assert.rejects(checkedSourcePath(alias, 'linked/foreign.mjs'), /without linked ancestors/);
 });
 
 test('the package audit catches private files even when listed in a generated manifest', async t => {
