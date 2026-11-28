@@ -4,6 +4,25 @@ import { mkdtemp, mkdir, writeFile, readFile, rm, symlink, access } from 'node:f
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fillMissingAssets, sourceAvatarAsset } from '../tools/release/resource-assets.mjs';
+import { validateResourceLock } from '../tools/release/bootstrap-resources.mjs';
+
+test('an explicit resource lock pins one installer to its release and exact byte digest', async () => {
+  const lock = JSON.parse(await readFile(new URL('../tools/release/resource-manifest.json', import.meta.url), 'utf8'));
+  assert.deepEqual(validateResourceLock(lock), { version: lock.version, entry: lock.files[0] });
+  for (const change of [
+    value => { value.version = '../outside'; },
+    value => { value.files = []; },
+    value => { value.files[0].file = 'different.exe'; },
+    value => { value.files[0].url = value.files[0].url.replace(value.version, '0.1.0'); },
+    value => { value.files[0].sha256 = 'abcd'; },
+    value => { value.files[0].bytes = 0; },
+    value => { value.repository = 'example/other-project'; },
+  ]) {
+    const invalid = structuredClone(lock);
+    change(invalid);
+    assert.throws(() => validateResourceLock(invalid), /Invalid (?:resource lock|locked installer)/);
+  }
+});
 
 async function fixture(t){
   const root=await mkdtemp(join(tmpdir(),'rin-resource-assets-'));

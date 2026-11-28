@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, readFile, rm, access } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, readdir, rm, access, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { resolve, join } from 'node:path';
 import { execFile } from 'node:child_process';
@@ -37,6 +37,18 @@ test('QA output isolates each run and rejects existing/outside evidence paths', 
   const explicit = join(base, 'selected', 'new-run');
   assert.equal(await createRunDirectory('probe', explicit, base), explicit);
   await assert.rejects(createRunDirectory('../probe', null, base), /category/);
+});
+
+test('QA output refuses linked default categories and explicit output parents', async t => {
+  const fixture = await mkdtemp(join(tmpdir(), 'rin-qa-linked-output-'));
+  t.after(() => rm(fixture, { recursive: true, force: true }));
+  const base = join(fixture, 'qa'), outside = join(fixture, 'outside'), link = join(base, 'linked');
+  await mkdir(base);
+  await mkdir(outside);
+  await symlink(outside, link, process.platform === 'win32' ? 'junction' : 'dir');
+  await assert.rejects(createRunDirectory('linked', undefined, base), /parents must be ordinary directories/);
+  await assert.rejects(createRunDirectory('probe', join(link, 'nested', 'output'), base), /parents must be ordinary directories/);
+  await assert.deepEqual(await readdir(outside), []);
 });
 
 for (const script of ['codex-probe.mjs', 'codex-tui-probe.mjs']) {

@@ -134,6 +134,43 @@ test('case variants and a directory junction share one project and retain confli
   await reload.saveDraft(b, 'merged explicitly'); assert.equal(reload.draft(a), 'merged explicitly');
 });
 
+test('loading conflicting long legacy drafts keeps each editable and preserves its own dictation IDs', async t => {
+  const { root, store, target } = await fixture(t);
+  const alias = join(root, 'alias');
+  const project = join(root, 'project');
+  await fs.mkdir(project);
+  await fs.symlink(project, alias, process.platform === 'win32' ? 'junction' : 'dir');
+  await store.add(project);
+  const destination = { ...target, cwd: project };
+  const first = '甲'.repeat(40000), second = '乙'.repeat(40000);
+  await store.saveDraft(destination, first, 'first-recording');
+  const legacy = JSON.parse(await fs.readFile(store.file, 'utf8'));
+  legacy.drafts[`${alias}|saved`] = { text: second, dictationIds: ['second-recording'] };
+  const before = JSON.stringify(legacy);
+  await fs.writeFile(store.file, before);
+
+  const opened = new WorkspaceStore(join(store.file, '..'));
+  await opened.load();
+  assert.equal(await fs.readFile(store.file, 'utf8'), before);
+  const original = opened.draftSnapshot(destination);
+  assert.equal(original.text, first);
+  assert.deepEqual(original.dictationIds, ['first-recording']);
+  assert.equal(original.recoveries.length, 1);
+  const [{ id }] = original.recoveries;
+  await opened.saveDraft(destination, first + '补');
+  const recovered = await opened.swapRecoveredDraft(destination, id);
+  assert.equal(recovered.text, second);
+  assert.deepEqual(recovered.dictationIds, ['second-recording']);
+
+  const reopened = new WorkspaceStore(join(store.file, '..'));
+  await reopened.load();
+  await reopened.appendDictation(destination, '重复', 'second-recording');
+  assert.equal(reopened.draftSnapshot(destination).text, second);
+  const restored = await reopened.swapRecoveredDraft(destination, id);
+  assert.equal(restored.text, first + '补');
+  assert.deepEqual(restored.dictationIds, ['first-recording']);
+});
+
 test('a missing project below an existing junction keeps its canonical draft identity', async t => {
   const { root, store } = await fixture(t);
   const parent = join(root, 'canonical-parent'), alias = join(root, 'junction-parent');

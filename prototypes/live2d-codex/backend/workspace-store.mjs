@@ -32,11 +32,12 @@ export function validateWorkspace(saved) {
     if (!object(p) || typeof p.id !== 'string' || !p.id || ids.has(p.id) || typeof p.cwd !== 'string' || !p.cwd.trim()) throw new Error('项目记录无效。');
     ids.add(p.id);
   }
-  if (!object(saved.drafts ?? {})) throw new Error('草稿记录无效。');
-  for (const d of Object.values(saved.drafts ?? {})) if (!object(d) || typeof d.text !== 'string' || d.dictationIds !== undefined && (!Array.isArray(d.dictationIds) || d.dictationIds.some(id => typeof id !== 'string'))) throw new Error('草稿记录无效。');
+  const validDraft = draft => object(draft) && typeof draft.text === 'string' &&
+    (draft.dictationIds === undefined || Array.isArray(draft.dictationIds) && draft.dictationIds.every(id => typeof id === 'string'));
+  if (!object(saved.drafts ?? {}) || !Object.values(saved.drafts ?? {}).every(validDraft)) throw new Error('草稿记录无效。');
   if (!object(saved.recoveredDrafts ?? {})) throw new Error('保留草稿记录无效。');
   for (const drafts of Object.values(saved.recoveredDrafts ?? {})) {
-    if (!Array.isArray(drafts) || drafts.some(d => !object(d) || typeof d.id !== 'string' || typeof d.text !== 'string' || d.text.length > DRAFT_LIMIT) ||
+    if (!Array.isArray(drafts) || drafts.some(d => !validDraft(d) || typeof d.id !== 'string') ||
         new Set(drafts.map(d => d.id)).size !== drafts.length) throw new Error('保留草稿记录无效。');
   }
   if (!object(saved.submissions ?? {})) throw new Error('发送记录无效。');
@@ -67,16 +68,28 @@ function canonicalDraftKey(key) {
   catch { return key; }
 }
 
-function canonicalDrafts(drafts = {}) {
-  const result = {};
-  for (const [oldKey, draft] of Object.entries(drafts)) {
+function canonicalizeDrafts(data) {
+  const result = new Map();
+  for (const [oldKey, draft] of Object.entries(data.drafts ?? {})) {
     const key = canonicalDraftKey(oldKey);
-    const existing = result[key];
-    // Aliases may contain independently edited drafts. Show all distinct text
-    // instead of choosing a winner and silently discarding the other version.
-    result[key] = !existing ? draft : { ...existing, text: existing.text === draft.text ? draft.text : [existing.text, draft.text].filter(Boolean).join('\n\n'), dictationIds: [...new Set([...(existing.dictationIds ?? []), ...(draft.dictationIds ?? [])])] };
+    const existing = result.get(key);
+    if (!existing) { result.set(key, draft); continue; }
+    const text = existing.text === draft.text ? draft.text : [existing.text, draft.text].filter(Boolean).join('\n\n');
+    if (existing.text !== draft.text && existing.text && draft.text && text.length > DRAFT_LIMIT) {
+      // Keep both versions accessible without creating an unsavable draft.
+      const recovery = (data.recoveredDrafts ??= {})[key] ??= [];
+      recovery.push({ id: randomUUID(), text: draft.text, dictationIds: draft.dictationIds });
+    } else {
+      result.set(key, { ...existing, text, dictationIds: [...new Set([...(existing.dictationIds ?? []), ...(draft.dictationIds ?? [])])] });
+    }
   }
-  return result;
+  data.drafts = Object.fromEntries(result);
+}
+
+function projectDraftKey(data, target) {
+  const key = draftKey(target);
+  if (target.provider !== 'dots' && !data.projects.some(p => pathKey(p.cwd) === pathKey(target.cwd))) throw new Error('草稿的项目不存在。');
+  return key;
 }
 
 export class WorkspaceStore {
@@ -86,7 +99,7 @@ export class WorkspaceStore {
       const saved = await readJson(this.file, validateWorkspace, this.io);
       if (!saved) return this.snapshot();
       this.data = { ...defaults(), ...saved, settings: { ...defaults().settings, ...saved.settings, shortcuts: { ...DEFAULT_SHORTCUTS, ...saved.settings?.shortcuts }, remoteKeys: { ...DEFAULT_REMOTE_KEYS, ...saved.settings?.remoteKeys } } };
-      this.data.drafts = canonicalDrafts(saved.drafts);
+      canonicalizeDrafts(this.data);
       this.data.submissions ??= {};
       for (const submission of Object.values(this.data.submissions)) if (submission.status === 'pending') submission.status = 'unknown';
       this.data.settings.wallpaperKind = 'artwork';
@@ -172,14 +185,14 @@ export class WorkspaceStore {
   }
   swapRecoveredDraft(target, id) {
     return this.transaction(data => {
-      const key = draftKey(target), drafts = data.recoveredDrafts?.[key];
+      const key = projectDraftKey(data, target), drafts = data.recoveredDrafts?.[key];
       const index = drafts?.findIndex(draft => draft.id === id) ?? -1;
       if (index < 0) throw new Error('这份保留草稿已变更，请重新选择。');
-      const selected = drafts[index].text;
-      const current = data.drafts[key]?.text ?? '';
-      if (current.length > DRAFT_LIMIT) throw new Error('请先缩短当前输入，再切换保留草稿。');
-      this.setDraft(data, target, selected);
-      if (current && current !== selected) drafts[index].text = current;
+      const { text, dictationIds } = drafts[index], current = data.drafts[key];
+      // Some old stores already contain an oversized merged draft. Moving
+      // stored copies must preserve those bytes and their recognition IDs.
+      data.drafts[key] = { text, dictationIds, updatedAt: Date.now() };
+      if (current?.text && current.text !== text) drafts[index] = { id, text: current.text, dictationIds: current.dictationIds };
       else drafts.splice(index, 1);
       if (!drafts.length) delete data.recoveredDrafts[key];
       return this.draftSnapshot(target, data);
@@ -194,9 +207,8 @@ export class WorkspaceStore {
     });
   }
   setDraft(data, target, text, dictationId) {
-    const key = draftKey(target);
-    if (target.provider !== 'dots' && (typeof target.cwd !== 'string' || !data.projects.some(p => pathKey(p.cwd) === pathKey(target.cwd)))) throw new Error('草稿的项目不存在。');
-    if (typeof text !== 'string' || text.length > DRAFT_LIMIT || (target.threadId !== null && target.threadId !== undefined && (typeof target.threadId !== 'string' || target.threadId.length > 200))) throw new Error('草稿内容无效。');
+    const key = projectDraftKey(data, target);
+    if (typeof text !== 'string' || text.length > DRAFT_LIMIT) throw new Error('草稿内容无效。');
     const dictationIds=[...(data.drafts[key]?.dictationIds ?? []),...(dictationId?[dictationId]:[])].slice(-32);
     if (text) data.drafts[key] = { text, updatedAt: Date.now(), ...(dictationIds.length?{dictationIds}:{}) }; else delete data.drafts[key];
     // Unsent input is user data, not a bounded/reconstructible history cache.
