@@ -77,13 +77,23 @@ npm run resources
 
 这条命令按 `tools/release/resource-manifest.json` 下载基础安装包，校验 SHA-256 后以不注册安装项的方式解包到 `work/release-resources/版本号`。源码树缺失的运行时目录会连接到解包目录，壁纸资源递归补齐缺失文件，已有文件保留。补齐后校验动态媒体的大小与哈希。历史资源包若带有 Core，也可用于准备源码旧头像模式。
 
-当前清单锁定 0.6.3-rc.14 安装包，默认从保留的同版 Release 下载。若安装包已下载到当前目录，可以使用下列命令，仍须通过清单的大小和 SHA-256 校验。安装包提供锁定的视觉和基础运行资源。源码和 Electron 依赖由各自的构建步骤准备。
+清单的 `version` 指定基础安装包版本，默认从 GitHub 下载。已有同一份安装包时可以直接复用，仍须通过大小和 SHA-256 校验。源码和 Electron 依赖由各自的构建步骤准备。
 
 ```powershell
-npm run resources -- --installer="./Rin-Desktop-0.6.3-rc.14-Setup.exe"
+$resourceVersion = (Get-Content tools/release/resource-manifest.json -Raw | ConvertFrom-Json).version
+npm run resources -- "--installer=./Rin-Desktop-$resourceVersion-Setup.exe"
 ```
 
-资源清单指向可下载的 GitHub 安装器。发布标签指向包内 `source-state.json` 记录的构建提交。核对新附件的公开下载、大小和 SHA-256 后，在 `main` 的后续提交中更新资源清单。构建提交仍引用当时使用的基础安装包。若较早标签的资源链接已失效，可使用当前 `main` 的资源清单。清理旧 Release 前先用新清单验证资源恢复。
+发布标签指向包内 `source-state.json` 记录的构建提交，使用该提交记录的资源锁可复现当时的输入。发布后核验新附件的大小和 SHA-256，再在 `main` 更新资源锁。只保留最新 Release 时，标签内的旧锁仍可配合已归档的匹配安装包使用。若没有旧安装包，可在支持 `--manifest` 的标签检出目录中使用官方 `main` 的资源锁，无需改动标签源码：
+
+```powershell
+git fetch origin
+New-Item -ItemType Directory -Force work | Out-Null
+git show origin/main:tools/release/resource-manifest.json | Set-Content -Encoding utf8NoBOM work/current-resource-lock.json
+npm run resources -- --manifest=work/current-resource-lock.json
+```
+
+此方式仍须通过当前检出版本的真人视频校验。需要旧版特有的媒体时，请使用该版锁匹配的本地安装包。清理旧 Release 前，在干净的当前源码中验证新资源锁能恢复资源。
 
 准备好后，在仓库根目录运行：
 

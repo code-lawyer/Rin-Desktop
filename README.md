@@ -1,6 +1,6 @@
 # Rin Desktop
 
-> 0.6.3-rc.14 是供下载安装验收的预发布测试版。壁纸挂载失败时仍可使用托盘和对话。此版修复 RC003 搜索结束后的连接操作、设置保存失败后的回显、Agent 审批和草稿恢复，并加强了公开构建的文件与源码校验。验收范围见 [项目状态](docs/project-status.md)。
+> 0.6.3-rc.15 是供下载安装验收的预发布测试版。旧数据中因路径别名重复保存的长草稿会分别保留，可从气泡中的「已保留的草稿」逐份打开。验收范围见 [项目状态](docs/project-status.md)。
 
 当前版本提供「动漫女版」「动漫男版」和「真人视频」。两套动漫原画各有五种可选姿态，以及对话期间自动触发的独立思考姿态。真人使用本地两态视频。
 
@@ -10,7 +10,7 @@
 
 把 Codex 放到 Windows 桌面的雨夜动态壁纸中。用对话气泡发送任务，在工作台管理本地项目与对话，也可以按需启用中文听写、回复朗读和遥控器操作。
 
-**[下载 0.6.3-rc.14 测试版](https://github.com/code-lawyer/Rin-Desktop/releases/tag/v0.6.3-rc.14)** · [快捷键](#快捷键) · [常见问题](#常见问题)
+**[下载 0.6.3-rc.15 测试版](https://github.com/code-lawyer/Rin-Desktop/releases/tag/v0.6.3-rc.15)** · [快捷键](#快捷键) · [常见问题](#常见问题)
 
 测试版安装为 **Rin Desktop Test**，与稳定版程序及数据默认隔离。测试前请从托盘退出正在运行的 Rin；需要沿用项目和草稿时，先备份，再选择数据副本。不要让测试版和日用版共用正在打开的数据目录。测试版尚未签名，Windows 可能显示未知发布者；实机验收通过前不作为稳定版推荐。
 
@@ -75,8 +75,8 @@ codex login status
 
 ## 2. 安装并打开 Rin Desktop
 
-1. 打开 [当前应用版本](https://github.com/code-lawyer/Rin-Desktop/releases/tag/v0.6.3-rc.14)。
-2. 在 **Assets** 中下载 **`Rin-Desktop-0.6.3-rc.14-Setup.exe`**。普通用户只需下载这个文件，第三方源码 ZIP 供开发者使用。
+1. 打开 [当前应用版本](https://github.com/code-lawyer/Rin-Desktop/releases/tag/v0.6.3-rc.15)。
+2. 在 **Assets** 中下载 **`Rin-Desktop-0.6.3-rc.15-Setup.exe`**。普通用户只需下载这个文件，第三方源码 ZIP 供开发者使用。
 3. 从托盘退出正在运行的 Rin，再双击安装，按向导完成操作。
 4. 从 Windows 开始菜单打开 **Rin Desktop Test**，桌面会显示雨夜壁纸。
 5. 按 **Ctrl+Alt+空格** 呼出对话气泡。
@@ -203,10 +203,10 @@ Windows 桌面层未就绪时仍可使用托盘、对话和工作台。壁纸会
 - **打开**：从 Windows 开始菜单启动 Rin Desktop Test。运行后，点击任务栏右下角的托盘图标，或按 Ctrl+Alt+空格打开气泡；图标可能在「显示隐藏图标」中。
 - **收起窗口**：气泡或工作台右上角的 × 只收起窗口，壁纸和后台服务继续运行。
 - **完全退出**：右键托盘图标，选择「退出桌面伙伴」。应用会退出壁纸及其启动的后台进程，原 Windows 壁纸会重新显露。
-- **升级**：从 [当前应用版本](https://github.com/code-lawyer/Rin-Desktop/releases/tag/v0.6.3-rc.14) 下载新安装包并安装。候选版使用独立测试目录；需要旧数据时，先备份，再在测试版选择数据副本。升级和卸载保留个人数据；Codex CLI 由用户单独维护。
+- **升级**：从 [当前应用版本](https://github.com/code-lawyer/Rin-Desktop/releases/tag/v0.6.3-rc.15) 下载新安装包并安装。候选版使用独立测试目录；需要旧数据时，先备份，再在测试版选择数据副本。升级和卸载保留个人数据；Codex CLI 由用户单独维护。
 - **旧版迁移**：在「壁纸与设置 → 数据」点击「使用已有数据目录」，选择旧的 `workspaces.json` 所在文件夹，按提示重启，即可沿用项目入口、会话、草稿和设置。
 
-当前测试版数据默认保存在 `%LOCALAPPDATA%\VibeVoice\test-builds\v0.6.3-rc.14`；原正式版数据目录为 `%LOCALAPPDATA%\VibeVoice`。Codex 的登录和会话还由 CLI 在其用户目录中管理。项目文件保留在你选择的本地文件夹中，更多说明见 [隐私与数据](docs/privacy.md)。默认不开机自启。
+当前测试版数据默认保存在 `%LOCALAPPDATA%\VibeVoice\test-builds\v0.6.3-rc.15`；原正式版数据目录为 `%LOCALAPPDATA%\VibeVoice`。Codex 的登录和会话还由 CLI 在其用户目录中管理。项目文件保留在你选择的本地文件夹中，更多说明见 [隐私与数据](docs/privacy.md)。默认不开机自启。
 
 ## 常见问题
 
@@ -233,7 +233,7 @@ Windows 桌面层未就绪时仍可使用托盘、对话和工作台。壁纸会
 
 ### 获取第三方对应源码
 
-Rin Desktop 沿用 0.3.1 的第三方 CPU 语音组件与独立 worker，相关源码与安装器一起保存在[当前发布页](https://github.com/code-lawyer/Rin-Desktop/releases/tag/v0.6.3-rc.14)。需要检查、修改或重新编译这些组件时，下载 `Third-Party-Corresponding-Source-0.3.1.zip`。文件名中的 0.3.1 是这组组件的源码归档版本。包内 `README.md` 提供构建说明，`SOURCES.json` 记录依赖版本、上游地址和校验值。普通安装和使用无需下载这个源码包。
+Rin Desktop 沿用 0.3.1 的第三方 CPU 语音组件与独立 worker，相关源码与安装器一起保存在[当前发布页](https://github.com/code-lawyer/Rin-Desktop/releases/tag/v0.6.3-rc.15)。需要检查、修改或重新编译这些组件时，下载 `Third-Party-Corresponding-Source-0.3.1.zip`。文件名中的 0.3.1 是这组组件的源码归档版本。包内 `README.md` 提供构建说明，`SOURCES.json` 记录依赖版本、上游地址和校验值。普通安装和使用无需下载这个源码包。
 
 ### 项目许可
 
